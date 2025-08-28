@@ -545,8 +545,8 @@ export type TimeFrame = '1m' | '5m' | '15m' | '1h' | '4h' | '1d';
  */
 export interface CandleRequestParams {
   coin: string;          // 交易对符号 (API使用 coin 参数)
-  interval?: TimeFrame;  // 时间框架 (可选，API可能使用默认值)
-  limit?: number;        // 返回数据条数 (默认50，最大365)
+  interval: TimeFrame;   // 时间框架 (必需，告诉API返回哪个时间框架的数据)
+  limit?: number;        // 返回数据条数 (默认20，针对指定时间框架)
 }
 
 /**

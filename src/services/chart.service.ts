@@ -96,14 +96,13 @@ export class ChartService {
     logger.debug(`Fetching candle data from API for ${symbol} ${timeFrame} (requesting ${limit} candles)`);
     
     try {
-      // 始终请求最大历史数据 (365天) 以确保丰富的图表显示
-      // API已支持365天数据，充分利用这个能力
-      const requestLimit = 365; // 使用API最大支持的365天数据
+      // 请求特定时间框架的20根K线 - 让API后端处理时间框架过滤
+      const requestLimit = 20; // 始终请求20根指定时间框架的K线
       
       const requestParams: CandleRequestParams = {
-        coin: symbol,  // API 使用 coin 参数而不是 symbol
-        limit: requestLimit
-        // 移除 interval 参数 - 根据用户API测试，不包含interval时工作正常
+        coin: symbol,        // API 使用 coin 参数而不是 symbol
+        interval: timeFrame, // 关键：告诉API我们需要哪个时间框架的数据
+        limit: requestLimit  // 请求20根该时间框架的K线
       };
 
       logger.info(`🔍 API request details:`, { 
@@ -164,6 +163,7 @@ export class ChartService {
   private processRawCandleData(rawData: any[], symbol: string, timeFrame: TimeFrame, requestedLimit: number): FormattedCandleData {
     try {
       // 处理K线数据数组 - API返回的是缩写字段格式
+      // API已经按照指定时间框架返回数据，无需额外处理
       const candles: CandleData[] = rawData.map((item: any) => ({
         open: this.parseNumericValue(item.o),      // API字段: o = open
         high: this.parseNumericValue(item.h),      // API字段: h = high  
@@ -326,6 +326,8 @@ export class ChartService {
     // 所有时间框架都要求20根K线，保证图表质量一致
     return 20;
   }
+
+  // 移除复杂的聚合逻辑 - API后端现在处理不同时间框架的数据过滤
 
   /**
    * 验证时间框架是否支持
