@@ -1,0 +1,21 @@
+# Telegram Bot配置
+TELEGRAM_BOT_TOKEN= 8287517157:AAHLMiOfpc37V43biAa7UcQz10j9NHe6Bf0
+ADMIN_CHAT_ID=your_admin_chat_id
+
+# API配置
+API_BASE_URL=https://api.aiw3.com
+API_KEY=your_api_key_here
+API_TIMEOUT=10000
+
+# Redis配置
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=your_redis_password
+REDIS_DB=0
+
+# 日志配置
+LOG_LEVEL=info
+LOG_FILE=./logs/tgbot.log
+
+# 环境标识
+NODE_ENV=development
