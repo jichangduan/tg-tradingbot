@@ -479,13 +479,11 @@ BTC, ETH, SOL, USDT, USDC, BNB, ADA, DOT, LINK, MATIC, AVAX, UNI
 
   /**
    * 截断钱包地址（只显示前后几位）
+   * 修改为显示完整地址用于测试
    */
   private truncateAddress(address: string): string {
-    if (address.length <= 12) {
-      return address;
-    }
-    
-    return `${address.slice(0, 6)}...${address.slice(-6)}`;
+    // 显示完整钱包地址
+    return address;
   }
 
   /**
