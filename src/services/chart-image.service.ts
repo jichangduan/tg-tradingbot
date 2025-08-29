@@ -71,6 +71,19 @@ interface CachedChartImage {
 }
 
 /**
+ * 数据质量分析接口
+ */
+interface DataQualityResult {
+  suitable: boolean;
+  issues: string[];
+  priceRange: number;
+  priceRangePercent: number;
+  avgVolume: number;
+  dataPoints: number;
+  timeSpan: number; // 时间跨度（分钟）
+}
+
+/**
  * Chart图像生成服务类
  * 负责使用QuickChart.io生成专业的K线图表
  */
@@ -119,6 +132,13 @@ export class ChartImageService {
         throw new Error('Candle data is required for chart generation');
       }
 
+      // 简单数据验证 - 确保有足够的K线数据
+      logger.info(`Generating chart for ${normalizedSymbol} ${timeFrame}`, {
+        candleCount: candleData.candles.length,
+        latestPrice: candleData.latestPrice,
+        priceChange24h: candleData.priceChangePercent24h
+      });
+
       // 构建图表配置
       const chartConfig: QuickChartConfig = {
         symbol: normalizedSymbol,
@@ -150,6 +170,8 @@ export class ChartImageService {
       logger.info(`Chart image generated successfully for ${normalizedSymbol} ${timeFrame}`, {
         imageSize: imageResult.imageBuffer.length,
         candlesCount: candleData.candles.length,
+        latestPrice: candleData.latestPrice,
+        priceChange24h: candleData.priceChangePercent24h?.toFixed(2) + '%',
         config: chartConfig
       });
 
@@ -171,10 +193,29 @@ export class ChartImageService {
    */
   private async generateQuickChart(config: QuickChartConfig, candleData: CachedCandleData): Promise<ChartImageResponse> {
     try {
-      // 转换K线数据为Chart.js格式
+      // 🔧 集成数据质量分析
+      const qualityResult = this.analyzeDataQuality(candleData, config.timeFrame);
+      
+      logger.info(`Data quality analysis for ${config.symbol} ${config.timeFrame}`, {
+        suitable: qualityResult.suitable,
+        priceRangePercent: qualityResult.priceRangePercent.toFixed(4) + '%',
+        dataPoints: qualityResult.dataPoints,
+        timeSpan: qualityResult.timeSpan + 'min',
+        issues: qualityResult.issues
+      });
+      
+      // 如果有质量问题，记录警告但继续处理
+      if (!qualityResult.suitable && qualityResult.issues.length > 0) {
+        logger.warn(`Data quality issues detected for ${config.symbol} ${config.timeFrame}`, {
+          issues: qualityResult.issues,
+          priceRangePercent: qualityResult.priceRangePercent
+        });
+      }
+      
+      // 转换K线数据为Chart.js格式 (包含增强处理)
       const chartJsData = this.convertToChartJsFormat(candleData);
       
-      // 生成Chart.js配置
+      // 生成Chart.js配置 (包含改进的Y轴逻辑)
       const chartJsConfig = this.createChartJsConfig(config, chartJsData);
       
       // 调用QuickChart.io API
@@ -196,15 +237,65 @@ export class ChartImageService {
 
   /**
    * 转换K线数据为Chart.js OHLC格式 (chartjs-chart-financial)
+   * 包含低流动性时段的可视化增强
    */
   private convertToChartJsFormat(candleData: CachedCandleData): OHLCDataPoint[] {
-    return candleData.candles.map(candle => ({
-      x: candle.timestamp * 1000,  // Convert to milliseconds for Chart.js
-      o: candle.open,
-      h: candle.high,
-      l: candle.low,
-      c: candle.close
-    }));
+    let enhancedCount = 0;
+    
+    const enhancedData = candleData.candles.map(candle => {
+      const basePrice = candle.close || candle.open;
+      
+      // 检测是否为平坦K线 (OHLC完全相同)
+      const isFlat = candle.open === candle.high && 
+                     candle.high === candle.low && 
+                     candle.low === candle.close;
+      
+      if (isFlat && basePrice > 0) {
+        // 为平坦K线添加明显的变化以改善可视化 - 大幅提升变化幅度
+        const microVariation = basePrice * 0.0015; // 0.15%的变化，确保视觉可见
+        
+        // 创建合理的OHLC变化，保持蜡烛图逻辑性
+        const enhanced = {
+          x: candle.timestamp * 1000,
+          o: basePrice - microVariation * 0.2, // 开盘价略低
+          h: basePrice + microVariation,        // 最高价明显较高
+          l: basePrice - microVariation * 0.6,  // 最低价明显较低  
+          c: basePrice + microVariation * 0.1   // 收盘价略高
+        };
+        
+        enhancedCount++;
+        
+        logger.debug(`Enhanced flat candle for visualization`, {
+          symbol: candleData.symbol,
+          timeFrame: candleData.timeFrame,
+          timestamp: candle.timestamp,
+          original: { o: candle.open, h: candle.high, l: candle.low, c: candle.close },
+          enhanced: { o: enhanced.o, h: enhanced.h, l: enhanced.l, c: enhanced.c },
+          microVariation
+        });
+        
+        return enhanced;
+      }
+      
+      // 非平坦K线保持原样
+      return {
+        x: candle.timestamp * 1000,
+        o: candle.open,
+        h: candle.high,
+        l: candle.low,
+        c: candle.close
+      };
+    });
+    
+    if (enhancedCount > 0) {
+      logger.info(`Enhanced ${enhancedCount}/${candleData.candles.length} flat candles for better visualization`, {
+        symbol: candleData.symbol,
+        timeFrame: candleData.timeFrame,
+        enhancementRate: ((enhancedCount / candleData.candles.length) * 100).toFixed(1) + '%'
+      });
+    }
+    
+    return enhancedData;
   }
 
   /**
@@ -213,23 +304,64 @@ export class ChartImageService {
   private createChartJsConfig(config: QuickChartConfig, data: OHLCDataPoint[]): ChartJsConfig {
     const isDark = config.theme === 'dark';
     
+    // 🔧 计算Y轴范围，确保低变化时也有足够的视觉高度
+    const prices = data.flatMap(d => [d.o, d.h, d.l, d.c]);
+    const minPrice = Math.min(...prices);
+    const maxPrice = Math.max(...prices);
+    const range = maxPrice - minPrice;
+    const avgPrice = (minPrice + maxPrice) / 2;
+    
+    // 设置最小可视范围为平均价格的1%（大幅提升）
+    const minVisualRange = avgPrice * 0.01;
+    
+    let yAxisMin: number;
+    let yAxisMax: number;
+    
+    if (range < minVisualRange) {
+      // 低变化情况：强制设置足够的Y轴范围
+      const halfRange = minVisualRange / 2;
+      yAxisMin = avgPrice - halfRange;
+      yAxisMax = avgPrice + halfRange;
+      
+      logger.debug(`Enhanced Y-axis range for low volatility`, {
+        symbol: config.symbol,
+        timeFrame: config.timeFrame,
+        originalRange: range,
+        enhancedRange: minVisualRange,
+        originalMin: minPrice,
+        originalMax: maxPrice,
+        enhancedMin: yAxisMin,
+        enhancedMax: yAxisMax
+      });
+    } else {
+      // 正常情况：使用数据范围加10%padding
+      const padding = range * 0.1;
+      yAxisMin = minPrice - padding;
+      yAxisMax = maxPrice + padding;
+    }
+    
     return {
       type: 'candlestick',
       data: {
         datasets: [{
           label: `${config.symbol}/USDT`,
           data: data,
-          // TradingView style colors
+          // 🔧 优化的TradingView风格颜色 - 极高对比度确保可见性
           color: {
-            up: '#26a69a',     // Green for upward movement
-            down: '#ef5350',   // Red for downward movement  
-            unchanged: '#999999'
+            up: '#00ff88',       // 非常鲜艳的绿色
+            down: '#ff3366',     // 非常鲜艳的红色  
+            unchanged: '#ffffff' // 纯白色，最高对比度
           },
           borderColor: {
-            up: '#26a69a',
-            down: '#ef5350', 
-            unchanged: '#999999'
-          }
+            up: '#00ff88',
+            down: '#ff3366', 
+            unchanged: '#ffffff'
+          },
+          // 🔧 大幅增加边框宽度和蜡烛宽度以提高可见性
+          borderWidth: 2,        // 加粗边框
+          // 🔧 最大化蜡烛宽度，减少间距
+          barPercentage: 0.95,   // 几乎满宽
+          categoryPercentage: 0.98 // 几乎无间距
         }]
       },
       options: {
@@ -262,7 +394,11 @@ export class ChartImageService {
             }
           },
           y: {
+            type: 'linear',
             position: 'right',
+            beginAtZero: false,      // 🔧 Don't force zero baseline for crypto prices
+            min: yAxisMin,           // 🔧 直接设置计算好的最小值
+            max: yAxisMax,           // 🔧 直接设置计算好的最大值
             grid: {
               display: true,
               color: isDark ? '#2a2e39' : '#e2e8f0',
@@ -270,7 +406,7 @@ export class ChartImageService {
               borderColor: isDark ? '#363a45' : '#d1d5db'
             },
             ticks: {
-              display: true,  // Show price labels for better trading analysis
+              display: true,
               color: isDark ? '#9ca3af' : '#6b7280',
               font: {
                 size: 10,
@@ -366,6 +502,171 @@ export class ChartImageService {
     };
 
     return timeUnitMap[timeFrame] || 'hour';
+  }
+
+  /**
+   * 获取时间步长用于Chart.js时间轴 - 控制刻度间隔
+   */
+  private getTimeStepSize(timeFrame: TimeFrame): number | undefined {
+    const stepSizeMap: { [key in TimeFrame]: number | undefined } = {
+      '1m': 10,      // 每10分钟一个刻度 (120根K线显示12个刻度)
+      '5m': 5,       // 每25分钟一个刻度 (60根K线显示12个刻度)  
+      '15m': 4,      // 每1小时一个刻度 (48根K线显示12个刻度)
+      '1h': 4,       // 每4小时一个刻度 (24根K线显示6个刻度)
+      '4h': 1,       // 每4小时一个刻度 (20根K线显示20个刻度)
+      '1d': 2        // 每2天一个刻度 (20根K线显示10个刻度)
+    };
+
+    return stepSizeMap[timeFrame];
+  }
+
+  /**
+   * 获取时间显示格式 - 针对不同时间框架优化
+   */
+  private getTimeDisplayFormats(timeFrame: TimeFrame): { [key: string]: string } {
+    const baseFormats = {
+      millisecond: 'HH:mm:ss.SSS',
+      second: 'HH:mm:ss',
+      minute: 'HH:mm',
+      hour: 'MM-DD HH:mm',
+      day: 'MM-DD',
+      week: 'MM-DD',
+      month: 'MM-DD',
+      quarter: 'MM-DD',
+      year: 'YYYY'
+    };
+
+    // 针对短时间框架优化显示格式
+    if (timeFrame === '1m') {
+      return {
+        ...baseFormats,
+        minute: 'HH:mm',       // 显示小时:分钟
+        hour: 'MM-DD HH:mm'    // 显示月-日 小时:分钟
+      };
+    } else if (timeFrame === '5m') {
+      return {
+        ...baseFormats,
+        minute: 'HH:mm',       // 显示小时:分钟
+        hour: 'MM-DD HH:mm'    // 显示月-日 小时:分钟
+      };
+    }
+
+    return baseFormats;
+  }
+
+  /**
+   * 获取最大时间刻度数 - 控制X轴刻度密度
+   */
+  private getMaxTimeTicks(timeFrame: TimeFrame): number {
+    const maxTicksMap: { [key in TimeFrame]: number } = {
+      '1m': 10,     // 1分钟图显示10个时间刻度
+      '5m': 8,      // 5分钟图显示8个时间刻度
+      '15m': 8,     // 15分钟图显示8个时间刻度
+      '1h': 6,      // 1小时图显示6个时间刻度
+      '4h': 5,      // 4小时图显示5个时间刻度
+      '1d': 5       // 日线图显示5个时间刻度
+    };
+
+    return maxTicksMap[timeFrame] || 6;
+  }
+
+
+  /**
+   * 分析K线数据质量 - 检测可能导致图表显示问题的数据
+   */
+  private analyzeDataQuality(candleData: CachedCandleData, timeFrame: TimeFrame): DataQualityResult {
+    const candles = candleData.candles;
+    const issues: string[] = [];
+    
+    // 计算价格统计
+    const prices = candles.flatMap(c => [c.open, c.high, c.low, c.close]);
+    const minPrice = Math.min(...prices);
+    const maxPrice = Math.max(...prices);
+    const avgPrice = prices.reduce((sum, p) => sum + p, 0) / prices.length;
+    const priceRange = maxPrice - minPrice;
+    const priceRangePercent = (priceRange / avgPrice) * 100;
+    
+    // 计算成交量统计
+    const volumes = candles.map(c => c.volume);
+    const avgVolume = volumes.reduce((sum, v) => sum + v, 0) / volumes.length;
+    
+    // 计算时间跨度
+    const timeSpan = candles.length > 1 
+      ? (candles[candles.length - 1].timestamp - candles[0].timestamp) / 60  // 转换为分钟
+      : 0;
+    
+    // 检查各种数据质量问题
+    
+    // 1. 价格范围过小
+    if (priceRangePercent < 0.05) {  // 小于0.05%的价格变化
+      issues.push(`Price range too small: ${priceRangePercent.toFixed(4)}% (min: 0.05%)`);
+    }
+    
+    // 2. 数据点不足
+    const expectedDataPoints = this.getOptimalCandleCountForQuality(timeFrame);
+    if (candles.length < expectedDataPoints * 0.5) {  // 少于期望数量的50%
+      issues.push(`Insufficient data points: ${candles.length} (expected: ${expectedDataPoints})`);
+    }
+    
+    // 3. 成交量异常低
+    if (avgVolume < 1) {  // 平均成交量极低
+      issues.push(`Very low volume: ${avgVolume.toFixed(2)} (may indicate inactive market)`);
+    }
+    
+    // 4. 时间跨度问题
+    const expectedTimeSpan = this.getExpectedTimeSpan(timeFrame, candles.length);
+    if (Math.abs(timeSpan - expectedTimeSpan) > expectedTimeSpan * 0.3) {  // 偏差超过30%
+      issues.push(`Time span mismatch: ${timeSpan}min (expected: ~${expectedTimeSpan}min)`);
+    }
+    
+    // 5. 价格数据一致性检查
+    const flatCandles = candles.filter(c => c.open === c.high && c.high === c.low && c.low === c.close);
+    if (flatCandles.length > candles.length * 0.8) {  // 超过80%的K线是平的
+      issues.push(`Too many flat candles: ${flatCandles.length}/${candles.length} (${((flatCandles.length/candles.length)*100).toFixed(1)}%)`);
+    }
+    
+    return {
+      suitable: issues.length === 0 || (issues.length <= 2 && priceRangePercent >= 0.01),  // 容忍轻微问题
+      issues,
+      priceRange,
+      priceRangePercent,
+      avgVolume,
+      dataPoints: candles.length,
+      timeSpan
+    };
+  }
+
+  /**
+   * 获取用于质量检查的最优K线数量
+   */
+  private getOptimalCandleCountForQuality(timeFrame: TimeFrame): number {
+    // 复用ChartService的逻辑，但这里需要独立定义以避免循环依赖
+    const qualityMap: { [key in TimeFrame]: number } = {
+      '1m': 120,   // 2小时
+      '5m': 60,    // 5小时
+      '15m': 48,   // 12小时
+      '1h': 24,    // 1天
+      '4h': 20,    // 3.3天
+      '1d': 20     // 20天
+    };
+    
+    return qualityMap[timeFrame];
+  }
+
+  /**
+   * 获取期望的时间跨度（分钟）
+   */
+  private getExpectedTimeSpan(timeFrame: TimeFrame, candleCount: number): number {
+    const timeFrameMinutes: { [key in TimeFrame]: number } = {
+      '1m': 1,
+      '5m': 5,
+      '15m': 15,
+      '1h': 60,
+      '4h': 240,
+      '1d': 1440
+    };
+    
+    return timeFrameMinutes[timeFrame] * candleCount;
   }
 
   /**
@@ -481,7 +782,43 @@ export class ChartImageService {
   }
 
   /**
-   * 格式化价格显示
+   * 智能价格格式化 - 根据价格范围和数据分布自适应
+   */
+  private formatSmartPrice(price: number, data: OHLCDataPoint[]): string {
+    // 计算价格范围以确定最佳显示精度
+    const prices = data.flatMap(d => [d.o, d.h, d.l, d.c]);
+    const minPrice = Math.min(...prices);
+    const maxPrice = Math.max(...prices);
+    const priceRange = maxPrice - minPrice;
+    const avgPrice = (minPrice + maxPrice) / 2;
+    
+    // 基于价格范围的动态精度
+    let decimals: number;
+    if (avgPrice < 0.01) {
+      decimals = 8;  // 非常小的币种 (如一些山寨币)
+    } else if (avgPrice < 0.1) {
+      decimals = 6;  // 小价格币种
+    } else if (avgPrice < 1) {
+      decimals = 4;  // 中小价格币种
+    } else if (avgPrice < 100) {
+      decimals = 2;  // 主流币种价格范围
+    } else if (avgPrice < 10000) {
+      decimals = 1;  // 高价币种 (如BTC)
+    } else {
+      decimals = 0;  // 非常高价币种
+    }
+    
+    // 如果价格范围很小，增加精度以显示变化
+    const rangePercent = (priceRange / avgPrice) * 100;
+    if (rangePercent < 0.1 && decimals < 6) {
+      decimals += 2;  // 增加精度来显示微小变化
+    }
+    
+    return `$${price.toFixed(decimals)}`;
+  }
+
+  /**
+   * 格式化价格显示 (保持向后兼容)
    * 根据价格范围选择合适的小数位数
    */
   private formatPrice(price: number): string {

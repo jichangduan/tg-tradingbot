@@ -86,7 +86,7 @@ export class ChartService {
   }
 
   /**
-   * 从API获取K线数据 - 确保获取足够数据以返回精确的candle数量
+   * 从API获取K线数据 - 根据时间框架动态调整K线数量
    */
   private async fetchCandleDataFromApi(
     symbol: string, 
@@ -96,8 +96,8 @@ export class ChartService {
     logger.debug(`Fetching candle data from API for ${symbol} ${timeFrame} (requesting ${limit} candles)`);
     
     try {
-      // 请求特定时间框架的20根K线 - 让API后端处理时间框架过滤
-      const requestLimit = 20; // 始终请求20根指定时间框架的K线
+      // 始终请求20根K线 - 简洁明了的图表显示
+      const requestLimit = 20;
       
       const requestParams: CandleRequestParams = {
         coin: symbol,        // API 使用 coin 参数而不是 symbol
@@ -164,14 +164,24 @@ export class ChartService {
     try {
       // 处理K线数据数组 - API返回的是缩写字段格式
       // API已经按照指定时间框架返回数据，无需额外处理
-      const candles: CandleData[] = rawData.map((item: any) => ({
-        open: this.parseNumericValue(item.o),      // API字段: o = open
-        high: this.parseNumericValue(item.h),      // API字段: h = high  
-        low: this.parseNumericValue(item.l),       // API字段: l = low
-        close: this.parseNumericValue(item.c),     // API字段: c = close
-        volume: this.parseNumericValue(item.v),    // API字段: v = volume
-        timestamp: this.parseTimestamp(item.t)     // API字段: t = open time
-      }));
+      const candles: CandleData[] = rawData.map((item: any) => {
+        const candleData = {
+          open: this.parseNumericValue(item.o),      // API字段: o = open
+          high: this.parseNumericValue(item.h),      // API字段: h = high  
+          low: this.parseNumericValue(item.l),       // API字段: l = low
+          close: this.parseNumericValue(item.c),     // API字段: c = close
+          volume: this.parseNumericValue(item.v),    // API字段: v = volume
+          timestamp: this.parseTimestamp(item.t)     // API字段: t = open time
+        };
+        
+        // 调试日志：检查解析后的数据
+        logger.debug(`Parsed candle data for ${symbol} ${timeFrame}:`, {
+          raw: item,
+          parsed: candleData
+        });
+        
+        return candleData;
+      });
 
       // 验证K线数据
       if (candles.length === 0) {
@@ -181,21 +191,21 @@ export class ChartService {
       // 按时间戳排序 (升序) - 确保最新数据在末尾
       candles.sort((a, b) => a.timestamp - b.timestamp);
 
-      // 始终尝试返回20根K线，但根据可用数据调整
-      const targetCandles = 20; // 固定目标：20根K线
+      // 始终返回20根最新的K线
+      const targetCandles = 20;
       
       let finalCandles: CandleData[];
       
       if (candles.length === 0) {
         throw new Error(`No candle data available for ${symbol} ${timeFrame}`);
       } else if (candles.length >= targetCandles) {
-        // 数据充足，返回最近的20根K线
+        // 返回最近的20根K线
         finalCandles = candles.slice(-targetCandles);
-        logger.info(`Using ${targetCandles} candles for ${symbol} ${timeFrame} (${candles.length} available)`);
+        logger.info(`Using ${targetCandles} recent candles for ${symbol} ${timeFrame} (${candles.length} available)`);
       } else {
-        // 数据不足，使用所有可用数据
+        // 数据不足20根，使用所有可用数据
         finalCandles = candles;
-        logger.warn(`Limited data for ${symbol} ${timeFrame}: using ${candles.length} candles instead of ${targetCandles}`);
+        logger.warn(`Only ${candles.length} candles available for ${symbol} ${timeFrame} (target: ${targetCandles})`);
       }
       
       logger.debug(`Candle data processing: received ${candles.length}, returning ${finalCandles.length} (requested: ${requestedLimit})`);
