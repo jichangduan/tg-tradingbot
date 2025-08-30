@@ -5,6 +5,7 @@ import { logger } from '../../utils/logger';
 import { DetailedError } from '../../types/api.types';
 import { ExtendedContext } from '../index';
 import { UserInitRequest, UserInitData } from '../../types/api.types';
+import { cacheService } from '../../services/cache.service';
 
 /**
  * Start命令处理器
@@ -96,6 +97,9 @@ export class StartHandler {
       // 调用用户服务初始化
       const userData = await userService.initializeUser(initRequest);
 
+      // 缓存用户的accessToken
+      await this.cacheUserAccessToken(user.id, userData.accessToken, requestId);
+
       // 发送初始化完成消息
       await this.sendInitializationSuccessMessage(ctx, userData);
 
@@ -103,6 +107,7 @@ export class StartHandler {
         userId: userData.userId,
         walletAddress: userData.walletAddress,
         isNewUser: userData.isNewUser,
+        tokenCached: true,
         requestId
       });
 
@@ -291,6 +296,44 @@ export class StartHandler {
   }
 
   /**
+   * 缓存用户的accessToken到Redis
+   */
+  private async cacheUserAccessToken(
+    telegramId: number,
+    accessToken: string,
+    requestId: string
+  ): Promise<void> {
+    try {
+      const tokenKey = `user:token:${telegramId}`;
+      const tokenTTL = 24 * 60 * 60; // 24小时过期
+      
+      const result = await cacheService.set(tokenKey, accessToken, tokenTTL);
+      
+      if (result.success) {
+        logger.info(`AccessToken cached successfully [${requestId}]`, {
+          telegramId,
+          tokenKey,
+          expiresIn: tokenTTL,
+          requestId
+        });
+      } else {
+        logger.warn(`Failed to cache accessToken [${requestId}]`, {
+          telegramId,
+          tokenKey,
+          error: result.error,
+          requestId
+        });
+      }
+    } catch (error) {
+      logger.error(`Error caching accessToken [${requestId}]`, {
+        telegramId,
+        error: (error as Error).message,
+        requestId
+      });
+    }
+  }
+
+  /**
    * 获取处理器统计信息
    */
   public getStats(): any {
@@ -303,6 +346,7 @@ export class StartHandler {
         'Invitation code processing',
         'Automatic wallet creation',
         'Background processing',
+        'AccessToken caching',
         'Comprehensive error handling'
       ]
     };

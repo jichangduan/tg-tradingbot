@@ -3,6 +3,7 @@ import { apiService } from '../../services/api.service';
 import { tokenService } from '../../services/token.service';
 import { getUserAccessToken } from '../../utils/auth';
 import { logger } from '../../utils/logger';
+import { handleTradingError } from '../../utils/error-handler';
 import { ExtendedContext } from '../index';
 
 /**
@@ -101,110 +102,20 @@ export class LongHandler {
         });
 
       } catch (apiError: any) {
-        // 处理API错误
-        let errorMessage = '❌ <b>交易请求失败</b>\n\n';
-        
-        if (apiError.status === 400) {
-          const responseMessage = apiError.response?.message || '';
-          
-          if (responseMessage.includes('Hyperliquid API returned null')) {
-            errorMessage += '🚫 <b>交易执行失败</b>\n\n';
-            errorMessage += '💡 <b>可能的原因:</b>\n';
-            errorMessage += '• 💰 账户余额不足（无法支付保证金）\n';
-            errorMessage += '• 🔒 账户未激活或被限制\n';
-            errorMessage += '• 📈 市场流动性不足\n';
-            errorMessage += '• ⚙️ 交易参数超出限制\n\n';
-            errorMessage += '🔍 <b>建议操作:</b>\n';
-            errorMessage += '• 检查 <code>/wallet</code> 余额是否足够\n';
-            errorMessage += '• 降低杠杆倍数或交易金额\n';
-            errorMessage += '• 稍后重试或联系管理员';
-          } else if (responseMessage.includes('Invalid symbol') || responseMessage.includes('symbol')) {
-            errorMessage += '🚫 <b>代币符号错误</b>\n\n';
-            errorMessage += `输入的代币: <code>${symbol.toUpperCase()}</code>\n\n`;
-            errorMessage += '💡 <b>支持的代币:</b>\n';
-            errorMessage += '• 主流币: BTC, ETH, SOL, BNB\n';
-            errorMessage += '• 稳定币: USDT, USDC\n';
-            errorMessage += '• 其他: 请联系管理员确认\n\n';
-            errorMessage += '🔍 <b>请检查代币符号是否正确</b>';
-          } else if (responseMessage.includes('leverage') || responseMessage.includes('杠杆')) {
-            errorMessage += '🚫 <b>杠杆倍数无效</b>\n\n';
-            errorMessage += `输入的杠杆: <code>${leverageStr}</code>\n\n`;
-            errorMessage += '💡 <b>有效杠杆范围:</b>\n';
-            errorMessage += '• 1x - 50x （具体取决于代币）\n';
-            errorMessage += '• 格式: 1x, 2x, 5x, 10x, 20x 等\n\n';
-            errorMessage += '🔍 <b>请使用正确的杠杆格式</b>';
-          } else if (responseMessage.includes('amount') || responseMessage.includes('金额')) {
-            errorMessage += '🚫 <b>交易金额无效</b>\n\n';
-            errorMessage += `输入的金额: <code>${amountStr}</code>\n\n`;
-            errorMessage += '💡 <b>金额要求:</b>\n';
-            errorMessage += '• 必须为正数\n';
-            errorMessage += '• 最小交易金额: 取决于代币\n';
-            errorMessage += '• 不能超过账户余额\n\n';
-            errorMessage += '🔍 <b>请检查金额是否正确</b>';
-          } else {
-            errorMessage += `错误详情: ${responseMessage}\n\n`;
-            errorMessage += '💡 <b>常见原因:</b>\n';
-            errorMessage += '• 💰 账户余额不足\n';
-            errorMessage += '• 📊 代币符号不支持\n';
-            errorMessage += '• ⚙️ 杠杆或金额参数错误\n';
-            errorMessage += '• 🌐 网络连接问题\n\n';
-            errorMessage += '🔍 <b>建议:</b> 检查参数并重试';
-          }
-        } else if (apiError.status === 403) {
-          errorMessage += '🔐 <b>认证失败</b>\n\n';
-          errorMessage += '您的账户认证出现问题，请重新尝试。\n\n';
-          errorMessage += '<i>如果问题持续存在，请联系管理员</i>';
-        } else if (apiError.status === 500) {
-          errorMessage += '🔧 <b>服务器内部错误</b>\n\n';
-          errorMessage += 'Hyperliquid交易系统暂时不可用，请稍后重试。\n\n';
-          errorMessage += '<i>如果问题持续存在，请联系技术支持</i>';
-        } else {
-          errorMessage += `🚫 ${apiError.message || '服务暂时不可用'}\n\n`;
-          errorMessage += '<i>这可能是后端API集成问题，请联系技术支持</i>';
-        }
-
-        await ctx.telegram.editMessageText(
-          ctx.chat?.id,
-          loadingMessage.message_id,
-          undefined,
-          errorMessage,
-          { parse_mode: 'HTML' }
+        // 使用统一错误处理系统
+        await handleTradingError(
+          ctx, 
+          apiError, 
+          'long', 
+          symbol, 
+          `${leverageStr} ${amountStr}`, 
+          loadingMessage.message_id
         );
-
-        logger.error(`Long trade failed [${requestId}]`, {
-          error: apiError.message,
-          status: apiError.status,
-          response: apiError.response,
-          symbol,
-          leverage: leverageStr,
-          amount: amountStr,
-          userId,
-          requestId
-        });
       }
 
     } catch (error) {
-      const duration = Date.now() - startTime;
-      logger.error(`Long command failed [${requestId}]`, {
-        error: (error as Error).message,
-        stack: (error as Error).stack,
-        duration,
-        userId,
-        username,
-        args,
-        requestId
-      });
-
-      await ctx.reply(
-        '❌ <b>系统错误</b>\n\n' +
-        '很抱歉，处理您的交易请求时出现了意外错误。\n\n' +
-        '💡 <b>请尝试:</b>\n' +
-        '• 稍后重试\n' +
-        '• 检查命令格式是否正确\n' +
-        '• 联系管理员获取帮助\n\n' +
-        '<i>错误已记录，技术团队会尽快处理</i>',
-        { parse_mode: 'HTML' }
-      );
+      // 使用统一错误处理处理系统异常
+      await handleTradingError(ctx, error, 'long', args[0], `${args[1]} ${args[2]}`);
     }
   }
 

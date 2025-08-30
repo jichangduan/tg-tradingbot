@@ -8,6 +8,8 @@ import { pointsHandler } from './points.handler';
 import { chartHandler } from './chart.handler';
 import { longHandler } from './long.handler';
 import { shortHandler } from './short.handler';
+import { closeHandler } from './close.handler';
+import { positionsHandler } from './positions.handler';
 import { logger } from '../../utils/logger';
 import { ExtendedContext } from '../index';
 
@@ -120,7 +122,9 @@ export function registerCommands(bot: Telegraf<ExtendedContext>): void {
 <b>📈 交易命令:</b>
 <code>/long &lt;代币&gt; &lt;杠杆&gt; &lt;金额&gt;</code> - 做多交易
 <code>/short &lt;代币&gt; &lt;杠杆&gt; &lt;金额&gt;</code> - 做空交易
-例如: <code>/long BTC 10x 200</code>, <code>/short ETH 5x 100</code>
+<code>/close &lt;代币&gt; [数量]</code> - 平仓操作
+<code>/positions</code> - 查看所有持仓情况
+例如: <code>/long BTC 10x 200</code>, <code>/short ETH 5x 100</code>, <code>/close BTC 50%</code>
 
 <b>💰 账户管理:</b>
 <code>/wallet</code> - 查看钱包余额
@@ -204,6 +208,18 @@ export function registerCommands(bot: Telegraf<ExtendedContext>): void {
     createCommandWrapper('short', shortHandler.handle.bind(shortHandler))
   );
 
+  // /close 命令 - 平仓操作
+  bot.command(
+    'close', 
+    createCommandWrapper('close', closeHandler.handle.bind(closeHandler))
+  );
+
+  // /positions 命令 - 仓位查询
+  bot.command(
+    'positions', 
+    createCommandWrapper('positions', positionsHandler.handle.bind(positionsHandler))
+  );
+
   // /status 命令 - 系统状态
   bot.command('status', async (ctx) => {
     logger.info('Status command received', {
@@ -273,6 +289,12 @@ export function registerCommands(bot: Telegraf<ExtendedContext>): void {
 <code>/price BTC</code> - 查询比特币价格
 <code>/chart BTC</code> - K线图表分析
 <code>/markets</code> - 查看市场行情
+
+<b>📈 交易操作:</b>
+<code>/long BTC 10x 200</code> - 做多交易
+<code>/short ETH 5x 100</code> - 做空交易
+<code>/close BTC 50%</code> - 平仓操作
+<code>/positions</code> - 查看持仓情况
 
 <b>💰 账户管理:</b>
 <code>/wallet</code> - 查看钱包余额
@@ -382,6 +404,8 @@ export function getRegisteredCommands(): Array<{ command: string; description: s
     { command: '/chart <symbol> [timeframe]', description: 'K线图表分析' },
     { command: '/long <symbol> <leverage> <amount>', description: '做多交易' },
     { command: '/short <symbol> <leverage> <amount>', description: '做空交易' },
+    { command: '/close <symbol> [amount]', description: '平仓操作' },
+    { command: '/positions', description: '查看所有持仓情况' },
     { command: '/markets', description: '查看市场行情' },
     { command: '/wallet', description: '查看钱包余额' },
     { command: '/invite', description: '查看邀请统计和积分' },
@@ -400,6 +424,7 @@ export async function setBotCommands(bot: Telegraf<ExtendedContext>): Promise<vo
       { command: 'help', description: '📚 帮助信息' },
       { command: 'price', description: '💰 查询价格' },
       { command: 'chart', description: '📊 K线图表' },
+      { command: 'positions', description: '📊 查看持仓' },
       { command: 'markets', description: '📈 市场行情' },
       { command: 'wallet', description: '💰 钱包余额' },
       { command: 'invite', description: '🎁 邀请统计' },
