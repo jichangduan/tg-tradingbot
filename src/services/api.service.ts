@@ -195,6 +195,22 @@ export class ApiService {
   }
 
   /**
+   * 带认证的POST请求方法
+   */
+  public async postWithAuth<T>(url: string, accessToken: string, data?: any, config?: ApiRequestConfig): Promise<T> {
+    return this.request<T>({
+      method: 'POST',
+      url,
+      data,
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        ...config?.headers
+      },
+      ...config
+    });
+  }
+
+  /**
    * PUT请求的便捷方法
    */
   public async put<T>(url: string, data?: any, config?: ApiRequestConfig): Promise<T> {

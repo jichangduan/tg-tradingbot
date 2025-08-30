@@ -6,6 +6,8 @@ import { walletHandler } from './wallet.handler';
 import { inviteHandler } from './invite.handler';
 import { pointsHandler } from './points.handler';
 import { chartHandler } from './chart.handler';
+import { longHandler } from './long.handler';
+import { shortHandler } from './short.handler';
 import { logger } from '../../utils/logger';
 import { ExtendedContext } from '../index';
 
@@ -115,6 +117,11 @@ export function registerCommands(bot: Telegraf<ExtendedContext>): void {
 <code>/chart &lt;交易对&gt; [时间]</code> - K线图表分析
 例如: <code>/chart BTC</code>, <code>/chart ETH 1d</code>
 
+<b>📈 交易命令:</b>
+<code>/long &lt;代币&gt; &lt;杠杆&gt; &lt;金额&gt;</code> - 做多交易
+<code>/short &lt;代币&gt; &lt;杠杆&gt; &lt;金额&gt;</code> - 做空交易
+例如: <code>/long BTC 10x 200</code>, <code>/short ETH 5x 100</code>
+
 <b>💰 账户管理:</b>
 <code>/wallet</code> - 查看钱包余额
 <code>/invite</code> - 查看邀请统计和积分
@@ -183,6 +190,18 @@ export function registerCommands(bot: Telegraf<ExtendedContext>): void {
   bot.command(
     'points', 
     createCommandWrapper('points', pointsHandler.handle.bind(pointsHandler))
+  );
+
+  // /long 命令 - 做多交易
+  bot.command(
+    'long', 
+    createCommandWrapper('long', longHandler.handle.bind(longHandler))
+  );
+
+  // /short 命令 - 做空交易
+  bot.command(
+    'short', 
+    createCommandWrapper('short', shortHandler.handle.bind(shortHandler))
   );
 
   // /status 命令 - 系统状态
@@ -361,6 +380,8 @@ export function getRegisteredCommands(): Array<{ command: string; description: s
     { command: '/help', description: '显示帮助信息' },
     { command: '/price <symbol>', description: '查询代币价格' },
     { command: '/chart <symbol> [timeframe]', description: 'K线图表分析' },
+    { command: '/long <symbol> <leverage> <amount>', description: '做多交易' },
+    { command: '/short <symbol> <leverage> <amount>', description: '做空交易' },
     { command: '/markets', description: '查看市场行情' },
     { command: '/wallet', description: '查看钱包余额' },
     { command: '/invite', description: '查看邀请统计和积分' },
