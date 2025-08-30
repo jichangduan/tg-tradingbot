@@ -10,6 +10,8 @@ import { longHandler } from './long.handler';
 import { shortHandler } from './short.handler';
 import { closeHandler } from './close.handler';
 import { positionsHandler } from './positions.handler';
+import { ordersHandler } from './orders.handler';
+import { pnlHandler } from './pnl.handler';
 import { logger } from '../../utils/logger';
 import { ExtendedContext } from '../index';
 
@@ -124,6 +126,8 @@ export function registerCommands(bot: Telegraf<ExtendedContext>): void {
 <code>/short &lt;代币&gt; &lt;杠杆&gt; &lt;金额&gt;</code> - 做空交易
 <code>/close &lt;代币&gt; [数量]</code> - 平仓操作
 <code>/positions</code> - 查看所有持仓情况
+<code>/orders</code> - 查看所有挂单情况
+<code>/pnl</code> - 盈亏分析报告
 例如: <code>/long BTC 10x 200</code>, <code>/short ETH 5x 100</code>, <code>/close BTC 50%</code>
 
 <b>💰 账户管理:</b>
@@ -220,6 +224,18 @@ export function registerCommands(bot: Telegraf<ExtendedContext>): void {
     createCommandWrapper('positions', positionsHandler.handle.bind(positionsHandler))
   );
 
+  // /orders 命令 - 订单查询
+  bot.command(
+    'orders', 
+    createCommandWrapper('orders', ordersHandler.handle.bind(ordersHandler))
+  );
+
+  // /pnl 命令 - 盈亏分析
+  bot.command(
+    'pnl', 
+    createCommandWrapper('pnl', pnlHandler.handle.bind(pnlHandler))
+  );
+
   // /status 命令 - 系统状态
   bot.command('status', async (ctx) => {
     logger.info('Status command received', {
@@ -295,6 +311,8 @@ export function registerCommands(bot: Telegraf<ExtendedContext>): void {
 <code>/short ETH 5x 100</code> - 做空交易
 <code>/close BTC 50%</code> - 平仓操作
 <code>/positions</code> - 查看持仓情况
+<code>/orders</code> - 查看挂单情况
+<code>/pnl</code> - 盈亏分析报告
 
 <b>💰 账户管理:</b>
 <code>/wallet</code> - 查看钱包余额
@@ -406,6 +424,8 @@ export function getRegisteredCommands(): Array<{ command: string; description: s
     { command: '/short <symbol> <leverage> <amount>', description: '做空交易' },
     { command: '/close <symbol> [amount]', description: '平仓操作' },
     { command: '/positions', description: '查看所有持仓情况' },
+    { command: '/orders', description: '查看所有挂单情况' },
+    { command: '/pnl', description: '盈亏分析报告' },
     { command: '/markets', description: '查看市场行情' },
     { command: '/wallet', description: '查看钱包余额' },
     { command: '/invite', description: '查看邀请统计和积分' },
@@ -425,6 +445,8 @@ export async function setBotCommands(bot: Telegraf<ExtendedContext>): Promise<vo
       { command: 'price', description: '💰 查询价格' },
       { command: 'chart', description: '📊 K线图表' },
       { command: 'positions', description: '📊 查看持仓' },
+      { command: 'orders', description: '📋 查看挂单' },
+      { command: 'pnl', description: '📈 盈亏分析' },
       { command: 'markets', description: '📈 市场行情' },
       { command: 'wallet', description: '💰 钱包余额' },
       { command: 'invite', description: '🎁 邀请统计' },
