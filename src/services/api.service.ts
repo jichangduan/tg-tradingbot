@@ -316,16 +316,58 @@ export class ApiService {
    * 健康检查 - 测试API连接状态
    */
   public async healthCheck(): Promise<boolean> {
+    const startTime = Date.now();
+    logger.debug('🔍 Starting API health check...', {
+      baseUrl: config.api.baseUrl,
+      timeout: 5000
+    });
+
     try {
-      // 尝试调用一个轻量级的API端点
-      await this.get('/health', undefined, { 
+      // 尝试调用健康检查端点
+      const response = await this.get('/health', undefined, { 
         skipLogging: true,
         timeout: 5000
       });
+      
+      const duration = Date.now() - startTime;
+      logger.info('✅ API health check passed', {
+        baseUrl: config.api.baseUrl,
+        duration: `${duration}ms`,
+        response: typeof response === 'object' ? JSON.stringify(response).substring(0, 100) : response
+      });
+      
       return true;
     } catch (error) {
-      logger.warn('API health check failed', { error: (error as Error).message });
+      const duration = Date.now() - startTime;
+      const err = error as ApiError;
+      
+      logger.warn('⚠️ API health check failed', {
+        baseUrl: config.api.baseUrl,
+        duration: `${duration}ms`,
+        error: err.message,
+        status: err.status,
+        code: err.code,
+        suggestion: this.getHealthCheckSuggestion(err)
+      });
+      
       return false;
+    }
+  }
+
+  /**
+   * 根据错误类型提供健康检查建议
+   */
+  private getHealthCheckSuggestion(error: ApiError): string {
+    if (error.status === 503) {
+      return 'API service temporarily unavailable - check if backend services are running';
+    } else if (error.status === 404) {
+      return 'Health check endpoint not found - verify API base URL and endpoint path';
+    } else if (error.code === 'NETWORK_ERROR') {
+      return 'Network connectivity issue - check DNS resolution and firewall settings';
+    } else if (error.message.includes('timeout')) {
+      return 'API response timeout - service may be overloaded or network is slow';
+    } else {
+      return 'Unknown API issue - check API logs for detailed error information';
     }
   }
 

@@ -197,23 +197,39 @@ export class TelegramBot {
     }
 
     try {
+      logger.info('🔧 Starting Bot initialization process...');
+      
       // 初始化依赖服务
+      logger.info('📋 Step 1: Initializing dependency services...');
       await this.initializeServices();
+      logger.info('✅ Step 1 completed: All services initialized');
 
       // 启动Bot
+      logger.info('🚀 Step 2: Launching Telegram Bot connection...');
+      logger.debug('Bot launch configuration', {
+        dropPendingUpdates: true,
+        botToken: config.telegram.botToken.substring(0, 10) + '...'
+      });
+      
       await this.bot.launch({
         dropPendingUpdates: true // 清除启动前的pending更新
       });
+      logger.info('✅ Step 2 completed: Bot launched successfully');
 
       this.isRunning = true;
+      logger.info('🔄 Bot status updated to running');
       
       // 获取Bot信息
+      logger.info('📡 Step 3: Retrieving Bot information from Telegram...');
       const botInfo = await this.bot.telegram.getMe();
+      logger.info('✅ Step 3 completed: Bot information retrieved');
       
-      logger.info('✅ TGBot started successfully', {
+      logger.info('🎉 TGBot started successfully', {
         botId: botInfo.id,
         botUsername: botInfo.username,
-        botName: botInfo.first_name
+        botName: botInfo.first_name,
+        canJoinGroups: botInfo.can_join_groups,
+        canReadAllGroupMessages: botInfo.can_read_all_group_messages
       });
 
       // 发送启动通知给管理员（如果配置了）
@@ -237,10 +253,36 @@ export class TelegramBot {
 
     } catch (error) {
       this.isRunning = false;
-      logger.error('❌ Failed to start TGBot', {
-        error: (error as Error).message,
-        stack: (error as Error).stack
+      const err = error as Error;
+      
+      logger.error('💥 CRITICAL: TGBot startup failed', {
+        error: err.message,
+        stack: err.stack,
+        name: err.name,
+        cause: (err as any).cause,
+        code: (err as any).code
       });
+
+      // 详细分析失败原因
+      if (err.message.includes('401')) {
+        logger.error('🔐 Authentication Error: Invalid TELEGRAM_BOT_TOKEN', {
+          tokenPrefix: config.telegram.botToken.substring(0, 10),
+          suggestion: 'Please check if the bot token is valid and active'
+        });
+      } else if (err.message.includes('network') || err.message.includes('ENOTFOUND')) {
+        logger.error('🌐 Network Error: Cannot connect to Telegram servers', {
+          suggestion: 'Please check network connectivity and DNS resolution'
+        });
+      } else if (err.message.includes('timeout')) {
+        logger.error('⏰ Timeout Error: Connection to Telegram timed out', {
+          suggestion: 'Network may be slow or Telegram services may be down'
+        });
+      } else {
+        logger.error('❓ Unknown Error during Bot startup', {
+          errorDetails: JSON.stringify(err, Object.getOwnPropertyNames(err))
+        });
+      }
+      
       throw error;
     }
   }
