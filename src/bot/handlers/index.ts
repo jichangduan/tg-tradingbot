@@ -12,6 +12,7 @@ import { closeHandler } from './close.handler';
 import { positionsHandler } from './positions.handler';
 import { ordersHandler } from './orders.handler';
 import { pnlHandler } from './pnl.handler';
+import { pushHandler } from './push.handler';
 import { logger } from '../../utils/logger';
 import { ExtendedContext } from '../index';
 
@@ -135,6 +136,9 @@ export function registerCommands(bot: Telegraf<ExtendedContext>): void {
 <code>/invite</code> - 查看邀请统计和积分
 <code>/points</code> - 查看您赚取的积分
 
+<b>📢 推送设置:</b>
+<code>/push</code> - 管理推送通知设置
+
 <b>💡 其他命令:</b>
 <code>/start</code> - 重新开始
 <code>/help</code> - 显示此帮助信息
@@ -236,6 +240,12 @@ export function registerCommands(bot: Telegraf<ExtendedContext>): void {
     createCommandWrapper('pnl', pnlHandler.handle.bind(pnlHandler))
   );
 
+  // /push 命令 - 推送设置
+  bot.command(
+    'push', 
+    createCommandWrapper('push', pushHandler.handle.bind(pushHandler))
+  );
+
   // /status 命令 - 系统状态
   bot.command('status', async (ctx) => {
     logger.info('Status command received', {
@@ -319,6 +329,9 @@ export function registerCommands(bot: Telegraf<ExtendedContext>): void {
 <code>/invite</code> - 查看邀请统计
 <code>/points</code> - 查看积分详情
 
+<b>📢 推送设置:</b>
+<code>/push</code> - 管理推送通知设置
+
 <b>📚 帮助信息:</b>
 <code>/help</code> - 查看完整帮助
 <code>/start</code> - 重新开始
@@ -378,6 +391,12 @@ export function registerCommands(bot: Telegraf<ExtendedContext>): void {
         return;
       }
 
+      // 路由push相关的回调到pushHandler
+      if (typeof callbackData === 'string' && callbackData.startsWith('push_')) {
+        await pushHandler.handleCallback(ctx, callbackData);
+        return;
+      }
+
       // 其他未处理的回调
       await ctx.answerCbQuery('功能开发中...');
       
@@ -430,6 +449,7 @@ export function getRegisteredCommands(): Array<{ command: string; description: s
     { command: '/wallet', description: '查看钱包余额' },
     { command: '/invite', description: '查看邀请统计和积分' },
     { command: '/points', description: '查看您赚取的积分' },
+    { command: '/push', description: '管理推送通知设置' },
     { command: '/status', description: '查看系统状态' }
   ];
 }
@@ -451,6 +471,7 @@ export async function setBotCommands(bot: Telegraf<ExtendedContext>): Promise<vo
       { command: 'wallet', description: '💰 钱包余额' },
       { command: 'invite', description: '🎁 邀请统计' },
       { command: 'points', description: '🎯 积分详情' },
+      { command: 'push', description: '📢 推送设置' },
       { command: 'status', description: '⚙️ 系统状态' }
     ]);
     

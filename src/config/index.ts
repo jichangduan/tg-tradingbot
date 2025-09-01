@@ -69,8 +69,16 @@ export const config = {
   app: {
     port: parseInt(process.env.PORT || '3000'),
     requestTimeout: parseInt(process.env.REQUEST_TIMEOUT || '30000'),
-    maxRequestsPerMinute: parseInt(process.env.MAX_REQUESTS_PER_MINUTE || '100'),
-    enableHealth: (process.env.HEALTH_ENABLED || 'true').toLowerCase() === 'true'
+    maxRequestsPerMinute: parseInt(process.env.MAX_REQUESTS_PER_MINUTE || '100')
+  },
+
+  // 推送配置
+  push: {
+    intervalMinutes: parseInt(process.env.PUSH_INTERVAL_MINUTES || '1'), // 测试环境1分钟
+    maxRetries: parseInt(process.env.PUSH_MAX_RETRIES || '3'),
+    batchSize: parseInt(process.env.PUSH_BATCH_SIZE || '50'),
+    enableScheduler: process.env.PUSH_SCHEDULER_ENABLED !== 'false', // 默认启用
+    timezone: process.env.PUSH_TIMEZONE || 'Asia/Shanghai'
   }
 };
 

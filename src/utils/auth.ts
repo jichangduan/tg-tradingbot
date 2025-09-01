@@ -137,3 +137,28 @@ export async function clearUserAccessToken(telegramId: string): Promise<boolean>
     return false;
   }
 }
+
+/**
+ * 简化的获取用户token函数（用于PushHandler）
+ * 尝试从缓存获取token，如果没有则返回null（需要用户重新认证）
+ */
+export async function getUserToken(telegramId: string): Promise<string | null> {
+  try {
+    const tokenKey = `user:token:${telegramId}`;
+    const cachedResult = await cacheService.get<string>(tokenKey);
+    
+    if (cachedResult.success && cachedResult.data) {
+      logger.debug('User token retrieved from cache', { telegramId });
+      return cachedResult.data;
+    } else {
+      logger.debug('No cached token found for user', { telegramId });
+      return null;
+    }
+  } catch (error) {
+    logger.error('Error retrieving user token', {
+      telegramId,
+      error: (error as Error).message
+    });
+    return null;
+  }
+}

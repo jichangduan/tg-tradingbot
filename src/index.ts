@@ -2,6 +2,7 @@ import { telegramBot } from './bot';
 import { setBotCommands } from './bot/handlers';
 import { logger } from './utils/logger';
 import { config } from './config';
+import { pushScheduler } from './services/push-scheduler.service';
 
 /**
  * AIW3 TGBot 应用入口
@@ -58,6 +59,22 @@ async function startApplication(): Promise<void> {
         ]
       });
     }
+
+    // 启动推送调度器（如果启用）
+    if (config.push.enableScheduler) {
+      logger.info('Starting push scheduler...');
+      pushScheduler.start();
+      
+      const schedulerStatus = pushScheduler.getStatus();
+      logger.info('Push scheduler started', {
+        isRunning: schedulerStatus.isRunning,
+        cronPattern: schedulerStatus.cronPattern,
+        environment: schedulerStatus.environment
+      });
+    } else {
+      logger.info('Push scheduler is disabled by configuration');
+    }
+
     // 健康检查服务由 main() 提前启动，避免外部依赖阻塞时无响应
 
   } catch (error) {
@@ -68,6 +85,10 @@ async function startApplication(): Promise<void> {
     
     // 确保清理资源
     try {
+      // 停止推送调度器
+      pushScheduler.stop();
+      logger.info('Push scheduler stopped during cleanup');
+      
       await telegramBot.stop();
     } catch (cleanupError) {
       logger.error('Error during cleanup', {
@@ -86,6 +107,10 @@ async function stopApplication(): Promise<void> {
   logger.info('🛑 Stopping AIW3 TGBot Application...');
   
   try {
+    // 停止推送调度器
+    pushScheduler.stop();
+    logger.info('Push scheduler stopped');
+    
     await telegramBot.stop();
     logger.info('✅ AIW3 TGBot Application stopped gracefully');
   } catch (error) {
@@ -105,16 +130,30 @@ function setupHealthCheckServer(): void {
   const app = express();
 
   // 健康检查端点
-  app.get('/health', async (req: any, res: any) => {
+  app.get('/health', async (_req: any, res: any) => {
     try {
       // 尝试获取Bot信息，失败时返回降级状态
       const isRunning = telegramBot.isActive();
       let bot: any = { isRunning };
       let services: any = undefined;
+      
       try {
         const botInfo = await telegramBot.getBotInfo();
         bot = botInfo.bot;
-        services = botInfo.services;
+        
+        // 合并原有服务信息和推送调度器信息
+        const schedulerStatus = pushScheduler.getStatus();
+        const lastPushTime = await pushScheduler.getLastPushTime();
+        
+        services = {
+          ...botInfo.services,
+          pushScheduler: {
+            isRunning: schedulerStatus.isRunning,
+            cronPattern: schedulerStatus.cronPattern,
+            environment: schedulerStatus.environment,
+            lastPushTime: lastPushTime
+          }
+        };
       } catch (_) {
         // ignore, keep minimal info
       }
@@ -138,12 +177,19 @@ function setupHealthCheckServer(): void {
   });
 
   // 基础信息端点
-  app.get('/', (req: any, res: any) => {
+  app.get('/', (_req: any, res: any) => {
     res.json({
       name: 'AIW3 TGBot',
       version: '1.0.0',
-      description: 'Telegram Bot for AIW3 cryptocurrency price queries',
+      description: 'Telegram Bot for AIW3 cryptocurrency trading and push notifications',
       status: telegramBot.isActive() ? 'running' : 'stopped',
+      features: [
+        'Price queries with /price command',
+        'Push notifications (flash news, whale actions, fund flows)',
+        'User push settings management with /push command',
+        'Real-time cryptocurrency data',
+        'Redis caching for performance'
+      ],
       endpoints: [
         'GET /health - Health check',
         'GET / - Basic information'
@@ -215,7 +261,7 @@ async function main(): Promise<void> {
   setupGlobalErrorHandlers();
   
   // 提前启动健康检查服务，确保即使外部依赖不可用也能响应
-  if (config.app.enableHealth && config.app.port) {
+  if (config.app.port) {
     setupHealthCheckServer();
   }
   
