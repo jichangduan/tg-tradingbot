@@ -332,7 +332,8 @@ export class ApiService {
       const duration = Date.now() - startTime;
       logger.info('✅ API health check passed', {
         baseUrl: config.api.baseUrl,
-        duration: `${duration}ms`,
+        duration,
+        durationText: `${duration}ms`,
         response: typeof response === 'object' ? JSON.stringify(response).substring(0, 100) : response
       });
       
@@ -343,7 +344,8 @@ export class ApiService {
       
       logger.warn('⚠️ API health check failed', {
         baseUrl: config.api.baseUrl,
-        duration: `${duration}ms`,
+        duration,
+        durationText: `${duration}ms`,
         error: err.message,
         status: err.status,
         code: err.code,
