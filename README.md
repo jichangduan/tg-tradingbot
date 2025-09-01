@@ -102,8 +102,8 @@ K 线数据（`CachedCandleData`，节选）
 ## 🏗️ 总体架构
 
 ```mermaid
-flowchart LR
-  U[Telegram 用户] -->|消息/命令| TGBot[Telegraf Bot]
+graph LR
+  U[Telegram 用户] -->|消息与命令| TGBot[Telegraf Bot]
   TGBot --> H[Handlers 指令处理]
   H --> S[Services 业务服务]
   S -->|HTTP| API[AIW3 API]
@@ -115,9 +115,9 @@ flowchart LR
     H
     S
     L
-    HC[Express /health]
+    HC[Express health]
   end
-  HC -->|GET /health| Ops[运维/探针]
+  HC --> Ops[运维与探针]
 ```
 
 ### 技术栈

@@ -32,7 +32,7 @@ Degraded (503):
 
 ### Architecture
 ```mermaid
-flowchart LR
+graph LR
   U[Telegram User] -->|messages| TGBot[Telegraf Bot]
   TGBot --> H[Handlers]
   H --> S[Services]
@@ -45,9 +45,9 @@ flowchart LR
     H
     S
     L
-    HC[Express /health]
+    HC[Express health]
   end
-  HC -->|GET /health| Ops[Ops/Probe]
+  HC --> Ops[Ops/Probe]
 ```
 
 ### Tech Stack
