@@ -58,11 +58,7 @@ async function startApplication(): Promise<void> {
         ]
       });
     }
-
-    // 设置应用健康检查（如果需要）
-    if (config.app.port) {
-      setupHealthCheckServer();
-    }
+    // 健康检查服务由 main() 提前启动，避免外部依赖阻塞时无响应
 
   } catch (error) {
     logger.error('❌ Failed to start AIW3 TGBot Application', {
@@ -111,25 +107,33 @@ function setupHealthCheckServer(): void {
   // 健康检查端点
   app.get('/health', async (req: any, res: any) => {
     try {
-      const botInfo = await telegramBot.getBotInfo();
-      const healthStatus = {
-        status: 'healthy',
-        timestamp: new Date().toISOString(),
-        bot: botInfo.bot,
-        services: botInfo.services,
-        uptime: process.uptime()
-      };
+      // 尝试获取Bot信息，失败时返回降级状态
+      const isRunning = telegramBot.isActive();
+      let bot: any = { isRunning };
+      let services: any = undefined;
+      try {
+        const botInfo = await telegramBot.getBotInfo();
+        bot = botInfo.bot;
+        services = botInfo.services;
+      } catch (_) {
+        // ignore, keep minimal info
+      }
 
-      res.json(healthStatus);
+      const status = isRunning ? 'healthy' : 'degraded';
+      res.status(isRunning ? 200 : 503).json({
+        status,
+        timestamp: new Date().toISOString(),
+        bot,
+        services,
+        uptime: process.uptime()
+      });
     } catch (error) {
-      const errorStatus = {
-        status: 'unhealthy',
+      res.status(500).json({
+        status: 'unavailable',
         timestamp: new Date().toISOString(),
         error: (error as Error).message,
         uptime: process.uptime()
-      };
-
-      res.status(503).json(errorStatus);
+      });
     }
   });
 
@@ -209,6 +213,11 @@ function setupGlobalErrorHandlers(): void {
 async function main(): Promise<void> {
   // 设置全局错误处理
   setupGlobalErrorHandlers();
+  
+  // 提前启动健康检查服务，确保即使外部依赖不可用也能响应
+  if (config.app.enableHealth && config.app.port) {
+    setupHealthCheckServer();
+  }
   
   // 验证配置
   try {

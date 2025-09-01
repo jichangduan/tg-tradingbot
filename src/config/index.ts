@@ -69,7 +69,8 @@ export const config = {
   app: {
     port: parseInt(process.env.PORT || '3000'),
     requestTimeout: parseInt(process.env.REQUEST_TIMEOUT || '30000'),
-    maxRequestsPerMinute: parseInt(process.env.MAX_REQUESTS_PER_MINUTE || '100')
+    maxRequestsPerMinute: parseInt(process.env.MAX_REQUESTS_PER_MINUTE || '100'),
+    enableHealth: (process.env.HEALTH_ENABLED || 'true').toLowerCase() === 'true'
   }
 };
 
