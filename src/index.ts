@@ -26,6 +26,21 @@ async function startApplication(): Promise<void> {
       cacheTTL: config.cache.tokenPriceTTL
     });
 
+    // 启动推送调度器（如果启用）- 提前启动，不依赖Bot
+    if (config.push.enableScheduler) {
+      logger.info('Starting push scheduler...');
+      pushScheduler.start();
+      
+      const schedulerStatus = pushScheduler.getStatus();
+      logger.info('Push scheduler started', {
+        isRunning: schedulerStatus.isRunning,
+        cronPattern: schedulerStatus.cronPattern,
+        environment: schedulerStatus.environment
+      });
+    } else {
+      logger.info('Push scheduler is disabled by configuration');
+    }
+
     // 启动TGBot
     logger.info('Initializing Telegram Bot...');
     await telegramBot.start();
@@ -60,20 +75,7 @@ async function startApplication(): Promise<void> {
       });
     }
 
-    // 启动推送调度器（如果启用）
-    if (config.push.enableScheduler) {
-      logger.info('Starting push scheduler...');
-      pushScheduler.start();
-      
-      const schedulerStatus = pushScheduler.getStatus();
-      logger.info('Push scheduler started', {
-        isRunning: schedulerStatus.isRunning,
-        cronPattern: schedulerStatus.cronPattern,
-        environment: schedulerStatus.environment
-      });
-    } else {
-      logger.info('Push scheduler is disabled by configuration');
-    }
+    // 推送调度器已在前面启动
 
     // 健康检查服务由 main() 提前启动，避免外部依赖阻塞时无响应
 

@@ -25,26 +25,50 @@ export class PushSchedulerService {
       return;
     }
 
-    // 测试环境1分钟，生产环境20分钟
-    const cronPattern = process.env.NODE_ENV === 'production' ? '*/20 * * * *' : '*/1 * * * *';
-    
-    logger.info('Starting push scheduler', {
-      cronPattern,
-      environment: process.env.NODE_ENV || 'development'
-    });
+    try {
+      // 修复cron表达式：生产环境20分钟，开发环境1分钟
+      const cronPattern = process.env.NODE_ENV === 'production' ? '*/20 * * * *' : '*/1 * * * *';
+      
+      logger.info('🔧 Initializing push scheduler', {
+        cronPattern,
+        environment: process.env.NODE_ENV || 'development',
+        timezone: 'Asia/Shanghai',
+        description: process.env.NODE_ENV === 'production' ? 'Every 20 minutes' : 'Every 1 minute'
+      });
 
-    this.scheduleTask = cron.schedule(cronPattern, async () => {
-      await this.executeScheduledPush();
-    }, {
-      scheduled: false, // 不自动启动
-      timezone: 'Asia/Shanghai'
-    });
+      this.scheduleTask = cron.schedule(cronPattern, async () => {
+        await this.executeScheduledPush();
+      }, {
+        scheduled: false, // 不自动启动
+        timezone: 'Asia/Shanghai'
+      });
 
-    // 启动任务
-    this.scheduleTask.start();
-    this.isRunning = true;
+      // 启动任务
+      this.scheduleTask.start();
+      this.isRunning = true;
 
-    logger.info('Push scheduler started successfully');
+      logger.info('✅ Push scheduler started successfully', {
+        isRunning: this.isRunning,
+        cronPattern,
+        nextExecutionEstimate: 'Within 1-20 minutes depending on environment'
+      });
+
+      // 立即执行一次推送任务用于测试
+      logger.info('🚀 Executing initial push task for immediate testing...');
+      setTimeout(() => {
+        this.executeScheduledPush().catch(error => {
+          logger.error('Initial push task failed', { error: error.message });
+        });
+      }, 5000); // 5秒后执行第一次推送
+
+    } catch (error) {
+      this.isRunning = false;
+      logger.error('❌ Failed to start push scheduler', {
+        error: (error as Error).message,
+        stack: (error as Error).stack
+      });
+      throw error;
+    }
   }
 
   /**
@@ -81,59 +105,86 @@ export class PushSchedulerService {
     const executionId = `push_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 
     try {
-      logger.info(`Starting scheduled push execution [${executionId}]`, {
+      logger.info(`🚀 ========== PUSH EXECUTION START [${executionId}] ==========`);
+      logger.info(`Starting scheduled push execution`, {
         executionId,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV
       });
 
-      // 获取所有启用推送的用户（这里我们暂时使用一个简化的方法）
+      // 获取所有启用推送的用户
+      logger.info(`📋 Step 1: Getting enabled push users [${executionId}]`);
       const enabledUsers = await this.getEnabledPushUsers();
       
       if (enabledUsers.length === 0) {
-        logger.info(`No users with push enabled [${executionId}]`, { executionId });
+        logger.warn(`⚠️ No users with push enabled [${executionId}]`, { 
+          executionId,
+          suggestion: 'Add test users or check user settings in database'
+        });
         return;
       }
 
-      logger.info(`Found ${enabledUsers.length} users with push enabled [${executionId}]`, {
+      logger.info(`✅ Step 1 completed: Found ${enabledUsers.length} users with push enabled`, {
         userCount: enabledUsers.length,
-        executionId
+        executionId,
+        userIds: enabledUsers.map(u => parseInt(u.userId || '0'))
       });
 
       // 为每个用户推送消息
+      logger.info(`📤 Step 2: Sending push messages to users [${executionId}]`);
       let successCount = 0;
       let failureCount = 0;
 
       for (const user of enabledUsers) {
         try {
+          logger.info(`📱 Sending push to user ${user.userId}`, {
+            userId: parseInt(user.userId || '0'),
+            settings: user.settings,
+            executionId
+          });
+
           await this.sendPushToUser(user.userId, user.settings, user.pushData);
           successCount++;
+          
+          logger.info(`✅ Push sent successfully to user ${user.userId}`, {
+            userId: parseInt(user.userId || '0'),
+            executionId
+          });
+
         } catch (error) {
           failureCount++;
-          logger.error(`Failed to send push to user [${executionId}]`, {
+          logger.error(`❌ Failed to send push to user ${user.userId}`, {
             userId: parseInt(user.userId || '0'),
             error: (error as Error).message,
+            stack: (error as Error).stack,
             executionId
           });
         }
       }
 
       // 更新最后推送时间
+      logger.info(`📝 Step 3: Updating last push time [${executionId}]`);
       await this.updateLastPushTime();
 
       const duration = Date.now() - startTime;
-      logger.info(`Scheduled push execution completed [${executionId}]`, {
+      logger.info(`🎉 ========== PUSH EXECUTION COMPLETED [${executionId}] ==========`);
+      logger.info(`Scheduled push execution completed successfully`, {
         executionId,
         duration,
+        durationText: `${duration}ms`,
         totalUsers: enabledUsers.length,
         successCount,
-        failureCount
+        failureCount,
+        successRate: enabledUsers.length > 0 ? Math.round((successCount / enabledUsers.length) * 100) + '%' : '0%'
       });
 
     } catch (error) {
       const duration = Date.now() - startTime;
-      logger.error(`Scheduled push execution failed [${executionId}]`, {
+      logger.error(`💥 ========== PUSH EXECUTION FAILED [${executionId}] ==========`);
+      logger.error(`Scheduled push execution failed`, {
         executionId,
         duration,
+        durationText: `${duration}ms`,
         error: (error as Error).message,
         stack: (error as Error).stack
       });
@@ -245,56 +296,123 @@ export class PushSchedulerService {
     pushData?: PushData
   ): Promise<void> {
     try {
+      logger.debug(`🔧 Initializing message sending for user ${userId}`, {
+        userId: parseInt(userId || '0'),
+        settings,
+        hasData: !!pushData
+      });
+
       const bot = telegramBot.getBot();
       
+      // 检查Bot实例是否可用
+      if (!bot) {
+        throw new Error('Telegram Bot instance is not available');
+      }
+
       // 检查是否有新的推送内容
       if (!pushData || !this.hasNewPushContent(pushData)) {
-        logger.debug('No new push content for user', { userId: parseInt(userId || '0') });
+        logger.debug('📭 No new push content for user', { 
+          userId: parseInt(userId || '0'),
+          hasData: !!pushData,
+          dataDetails: pushData ? {
+            flashCount: pushData.flash_news?.length || 0,
+            whaleCount: pushData.whale_actions?.length || 0,
+            fundCount: pushData.fund_flows?.length || 0
+          } : 'no data'
+        });
         return;
       }
 
       let messages: string[] = [];
+      const messageTypes: string[] = [];
 
       // 处理快讯推送
       if (settings.flash_enabled && pushData.flash_news && pushData.flash_news.length > 0) {
         for (const news of pushData.flash_news) {
           messages.push(this.formatFlashNewsMessage(news));
+          messageTypes.push('flash_news');
         }
+        logger.debug(`📰 Added ${pushData.flash_news.length} flash news messages`);
       }
 
       // 处理鲸鱼动向推送
       if (settings.whale_enabled && pushData.whale_actions && pushData.whale_actions.length > 0) {
         for (const action of pushData.whale_actions) {
           messages.push(this.formatWhaleActionMessage(action));
+          messageTypes.push('whale_action');
         }
+        logger.debug(`🐋 Added ${pushData.whale_actions.length} whale action messages`);
       }
 
       // 处理资金流向推送
       if (settings.fund_enabled && pushData.fund_flows && pushData.fund_flows.length > 0) {
         for (const flow of pushData.fund_flows) {
           messages.push(this.formatFundFlowMessage(flow));
+          messageTypes.push('fund_flow');
+        }
+        logger.debug(`💰 Added ${pushData.fund_flows.length} fund flow messages`);
+      }
+
+      if (messages.length === 0) {
+        logger.debug(`📭 No messages to send (settings disabled or no content)`, {
+          userId: parseInt(userId || '0'),
+          settings
+        });
+        return;
+      }
+
+      logger.info(`📤 Sending ${messages.length} messages to user ${userId}`, {
+        userId: parseInt(userId || '0'),
+        messageCount: messages.length,
+        messageTypes
+      });
+
+      // 发送消息
+      for (let i = 0; i < messages.length; i++) {
+        const message = messages[i];
+        const messageType = messageTypes[i];
+        
+        try {
+          logger.debug(`📱 Sending message ${i + 1}/${messages.length} (${messageType})`, {
+            userId: parseInt(userId || '0'),
+            messageType,
+            messageLength: message.length
+          });
+
+          await bot.telegram.sendMessage(parseInt(userId), message, {
+            parse_mode: 'HTML',
+            disable_web_page_preview: true
+          } as any);
+
+          logger.debug(`✅ Message ${i + 1}/${messages.length} sent successfully`, {
+            userId: parseInt(userId || '0'),
+            messageType
+          });
+
+          // 添加短暂延迟避免触发Telegram API限制
+          await new Promise(resolve => setTimeout(resolve, 150));
+          
+        } catch (messageError) {
+          logger.error(`❌ Failed to send message ${i + 1}/${messages.length}`, {
+            userId: parseInt(userId || '0'),
+            messageType,
+            error: (messageError as Error).message
+          });
+          throw messageError;
         }
       }
 
-      // 发送消息
-      for (const message of messages) {
-        await bot.telegram.sendMessage(parseInt(userId), message, {
-          parse_mode: 'HTML'
-        });
-
-        // 添加短暂延迟避免触发Telegram API限制
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
-
-      logger.info('Push messages sent to user', {
+      logger.info(`🎉 All push messages sent successfully to user ${userId}`, {
         userId: parseInt(userId || '0'),
-        messageCount: messages.length
+        totalMessages: messages.length,
+        messageTypes: messageTypes.join(', ')
       });
 
     } catch (error) {
-      logger.error('Failed to send push message to user', {
+      logger.error(`💥 Failed to send push messages to user ${userId}`, {
         userId: parseInt(userId || '0'),
-        error: (error as Error).message
+        error: (error as Error).message,
+        stack: (error as Error).stack
       });
       throw error;
     }
