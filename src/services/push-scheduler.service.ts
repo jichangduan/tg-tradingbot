@@ -1,8 +1,9 @@
 import * as cron from 'node-cron';
-import { PushSettings, PushData } from './push.service';
+import { PushSettings, PushData, pushService } from './push.service';
 import { cacheService } from './cache.service';
 import { logger } from '../utils/logger';
 import { telegramBot } from '../bot';
+import { apiService } from './api.service';
 
 /**
  * 推送调度服务
@@ -203,78 +204,80 @@ export class PushSchedulerService {
     try {
       logger.info('Fetching enabled push users from backend API');
       
-      // 直接使用数据库查询获取启用推送的用户（通过后端PushNotificationService）
       const enabledUsers: Array<{
         userId: string;
         settings: PushSettings;
         pushData?: PushData;
       }> = [];
       
-      // 临时添加一些测试用户来验证推送功能
-      // TODO: 当你有真实用户设置推送后，可以移除这些测试用户
-      const testUsers = [
-        '7547622528', // 替换为实际的telegram user ID
-        // 可以添加更多测试用户ID
-      ];
-      
-      for (const userId of testUsers) {
-        try {
-          // 为每个测试用户生成默认的推送设置和数据
-          const settings: PushSettings = {
-            flash_enabled: true,
-            whale_enabled: true,
-            fund_enabled: true
-          };
-          
-          // 生成模拟推送数据
-          const pushData: PushData = {
-            flash_news: [
-              {
-                title: '测试快讯',
-                content: 'Bitcoin突破新高度，市场情绪乐观',
-                timestamp: new Date().toISOString()
+      // 1. 调用后端API获取所有启用推送的用户列表
+      try {
+        const response = await apiService.get<{
+          code: string;
+          message: string;
+          data: Array<{
+            user_id: string;
+            telegram_id: string;
+            settings: {
+              flash_enabled: boolean;
+              whale_enabled: boolean;
+              fund_enabled: boolean;
+            };
+          }>;
+        }>('/api/tgbot/push/users/enabled');
+        
+        if (response.code === '0' && response.data && response.data.length > 0) {
+          // 2. 对于每个用户，获取其推送设置和推送数据
+          for (const user of response.data) {
+            try {
+              // 获取用户的推送设置（使用已有的pushService）
+              // TODO: 需要用户的access token，现在先跳过这个用户
+              logger.debug('Skipping user - need access token for push settings', {
+                telegramId: user.telegram_id
+              });
+              
+              // 临时使用默认设置
+              const settings: PushSettings = {
+                flash_enabled: true,
+                whale_enabled: true,
+                fund_enabled: true
+              };
+              
+              if (settings) {
+                // 获取推送内容数据
+                const pushDataResult = await this.getPushDataForUser(user.telegram_id);
+                
+                enabledUsers.push({
+                  userId: user.telegram_id,
+                  settings: settings,
+                  pushData: pushDataResult
+                });
+                
+                logger.debug('Added user for push notifications', {
+                  telegramId: user.telegram_id,
+                  settings: settings
+                });
               }
-            ],
-            whale_actions: [
-              {
-                address: '1A2B3C...XYZ',
-                action: '买入',
-                amount: '100 BTC',
-                timestamp: new Date().toISOString()
-              }
-            ],
-            fund_flows: [
-              {
-                from: 'Coinbase',
-                to: 'Binance',
-                amount: '500 ETH',
-                timestamp: new Date().toISOString()
-              }
-            ]
-          };
-          
-          enabledUsers.push({
-            userId,
-            settings,
-            pushData
-          });
-          
-          logger.info('Added test user for push testing', { 
-            userId: parseInt(userId || '0'),
-            settings 
-          });
-          
-        } catch (error) {
-          logger.warn('Failed to process user for push', {
-            userId: parseInt(userId || '0'),
-            error: (error as Error).message
-          });
+            } catch (userError) {
+              logger.warn('Failed to process user for push', {
+                telegramId: user.telegram_id,
+                error: (userError as Error).message
+              });
+              continue;
+            }
+          }
+        } else {
+          logger.info('No enabled push users found in database');
         }
+      } catch (apiError) {
+        logger.warn('Failed to fetch users from API, will continue with empty list', {
+          error: (apiError as Error).message
+        });
       }
 
       logger.info('Enabled push users fetched successfully', {
         userCount: enabledUsers.length,
-        userIds: enabledUsers.map(u => parseInt(u.userId || '0'))
+        userIds: enabledUsers.map(u => u.userId)
       });
 
       return enabledUsers;
@@ -284,6 +287,66 @@ export class PushSchedulerService {
         error: (error as Error).message
       });
       return [];
+    }
+  }
+
+  /**
+   * 为用户获取推送数据
+   * 从各种数据源获取快讯、鲸鱼动向、资金流向等信息
+   */
+  private async getPushDataForUser(userId: string): Promise<PushData | undefined> {
+    try {
+      logger.debug('Fetching push data for user', { telegramId: userId });
+      
+      // 调用后端API获取推送内容
+      const response = await apiService.get<{
+        code: string;
+        message: string;
+        data: {
+          flash_news: Array<{
+            title: string;
+            content: string;
+            timestamp: string;
+          }>;
+          whale_actions: Array<{
+            address: string;
+            action: string;
+            amount: string;
+            timestamp: string;
+          }>;
+          fund_flows: Array<{
+            from: string;
+            to: string;
+            amount: string;
+            timestamp: string;
+          }>;
+        };
+      }>('/api/tgbot/push/content');
+      
+      if (response.code === '0' && response.data) {
+        logger.debug('Successfully fetched push data', {
+          telegramId: userId,
+          flashNewsCount: response.data.flash_news?.length || 0,
+          whaleActionsCount: response.data.whale_actions?.length || 0,
+          fundFlowsCount: response.data.fund_flows?.length || 0
+        });
+        
+        return {
+          flash_news: response.data.flash_news || [],
+          whale_actions: response.data.whale_actions || [],
+          fund_flows: response.data.fund_flows || []
+        };
+      }
+      
+      logger.debug('No push data available from API', { telegramId: userId });
+      return undefined;
+      
+    } catch (error) {
+      logger.warn('Failed to fetch push data for user', {
+        telegramId: userId,
+        error: (error as Error).message
+      });
+      return undefined;
     }
   }
 

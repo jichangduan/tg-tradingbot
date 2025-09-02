@@ -215,14 +215,29 @@ export class SolanaService {
    */
   private async getSOLPrice(): Promise<number> {
     try {
-      // 可以使用现有的价格API
-      // 暂时返回一个默认价格，后续可以集成
-      return 20; // $20 USD per SOL (示例价格)
+      // 调用实际的价格API获取SOL价格
+      const response = await apiService.get<{
+        code: string;
+        message: string;
+        data: {
+          price: number;
+          symbol: string;
+        };
+      }>('/api/market/price/SOL');
+      
+      if (response.code === '0' && response.data?.price) {
+        return response.data.price;
+      }
+      
+      // 如果API失败，抛出错误而不是返回硬编码值
+      throw new Error('Failed to fetch SOL price from API');
+      
     } catch (error) {
-      logger.warn('Failed to get SOL price, using default', {
+      logger.warn('Failed to get SOL price', {
         error: (error as Error).message
       });
-      return 20;
+      // 重新抛出错误，让调用方处理
+      throw error;
     }
   }
 

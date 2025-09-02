@@ -284,15 +284,15 @@ export class ChartHandler {
       callback_data: `chart_${symbol}_${tf}`
     }));
 
-    // 交易按钮行 (占位符，等待未来API集成)
+    // 交易按钮行 (连接到实际的交易命令)
     const tradingButtons = [
       {
         text: `📉 Short ${symbol}`,
-        callback_data: `short_${symbol}_placeholder`
+        callback_data: `short_${symbol}`
       },
       {
         text: `📈 Long ${symbol}`,
-        callback_data: `long_${symbol}_placeholder`
+        callback_data: `long_${symbol}`
       }
     ];
 
@@ -317,7 +317,7 @@ export class ChartHandler {
         const [, symbol, newTimeFrame] = callbackData.split('_');
         await this.regenerateChart(ctx, symbol, newTimeFrame as TimeFrame);
       } else if (callbackData.startsWith('short_') || callbackData.startsWith('long_')) {
-        // 处理交易按钮（占位符）
+        // 处理交易按钮
         await this.handleTradingCallback(ctx, callbackData);
       }
     } catch (error) {
@@ -407,23 +407,40 @@ export class ChartHandler {
   }
 
   /**
-   * 处理交易按钮回调（占位符）
+   * 处理交易按钮回调
    */
   private async handleTradingCallback(ctx: ExtendedContext, callbackData: string): Promise<void> {
     const isShort = callbackData.startsWith('short_');
     const symbol = callbackData.split('_')[1];
     const action = isShort ? 'Short' : 'Long';
 
+    // 确认用户操作
     await ctx.answerCbQuery(
-      `🔧 ${action} ${symbol} 功能开发中...\n\n将在未来版本中集成交易API`,
-      { show_alert: true }
+      `正在打开 ${action} ${symbol} 交易界面...`,
+      { show_alert: false }
     );
 
-    logger.info('Trading button placeholder triggered', {
-      action,
-      symbol,
-      userId: ctx.from?.id
-    });
+    // 调用相应的交易处理器
+    try {
+      if (isShort) {
+        const { default: shortHandler } = await import('./short.handler');
+        await shortHandler.handle(ctx, [symbol]);
+      } else {
+        const { default: longHandler } = await import('./long.handler');
+        await longHandler.handle(ctx, [symbol]);
+      }
+    } catch (error) {
+      logger.error('Failed to handle trading callback', {
+        action,
+        symbol,
+        userId: ctx.from?.id,
+        error: (error as Error).message
+      });
+      
+      await ctx.reply(
+        `❌ 无法打开 ${action} ${symbol} 交易界面，请稍后重试。`
+      );
+    }
   }
 
   /**
