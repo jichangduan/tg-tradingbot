@@ -26,7 +26,7 @@ export class PushSchedulerService {
     }
 
     // 测试环境1分钟，生产环境20分钟
-    const cronPattern = process.env.NODE_ENV === 'production' ? '*/20 * * * *' : '* * * * *';
+    const cronPattern = process.env.NODE_ENV === 'production' ? '*/20 * * * *' : '*/1 * * * *';
     
     logger.info('Starting push scheduler', {
       cronPattern,
@@ -413,7 +413,7 @@ export class PushSchedulerService {
     cronPattern: string;
     environment: string;
   } {
-    const cronPattern = process.env.NODE_ENV === 'production' ? '*/20 * * * *' : '* * * * *';
+    const cronPattern = process.env.NODE_ENV === 'production' ? '*/20 * * * *' : '*/1 * * * *';
     
     return {
       isRunning: this.isRunning,

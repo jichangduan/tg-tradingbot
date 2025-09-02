@@ -406,8 +406,7 @@ export class TelegramBot {
    * 获取Bot运行状态
    */
   public isActive(): boolean {
-    // Return true if bot is set up (more reliable than launch status)
-    return !!this.bot;
+    return this.isRunning;
   }
 
   /**
