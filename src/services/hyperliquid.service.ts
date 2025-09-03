@@ -114,6 +114,62 @@ export async function getUserWallet(telegramId?: string) {
   return response;
 }
 
+// 创建用户Hyperliquid钱包
+export async function createUserHyperliquidWallet(telegramId: string): Promise<IUserWalletData | null> {
+  if (!telegramId) {
+    throw new Error('telegramId is required for createUserHyperliquidWallet');
+  }
+
+  // 获取用户的JWT Token
+  const accessToken = await getUserAccessToken(telegramId);
+  if (!accessToken) {
+    throw new Error(`No JWT Token found for user ${telegramId}. Please initialize user first using /start`);
+  }
+
+  try {
+    logger.info(`Creating Hyperliquid wallet for user ${telegramId}`, {
+      telegramId,
+      hasToken: true
+    });
+
+    // 调用后端API创建钱包 - 基于后端代码分析，这个API会自动创建并保存钱包
+    // 实际上调用的是 getUserWallet，但后端会在不存在时自动创建
+    const createWalletResponse = await apiService.getWithAuth<{
+      tradingwalletaddress?: string;
+      strategywalletaddress?: string;
+      maxfeerate?: string;
+    }>('/api/hyperliquid/getUserWallet', accessToken, { 
+      telegram_id: telegramId 
+    });
+
+    if (createWalletResponse && createWalletResponse.tradingwalletaddress) {
+      logger.info(`Hyperliquid wallet created successfully for user ${telegramId}`, {
+        telegramId,
+        tradingWallet: createWalletResponse.tradingwalletaddress,
+        strategyWallet: createWalletResponse.strategywalletaddress
+      });
+
+      // 返回钱包数据
+      return {
+        tradingwalletaddress: createWalletResponse.tradingwalletaddress,
+        strategywalletaddress: createWalletResponse.strategywalletaddress || ''
+      };
+    } else {
+      logger.error(`Failed to create Hyperliquid wallet for user ${telegramId}`, {
+        telegramId,
+        response: createWalletResponse
+      });
+      return null;
+    }
+  } catch (error) {
+    logger.error(`Error creating Hyperliquid wallet for user ${telegramId}`, {
+      telegramId,
+      error: (error as Error).message
+    });
+    return null;
+  }
+}
+
 // 获取用户现货余额
 export async function getUserHyperliquidBalance(walletType: 1 | 2, telegramId?: string) {
   if (!telegramId) {

@@ -2,6 +2,7 @@ import {
   getUserWallet, 
   getUserHyperliquidBalance, 
   getUserContractBalance,
+  createUserHyperliquidWallet,
   IUserWalletData,
   IUserBalanceData,
   IUserStateData
@@ -40,14 +41,32 @@ export class WalletService {
         requestId
       });
 
-      // 步骤1: 获取Hyperliquid钱包地址 (现在直接使用缓存的JWT Token)
-      const walletData = await getUserWallet(telegramId);
+      // 步骤1: 获取Hyperliquid钱包地址，如果不存在则自动创建
+      let walletData = await getUserWallet(telegramId);
+      
+      // 如果钱包不存在，尝试创建新钱包
       if (!walletData || !walletData.tradingwalletaddress) {
-        throw this.createDetailedError(
-          ApiErrorCode.TOKEN_NOT_FOUND,
-          'Hyperliquid wallet not found',
-          '未找到Hyperliquid交易钱包，请确保账户已正确初始化'
-        );
+        logger.info(`Hyperliquid wallet not found for user ${telegramId}, attempting to create new wallet`, {
+          telegramId,
+          requestId
+        });
+        
+        // 尝试创建钱包
+        const createdWallet = await createUserHyperliquidWallet(telegramId);
+        if (createdWallet && createdWallet.tradingwalletaddress) {
+          walletData = createdWallet;
+          logger.info(`Successfully created Hyperliquid wallet for user ${telegramId}`, {
+            telegramId,
+            tradingWallet: createdWallet.tradingwalletaddress,
+            requestId
+          });
+        } else {
+          throw this.createDetailedError(
+            ApiErrorCode.TOKEN_NOT_FOUND,
+            'Failed to create Hyperliquid wallet',
+            '无法创建Hyperliquid交易钱包，请稍后重试或联系管理员'
+          );
+        }
       }
 
       // 步骤2: 并行查询现货余额和合约余额
