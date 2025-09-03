@@ -338,8 +338,8 @@ export interface SolanaRPCResponse<T = any> {
  */
 export interface FormattedWalletBalance {
   address: string;            // 钱包地址
-  network: 'solana' | 'ethereum'; // 网络类型
-  nativeBalance: number;      // 主币余额 (SOL/ETH)
+  network: 'solana' | 'ethereum' | 'arbitrum' | 'hyperliquid'; // 网络类型
+  nativeBalance: number;      // 主币余额 (SOL/ETH/USDC)
   nativeSymbol: string;       // 主币符号
   tokenBalances: TokenBalance[]; // 代币余额
   totalUsdValue: number;      // 总USD价值
