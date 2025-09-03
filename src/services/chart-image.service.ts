@@ -376,12 +376,8 @@ export class ChartImageService {
             type: 'time',
             time: {
               unit: this.getTimeUnit(config.timeFrame),
-              displayFormats: {
-                minute: 'HH:mm',
-                hour: 'MM-DD HH:mm',
-                day: 'MM-DD',
-                week: 'MM-DD'
-              }
+              displayFormats: this.getTimeDisplayFormats(config.timeFrame),
+              stepSize: this.getTimeStepSize(config.timeFrame)
             },
             grid: {
               display: true,
@@ -390,7 +386,13 @@ export class ChartImageService {
               borderColor: isDark ? '#363a45' : '#d1d5db'
             },
             ticks: {
-              display: false  // Hide time labels for minimal look
+              display: true,  // 显示时间标签
+              maxTicksLimit: this.getMaxTimeTicks(config.timeFrame),
+              color: isDark ? '#9ca3af' : '#6b7280',
+              font: {
+                size: 10,
+                family: 'Inter, sans-serif'
+              }
             }
           },
           y: {
@@ -505,69 +507,105 @@ export class ChartImageService {
   }
 
   /**
-   * 获取时间步长用于Chart.js时间轴 - 控制刻度间隔
+   * 获取时间步长用于Chart.js时间轴 - 针对4个支持时间框架的刻度间隔
    */
   private getTimeStepSize(timeFrame: TimeFrame): number | undefined {
-    const stepSizeMap: { [key in TimeFrame]: number | undefined } = {
-      '1m': 10,      // 每10分钟一个刻度 (120根K线显示12个刻度)
-      '5m': 5,       // 每25分钟一个刻度 (60根K线显示12个刻度)  
-      '15m': 4,      // 每1小时一个刻度 (48根K线显示12个刻度)
-      '1h': 4,       // 每4小时一个刻度 (24根K线显示6个刻度)
-      '4h': 1,       // 每4小时一个刻度 (20根K线显示20个刻度)
-      '1d': 2        // 每2天一个刻度 (20根K线显示10个刻度)
-    };
-
-    return stepSizeMap[timeFrame];
+    // 根据当前支持的4个时间框架: 1m, 5m, 1h, 1d 和20根K线数据
+    switch (timeFrame) {
+      case '1m': return 5;    // 1分钟图: 每5分钟一个刻度 (20根K线显示~4个刻度)
+      case '5m': return 4;    // 5分钟图: 每20分钟一个刻度 (20根K线显示5个刻度)  
+      case '1h': return 4;    // 1小时图: 每4小时一个刻度 (20根K线显示5个刻度)
+      case '1d': return 3;    // 日线图: 每3天一个刻度 (20根K线显示~7个刻度)
+      default: return undefined; // 让Chart.js自动决定
+    }
   }
 
   /**
-   * 获取时间显示格式 - 针对不同时间框架优化
+   * 获取时间显示格式 - 针对4个支持的时间框架优化
    */
   private getTimeDisplayFormats(timeFrame: TimeFrame): { [key: string]: string } {
-    const baseFormats = {
-      millisecond: 'HH:mm:ss.SSS',
-      second: 'HH:mm:ss',
-      minute: 'HH:mm',
-      hour: 'MM-DD HH:mm',
-      day: 'MM-DD',
-      week: 'MM-DD',
-      month: 'MM-DD',
-      quarter: 'MM-DD',
-      year: 'YYYY'
-    };
-
-    // 针对短时间框架优化显示格式
-    if (timeFrame === '1m') {
-      return {
-        ...baseFormats,
-        minute: 'HH:mm',       // 显示小时:分钟
-        hour: 'MM-DD HH:mm'    // 显示月-日 小时:分钟
-      };
-    } else if (timeFrame === '5m') {
-      return {
-        ...baseFormats,
-        minute: 'HH:mm',       // 显示小时:分钟
-        hour: 'MM-DD HH:mm'    // 显示月-日 小时:分钟
-      };
+    // 根据当前支持的4个时间框架: 1m, 5m, 1h, 1d
+    switch (timeFrame) {
+      case '1m':
+        return {
+          millisecond: 'HH:mm:ss',
+          second: 'HH:mm:ss',
+          minute: 'HH:mm',           // 1分钟图显示: 14:35
+          hour: 'MM-DD HH:mm',
+          day: 'MM-DD',
+          week: 'MM-DD',
+          month: 'MM-DD',
+          quarter: 'MM-DD',
+          year: 'YYYY'
+        };
+      
+      case '5m':
+        return {
+          millisecond: 'HH:mm:ss',
+          second: 'HH:mm:ss',
+          minute: 'HH:mm',           // 5分钟图显示: 14:30, 14:35
+          hour: 'MM-DD HH:mm',
+          day: 'MM-DD',
+          week: 'MM-DD',
+          month: 'MM-DD',
+          quarter: 'MM-DD',
+          year: 'YYYY'
+        };
+      
+      case '1h':
+        return {
+          millisecond: 'HH:mm:ss',
+          second: 'HH:mm:ss',
+          minute: 'HH:mm',
+          hour: 'MM-DD HH:mm',       // 1小时图显示: 12-25 14:00
+          day: 'MM-DD',
+          week: 'MM-DD',
+          month: 'MM-DD',
+          quarter: 'MM-DD',
+          year: 'YYYY'
+        };
+      
+      case '1d':
+        return {
+          millisecond: 'HH:mm:ss',
+          second: 'HH:mm:ss',
+          minute: 'HH:mm',
+          hour: 'MM-DD HH:mm',
+          day: 'MM-DD',              // 日线图显示: 12-25, 12-26
+          week: 'MM-DD',
+          month: 'MM-DD',
+          quarter: 'MM-DD',
+          year: 'YYYY'
+        };
+      
+      default:
+        // 默认格式
+        return {
+          millisecond: 'HH:mm:ss',
+          second: 'HH:mm:ss',
+          minute: 'HH:mm',
+          hour: 'MM-DD HH:mm',
+          day: 'MM-DD',
+          week: 'MM-DD',
+          month: 'MM-DD',
+          quarter: 'MM-DD',
+          year: 'YYYY'
+        };
     }
-
-    return baseFormats;
   }
 
   /**
-   * 获取最大时间刻度数 - 控制X轴刻度密度
+   * 获取最大时间刻度数 - 针对4个支持时间框架的密度控制
    */
   private getMaxTimeTicks(timeFrame: TimeFrame): number {
-    const maxTicksMap: { [key in TimeFrame]: number } = {
-      '1m': 10,     // 1分钟图显示10个时间刻度
-      '5m': 8,      // 5分钟图显示8个时间刻度
-      '15m': 8,     // 15分钟图显示8个时间刻度
-      '1h': 6,      // 1小时图显示6个时间刻度
-      '4h': 5,      // 4小时图显示5个时间刻度
-      '1d': 5       // 日线图显示5个时间刻度
-    };
-
-    return maxTicksMap[timeFrame] || 6;
+    // 根据当前支持的4个时间框架: 1m, 5m, 1h, 1d 优化刻度数量
+    switch (timeFrame) {
+      case '1m': return 6;    // 1分钟图: 6个时间刻度, 避免过于密集
+      case '5m': return 5;    // 5分钟图: 5个时间刻度, 平衡清晰度
+      case '1h': return 6;    // 1小时图: 6个时间刻度, 显示合理的时间跨度
+      case '1d': return 8;    // 日线图: 8个时间刻度, 显示更多日期信息
+      default: return 6;      // 默认6个刻度
+    }
   }
 
 
