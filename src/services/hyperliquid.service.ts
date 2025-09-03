@@ -53,20 +53,27 @@ export interface IWithdrawRequestWithSignature extends IWithdrawRequest {
 }
 
 // 获取用户钱包地址
-export async function getUserWallet() {
-  const response = await apiService.get<IUserWalletData>("/api/hyperliquid/getUserWallet");
+export async function getUserWallet(telegramId?: string) {
+  const params = telegramId ? { telegram_id: telegramId } : {};
+  const response = await apiService.get<IUserWalletData>("/api/hyperliquid/getUserWallet", params);
   return response;
 }
 
 // 获取用户现货余额
-export async function getUserHyperliquidBalance(walletType: 1 | 2) {
+export async function getUserHyperliquidBalance(walletType: 1 | 2, telegramId?: string) {
+  const requestBody: any = {
+    type: walletType
+  };
+  
+  if (telegramId) {
+    requestBody.telegram_id = telegramId;
+  }
+  
   const response = await apiService.post<{
     code: number;
     data: IUserBalanceResponse;
     message: string;
-  }>("/api/hyperliquid/getUserBalance", {
-    type: walletType
-  });
+  }>("/api/hyperliquid/getUserBalance", requestBody);
 
   if (response.code === 200 && response.data) {
     // 找到USDC的余额
@@ -179,14 +186,20 @@ export async function openPositionsApi(params?: Record<string, unknown>) {
 }
 
 // 获取合约余额信息
-export async function getUserContractBalance(walletType?: 1 | 2) {
+export async function getUserContractBalance(walletType?: 1 | 2, telegramId?: string) {
+  const requestBody: any = {
+    type: walletType || 1
+  };
+  
+  if (telegramId) {
+    requestBody.telegram_id = telegramId;
+  }
+  
   const response = await apiService.post<{
     code: number;
     data: IUserStateData;
     message: string;
-  }>("/api/hyperliquid/getUserState", {
-    type: walletType || 1
-  });
+  }>("/api/hyperliquid/getUserState", requestBody);
 
   if (response.code === 200 && response?.data) {
     return {

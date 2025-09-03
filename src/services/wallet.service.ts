@@ -53,7 +53,7 @@ export class WalletService {
       }
 
       // 步骤2: 获取Hyperliquid钱包地址
-      const walletData = await getUserWallet();
+      const walletData = await getUserWallet(telegramId);
       if (!walletData || !walletData.tradingwalletaddress) {
         throw this.createDetailedError(
           ApiErrorCode.TOKEN_NOT_FOUND,
@@ -64,8 +64,8 @@ export class WalletService {
 
       // 步骤3: 并行查询现货余额和合约余额
       const [spotBalance, contractBalance] = await Promise.all([
-        getUserHyperliquidBalance(1), // 1 = trading wallet
-        getUserContractBalance(1)
+        getUserHyperliquidBalance(1, telegramId), // 1 = trading wallet
+        getUserContractBalance(1, telegramId)
       ]);
 
       // 步骤4: 转换为标准格式
