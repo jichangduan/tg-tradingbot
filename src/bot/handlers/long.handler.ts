@@ -116,14 +116,14 @@ export class LongHandler {
           apiError, 
           'long', 
           symbol, 
-          `${leverageStr} ${amountStr}`, 
+          amountStr, 
           loadingMessage.message_id
         );
       }
 
     } catch (error) {
       // 使用统一错误处理处理系统异常
-      await handleTradingError(ctx, error, 'long', args[0], `${args[1]} ${args[2]}`);
+      await handleTradingError(ctx, error, 'long', args[0], args[2]);
     }
   }
 
