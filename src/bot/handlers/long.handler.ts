@@ -5,6 +5,7 @@ import { getUserAccessToken } from '../../utils/auth';
 import { logger } from '../../utils/logger';
 import { handleTradingError } from '../../utils/error-handler';
 import { ExtendedContext } from '../index';
+import { accountService } from '../../services/account.service';
 
 /**
  * Long命令处理器
@@ -71,11 +72,60 @@ export class LongHandler {
           telegram_id: userId!.toString()
         };
 
+        // 检查余额是否足够
+        const requiredAmount = parseFloat(amountStr);
+        if (isNaN(requiredAmount) || requiredAmount <= 0) {
+          await ctx.telegram.editMessageText(
+            ctx.chat?.id,
+            loadingMessage.message_id,
+            undefined,
+            '❌ <b>交易参数错误</b>\n\n' +
+            '请输入有效的数量\n\n' +
+            '示例: <code>/long BTC 10x 200</code>',
+            { parse_mode: 'HTML' }
+          );
+          return;
+        }
+
+        // 检查账户余额
+        try {
+          const hasEnoughBalance = await accountService.checkSufficientBalance(
+            userId!.toString(),
+            requiredAmount,
+            'USDC'
+          );
+
+          if (!hasEnoughBalance) {
+            await ctx.telegram.editMessageText(
+              ctx.chat?.id,
+              loadingMessage.message_id,
+              undefined,
+              '💰 <b>账户余额不足</b>\n\n' +
+              `交易需要: <code>${requiredAmount} USDC</code>\n\n` +
+              '💡 <b>解决方案:</b>\n' +
+              `• 使用 /wallet 查看当前余额\n` +
+              `• 向钱包充值更多 USDC\n` +
+              `• 减少交易金额`,
+              { parse_mode: 'HTML' }
+            );
+            return;
+          }
+        } catch (balanceError) {
+          logger.warn(`Failed to check balance for long trading`, {
+            userId,
+            requiredAmount,
+            error: (balanceError as Error).message,
+            requestId
+          });
+          // 如果余额检查失败，继续执行交易（让后端处理）
+        }
+
         // 添加调试日志
         logger.info(`Long trading request data`, {
           tradingData,
           parsedArgs: { symbol, leverageStr, amountStr },
           originalArgs: args,
+          requiredAmount,
           requestId
         });
 
