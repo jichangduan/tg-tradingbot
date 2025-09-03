@@ -135,24 +135,28 @@ export async function createUserHyperliquidWallet(telegramId: string): Promise<I
     // 调用后端API创建钱包 - 基于后端代码分析，这个API会自动创建并保存钱包
     // 实际上调用的是 getUserWallet，但后端会在不存在时自动创建
     const createWalletResponse = await apiService.getWithAuth<{
-      tradingwalletaddress?: string;
-      strategywalletaddress?: string;
-      maxfeerate?: string;
+      code: number;
+      data: {
+        tradingwalletaddress?: string;
+        strategywalletaddress?: string;
+        maxfeerate?: string;
+      };
+      message: string;
     }>('/api/hyperliquid/getUserWallet', accessToken, { 
       telegram_id: telegramId 
     });
 
-    if (createWalletResponse && createWalletResponse.tradingwalletaddress) {
+    if (createWalletResponse && createWalletResponse.code === 200 && createWalletResponse.data && createWalletResponse.data.tradingwalletaddress) {
       logger.info(`Hyperliquid wallet created successfully for user ${telegramId}`, {
         telegramId,
-        tradingWallet: createWalletResponse.tradingwalletaddress,
-        strategyWallet: createWalletResponse.strategywalletaddress
+        tradingWallet: createWalletResponse.data.tradingwalletaddress,
+        strategyWallet: createWalletResponse.data.strategywalletaddress
       });
 
       // 返回钱包数据
       return {
-        tradingwalletaddress: createWalletResponse.tradingwalletaddress,
-        strategywalletaddress: createWalletResponse.strategywalletaddress || ''
+        tradingwalletaddress: createWalletResponse.data.tradingwalletaddress,
+        strategywalletaddress: createWalletResponse.data.strategywalletaddress || ''
       };
     } else {
       logger.error(`Failed to create Hyperliquid wallet for user ${telegramId}`, {
