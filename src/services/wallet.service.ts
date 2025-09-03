@@ -40,19 +40,7 @@ export class WalletService {
         requestId
       });
 
-      // 步骤1: 通过telegram_id获取用户信息
-      const userInitRequest = { telegram_id: telegramId };
-      const userData = await userService.initializeUser(userInitRequest);
-      
-      if (!userData.walletAddress) {
-        throw this.createDetailedError(
-          ApiErrorCode.TOKEN_NOT_FOUND,
-          'User wallet address not found',
-          '未找到用户钱包地址，请先完成账户初始化'
-        );
-      }
-
-      // 步骤2: 获取Hyperliquid钱包地址
+      // 步骤1: 获取Hyperliquid钱包地址 (现在直接使用缓存的JWT Token)
       const walletData = await getUserWallet(telegramId);
       if (!walletData || !walletData.tradingwalletaddress) {
         throw this.createDetailedError(
@@ -62,13 +50,13 @@ export class WalletService {
         );
       }
 
-      // 步骤3: 并行查询现货余额和合约余额
+      // 步骤2: 并行查询现货余额和合约余额
       const [spotBalance, contractBalance] = await Promise.all([
         getUserHyperliquidBalance(1, telegramId), // 1 = trading wallet
         getUserContractBalance(1, telegramId)
       ]);
 
-      // 步骤4: 转换为标准格式
+      // 步骤3: 转换为标准格式
       const walletBalance = this.convertToFormattedBalance(
         walletData,
         spotBalance.data,

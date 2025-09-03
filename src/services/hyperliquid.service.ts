@@ -1,4 +1,6 @@
 import { apiService } from './api.service';
+import { cacheService } from './cache.service';
+import { logger } from '../utils/logger';
 
 export interface IUserWalletData {
   tradingwalletaddress: string;
@@ -52,28 +54,94 @@ export interface IWithdrawRequestWithSignature extends IWithdrawRequest {
   twitter_auth_code?: string; // Twitter授权码（三方登录用户使用）
 }
 
+/**
+ * 从缓存中获取用户的JWT Token
+ * @param telegramId Telegram用户ID
+ * @returns JWT Token字符串，如果不存在则返回null
+ */
+async function getUserAccessToken(telegramId: string): Promise<string | null> {
+  try {
+    const tokenKey = `user:token:${telegramId}`;
+    const result = await cacheService.get<string>(tokenKey);
+    
+    if (result.success && result.data) {
+      logger.debug(`JWT Token retrieved from cache for user ${telegramId}`, {
+        tokenKey,
+        hasToken: true,
+        tokenLength: result.data.length
+      });
+      return result.data;
+    } else {
+      logger.warn(`No JWT Token found in cache for user ${telegramId}`, {
+        tokenKey,
+        error: result.error
+      });
+      return null;
+    }
+  } catch (error) {
+    logger.error(`Failed to get JWT Token from cache for user ${telegramId}`, {
+      error: (error as Error).message
+    });
+    return null;
+  }
+}
+
 // 获取用户钱包地址
 export async function getUserWallet(telegramId?: string) {
-  const params = telegramId ? { telegram_id: telegramId } : {};
-  const response = await apiService.get<IUserWalletData>("/api/hyperliquid/getUserWallet", params);
+  if (!telegramId) {
+    throw new Error('telegramId is required for getUserWallet');
+  }
+
+  // 获取用户的JWT Token
+  const accessToken = await getUserAccessToken(telegramId);
+  if (!accessToken) {
+    throw new Error(`No JWT Token found for user ${telegramId}. Please initialize user first using /start`);
+  }
+
+  const params = { telegram_id: telegramId };
+  
+  logger.info(`Getting user wallet with authentication for ${telegramId}`, {
+    telegramId,
+    hasToken: true
+  });
+
+  const response = await apiService.getWithAuth<IUserWalletData>(
+    "/api/hyperliquid/getUserWallet", 
+    accessToken, 
+    params
+  );
+  
   return response;
 }
 
 // 获取用户现货余额
 export async function getUserHyperliquidBalance(walletType: 1 | 2, telegramId?: string) {
+  if (!telegramId) {
+    throw new Error('telegramId is required for getUserHyperliquidBalance');
+  }
+
+  // 获取用户的JWT Token
+  const accessToken = await getUserAccessToken(telegramId);
+  if (!accessToken) {
+    throw new Error(`No JWT Token found for user ${telegramId}. Please initialize user first using /start`);
+  }
+
   const requestBody: any = {
-    type: walletType
+    type: walletType,
+    telegram_id: telegramId
   };
   
-  if (telegramId) {
-    requestBody.telegram_id = telegramId;
-  }
+  logger.info(`Getting user hyperliquid balance with authentication for ${telegramId}`, {
+    telegramId,
+    walletType,
+    hasToken: true
+  });
   
-  const response = await apiService.post<{
+  const response = await apiService.postWithAuth<{
     code: number;
     data: IUserBalanceResponse;
     message: string;
-  }>("/api/hyperliquid/getUserBalance", requestBody);
+  }>("/api/hyperliquid/getUserBalance", accessToken, requestBody);
 
   if (response.code === 200 && response.data) {
     // 找到USDC的余额
@@ -187,19 +255,32 @@ export async function openPositionsApi(params?: Record<string, unknown>) {
 
 // 获取合约余额信息
 export async function getUserContractBalance(walletType?: 1 | 2, telegramId?: string) {
+  if (!telegramId) {
+    throw new Error('telegramId is required for getUserContractBalance');
+  }
+
+  // 获取用户的JWT Token
+  const accessToken = await getUserAccessToken(telegramId);
+  if (!accessToken) {
+    throw new Error(`No JWT Token found for user ${telegramId}. Please initialize user first using /start`);
+  }
+
   const requestBody: any = {
-    type: walletType || 1
+    type: walletType || 1,
+    telegram_id: telegramId
   };
   
-  if (telegramId) {
-    requestBody.telegram_id = telegramId;
-  }
+  logger.info(`Getting user contract balance with authentication for ${telegramId}`, {
+    telegramId,
+    walletType: walletType || 1,
+    hasToken: true
+  });
   
-  const response = await apiService.post<{
+  const response = await apiService.postWithAuth<{
     code: number;
     data: IUserStateData;
     message: string;
-  }>("/api/hyperliquid/getUserState", requestBody);
+  }>("/api/hyperliquid/getUserState", accessToken, requestBody);
 
   if (response.code === 200 && response?.data) {
     return {
