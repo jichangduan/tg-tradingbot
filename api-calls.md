@@ -57,8 +57,12 @@
 ### 8. `/close` - 平仓
 - **接口**: `POST /api/tgbot/trading/close`
 - **认证**: JWT Token
-- **参数**: 平仓参数
-- **状态**: 🟡 需要测试
+- **参数**: `{symbol, percentage, orderType}`
+- **状态**: ✅ **已修复** - 参数格式问题已解决
+- **修复**: 
+  - 修复前端参数映射，正确发送 `percentage` 字段
+  - 支持百分比格式（如 `50%`, `100%`）和数量格式
+  - 当用户无持仓时返回准确的错误提示
 
 ### 9. `/positions` - 持仓查询
 - **接口**: `GET /api/tgbot/trading/positions` 
@@ -243,3 +247,42 @@
 
 ### 部署说明
 修复后的代码需要部署到服务器才能生效。用户将收到准确的余额不足提示，不再看到误导性的交易执行失败信息。
+
+## 最新修复进展 (2025-09-03) - /close 命令参数修复
+
+### /close 命令参数格式问题修复 ✅
+
+**问题：** `/close` 命令返回 400 错误 "No positions found for BTC"，根本原因是参数格式不匹配
+
+**根本原因：** 
+- **前端发送**：`{symbol, amount, percentage, telegram_id}` 
+- **后端期望**：`{symbol, percentage, orderType}` (来自 TgBotController.js:428)
+- 前端 `amount: 0.01` 字段未被后端使用
+- 前端 `percentage: false` 格式不正确
+
+**修复措施：**
+1. ✅ **修复参数映射**：close.handler.ts 第82-87行
+   - 移除无用的 `amount` 和 `telegram_id` 字段
+   - 正确格式化 `percentage` 字段：
+     - 百分比输入（如 `50%`）→ 发送 `percentage: "50%"`
+     - 数量输入（如 `0.01`）→ 发送 `percentage: "0.01"`
+   - 添加 `orderType: 'market'` 字段
+
+2. ✅ **后端兼容性确认**：
+   - TgBotController.js 已支持百分比和数量两种格式
+   - 当无持仓时正确返回 "No positions found" 错误（这是期望行为）
+
+3. ✅ **测试场景覆盖**：
+   - `/close BTC` → 发送 `{symbol: "BTC", percentage: "100%", orderType: "market"}`
+   - `/close BTC 50%` → 发送 `{symbol: "BTC", percentage: "50%", orderType: "market"}`  
+   - `/close BTC 0.01` → 发送 `{symbol: "BTC", percentage: "0.01", orderType: "market"}`
+
+**测试结果：**
+- ✅ 参数格式修复完成
+- ✅ JWT Token 认证流程正常
+- ✅ 无持仓时返回正确错误提示（400："No positions found"）
+- 🟡 需要实际持仓测试成功场景
+
+**注意事项：**
+- 当前错误 "No positions found for BTC" 是正确行为，说明用户确实没有 BTC 持仓
+- 需要先用 `/long BTC x2 100` 开仓，然后才能测试 `/close BTC` 平仓功能

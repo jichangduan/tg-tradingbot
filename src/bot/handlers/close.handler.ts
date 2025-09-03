@@ -78,11 +78,12 @@ export class CloseHandler {
       );
 
       // 准备平仓数据（移到try块外以便重试时使用）
+      // 修复：根据后端API期望格式化参数 (TgBotController.js line 428)
       const closeData = {
         symbol: symbol.toUpperCase(),
-        amount: amount,
-        percentage: isPercentage,
-        telegram_id: userId!.toString()
+        // 如果是百分比，发送原始用户输入（已包含%）；如果是数量，发送数量字符串
+        percentage: isPercentage ? closeAmount : amount.toString(),
+        orderType: 'market'
       };
 
       try {
