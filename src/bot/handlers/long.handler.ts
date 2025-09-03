@@ -71,6 +71,14 @@ export class LongHandler {
           telegram_id: userId!.toString()
         };
 
+        // 添加调试日志
+        logger.info(`Long trading request data`, {
+          tradingData,
+          parsedArgs: { symbol, leverageStr, amountStr },
+          originalArgs: args,
+          requestId
+        });
+
         // 调用交易API
         const result = await apiService.postWithAuth(
           '/api/tgbot/trading/long',
