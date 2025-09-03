@@ -37,14 +37,19 @@
 ### 6. `/long` - 做多交易
 - **接口**: `POST /api/tgbot/trading/long`
 - **认证**: JWT Token
-- **参数**: 交易参数
-- **状态**: 🟡 需要测试
+- **参数**: `{symbol, leverage, amount, telegram_id}`
+- **状态**: ❌ **400错误** - "Hyperliquid API returned null"
+- **问题分析**: 
+  - 参数格式正确，后端接收正常
+  - Leverage参数实际未被Hyperliquid API使用
+  - 错误来源于Hyperliquid交易执行，非参数验证
+  - 需要检查用户钱包状态和余额
 
 ### 7. `/short` - 做空交易  
 - **接口**: `POST /api/tgbot/trading/short`
 - **认证**: JWT Token
-- **参数**: 交易参数
-- **状态**: 🟡 需要测试
+- **参数**: `{symbol, leverage, amount, telegram_id}`
+- **状态**: ❌ **400错误** - 与`/long`相同的问题
 
 ### 8. `/close` - 平仓
 - **接口**: `POST /api/tgbot/trading/close`
@@ -137,9 +142,20 @@
 3. **API调用认证** - ✅ 所有Hyperliquid接口现在正确传递JWT Token
 4. **错误处理优化** - ✅ 添加了清晰的错误提示，引导用户先执行 `/start`
 
+### ❌ 当前问题 (2025-09-03)
+1. **交易命令失败** - `/long` 和 `/short` 返回400错误
+   - 错误信息: "Failed to execute long order - Hyperliquid API returned null"  
+   - 根本原因: Hyperliquid交易API返回null，非参数问题
+   - 可能原因: 用户钱包余额不足、网络连接、Hyperliquid服务状态
+
+2. **钱包命令502错误** - `/wallet` 间歇性返回502 Bad Gateway
+   - 原因: 后端服务不可用或重启中
+   - 用户体验: 显示技术错误而非友好提示
+
 ### 🟡 待验证
+- 修复交易命令的Hyperliquid API调用问题
+- 改进错误处理，引导用户先执行 `/start`
 - 所有标记为 🟡 的接口需要实际测试
-- 交易接口的参数格式需要确认
 - 推送和邀请功能的完整流程
 
 ## 修复摘要 (2025-09-03 完成)
@@ -152,6 +168,30 @@
    - `getUserContractBalance()` → 使用 `apiService.postWithAuth()`
 3. **优化wallet.service.ts**：移除不必要的 `userService.initializeUser()` 调用
 4. **改进错误处理**：添加清晰的Token缺失错误提示
+
+5. **自动钱包创建功能**：用户无钱包时自动调用 `/api/hyperliquid/createUserWallet`
+6. **交易命令调试日志**：添加详细日志帮助诊断400错误
+
+### 调试发现 (2025-09-03)
+
+#### 交易命令400错误分析
+1. **参数传递正确**：前端正确解析 `/long btc x10 200` 并传递给后端
+2. **JWT认证正常**：用户认证和权限验证通过
+3. **后端接口正常**：TgBotController.js 正确接收参数
+4. **Hyperliquid API问题**：最终调用 Hyperliquid 交易API时返回null
+5. **Leverage参数未使用**：后端代码显示leverage参数实际未传递给Hyperliquid
+
+#### 可能原因
+- 用户钱包余额不足（需要先充值USDC）
+- Hyperliquid服务状态异常
+- 交易参数格式不符合Hyperliquid要求
+- 网络连接问题
+
+#### 下一步行动
+1. **检查用户钱包余额** - 确认USDC余额是否充足
+2. **验证Hyperliquid服务** - 测试Hyperliquid API直接调用
+3. **完善错误处理** - 提供具体失败原因而非通用错误
+4. **优化用户体验** - 502错误时引导用户先执行`/start`
 
 ### 部署说明
 修复后的代码需要部署到服务器才能生效。部署后，`/wallet` 命令应该能够正常显示用户余额，不再出现403错误。

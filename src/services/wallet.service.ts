@@ -252,7 +252,8 @@ export class WalletService {
       return this.createDetailedError(
         ApiErrorCode.NETWORK_ERROR,
         error.message,
-        'Hyperliquid网络连接失败，请检查网络连接'
+        '🌐 <b>网络连接失败</b>\n\n请先执行 <code>/start</code> 命令确保您的账户状态正常，然后重试钱包查询。\n\n📶 请检查网络连接状态。',
+        true
       );
     }
 
@@ -261,7 +262,8 @@ export class WalletService {
       return this.createDetailedError(
         ApiErrorCode.TIMEOUT_ERROR,
         error.message,
-        '请求超时，请稍后重试'
+        '⏰ <b>请求超时</b>\n\n服务响应较慢，建议先执行 <code>/start</code> 命令刷新账户状态，然后重试。\n\n🔄 请稍后重试钱包查询。',
+        true
       );
     }
 
@@ -293,7 +295,8 @@ export class WalletService {
           return this.createDetailedError(
             ApiErrorCode.TOKEN_NOT_FOUND,
             message,
-            '未找到Hyperliquid账户信息，请先完成交易账户初始化'
+            '👤 <b>账户未初始化</b>\n\n请先执行 <code>/start</code> 命令初始化您的账户，创建交易钱包。\n\n🚀 初始化完成后即可查看钱包余额。',
+            false
           );
         case 429:
           return this.createDetailedError(
@@ -308,7 +311,8 @@ export class WalletService {
           return this.createDetailedError(
             ApiErrorCode.SERVER_ERROR,
             message,
-            'Hyperliquid服务器内部错误，请稍后重试'
+            '🔧 <b>服务初始化中</b>\n\n请先执行 <code>/start</code> 命令初始化您的账户，然后重试钱包查询。\n\n💡 如果问题持续存在，请稍后重试或联系管理员。',
+            true
           );
         default:
           return this.createDetailedError(
@@ -323,7 +327,8 @@ export class WalletService {
     return this.createDetailedError(
       ApiErrorCode.UNKNOWN_ERROR,
       error.message || 'Unknown error',
-      'Hyperliquid钱包余额查询失败，请稍后重试'
+      '❌ <b>钱包查询失败</b>\n\n请先执行 <code>/start</code> 命令重新初始化您的账户。\n\n🔄 如果问题持续存在，请稍后重试或联系管理员。',
+      true
     );
   }
 
@@ -332,7 +337,7 @@ export class WalletService {
    */
   private createDetailedError(
     code: ApiErrorCode,
-    originalMessage: string,
+    _originalMessage: string,
     userFriendlyMessage: string,
     retryable: boolean = true
   ): DetailedError {
