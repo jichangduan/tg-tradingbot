@@ -357,11 +357,11 @@ export class ChartImageService {
             down: '#ff3366', 
             unchanged: '#ffffff'
           },
-          // 🔧 大幅增加边框宽度和蜡烛宽度以提高可见性
+          // 🔧 调整边框宽度和蜡烛宽度，增加间距改善视觉效果
           borderWidth: 2,        // 加粗边框
-          // 🔧 最大化蜡烛宽度，减少间距
-          barPercentage: 0.95,   // 几乎满宽
-          categoryPercentage: 0.98 // 几乎无间距
+          // 🔧 优化蜡烛宽度和间距，改善视觉效果
+          barPercentage: 0.8,    // 减少蜡烛宽度，增加间距
+          categoryPercentage: 0.9 // 增加类别间距，避免过于拥挤
         }]
       },
       options: {
@@ -525,18 +525,19 @@ export class ChartImageService {
    */
   private getTimeDisplayFormats(timeFrame: TimeFrame): { [key: string]: string } {
     // 根据当前支持的4个时间框架: 1m, 5m, 1h, 1d
+    // 所有格式统一不显示年份，只显示月-日
     switch (timeFrame) {
       case '1m':
         return {
           millisecond: 'HH:mm:ss',
           second: 'HH:mm:ss',
           minute: 'HH:mm',           // 1分钟图显示: 14:35
-          hour: 'MM-DD HH:mm',
+          hour: 'HH:mm',             // 不显示日期，只显示时间
           day: 'MM-DD',
           week: 'MM-DD',
           month: 'MM-DD',
           quarter: 'MM-DD',
-          year: 'YYYY'
+          year: 'MM-DD'              // 移除年份显示
         };
       
       case '5m':
@@ -544,12 +545,12 @@ export class ChartImageService {
           millisecond: 'HH:mm:ss',
           second: 'HH:mm:ss',
           minute: 'HH:mm',           // 5分钟图显示: 14:30, 14:35
-          hour: 'MM-DD HH:mm',
+          hour: 'HH:mm',             // 不显示日期，只显示时间
           day: 'MM-DD',
           week: 'MM-DD',
           month: 'MM-DD',
           quarter: 'MM-DD',
-          year: 'YYYY'
+          year: 'MM-DD'              // 移除年份显示
         };
       
       case '1h':
@@ -557,12 +558,12 @@ export class ChartImageService {
           millisecond: 'HH:mm:ss',
           second: 'HH:mm:ss',
           minute: 'HH:mm',
-          hour: 'MM-DD HH:mm',       // 1小时图显示: 12-25 14:00
+          hour: 'MM-DD',             // 1小时图只显示: 12-25 (不显示时间)
           day: 'MM-DD',
           week: 'MM-DD',
           month: 'MM-DD',
           quarter: 'MM-DD',
-          year: 'YYYY'
+          year: 'MM-DD'              // 移除年份显示
         };
       
       case '1d':
@@ -570,26 +571,26 @@ export class ChartImageService {
           millisecond: 'HH:mm:ss',
           second: 'HH:mm:ss',
           minute: 'HH:mm',
-          hour: 'MM-DD HH:mm',
+          hour: 'MM-DD',
           day: 'MM-DD',              // 日线图显示: 12-25, 12-26
           week: 'MM-DD',
           month: 'MM-DD',
           quarter: 'MM-DD',
-          year: 'YYYY'
+          year: 'MM-DD'              // 移除年份显示
         };
       
       default:
-        // 默认格式
+        // 默认格式 - 统一不显示年份
         return {
           millisecond: 'HH:mm:ss',
           second: 'HH:mm:ss',
           minute: 'HH:mm',
-          hour: 'MM-DD HH:mm',
+          hour: 'MM-DD',
           day: 'MM-DD',
           week: 'MM-DD',
           month: 'MM-DD',
           quarter: 'MM-DD',
-          year: 'YYYY'
+          year: 'MM-DD'
         };
     }
   }
@@ -599,12 +600,13 @@ export class ChartImageService {
    */
   private getMaxTimeTicks(timeFrame: TimeFrame): number {
     // 根据当前支持的4个时间框架: 1m, 5m, 1h, 1d 优化刻度数量
+    // 目标: 让每根K线或每几根K线都有时间标签（20根K线数据）
     switch (timeFrame) {
-      case '1m': return 6;    // 1分钟图: 6个时间刻度, 避免过于密集
-      case '5m': return 5;    // 5分钟图: 5个时间刻度, 平衡清晰度
-      case '1h': return 6;    // 1小时图: 6个时间刻度, 显示合理的时间跨度
-      case '1d': return 8;    // 日线图: 8个时间刻度, 显示更多日期信息
-      default: return 6;      // 默认6个刻度
+      case '1m': return 10;   // 1分钟图: 10个时间刻度, 每2根K线显示一个时间
+      case '5m': return 10;   // 5分钟图: 10个时间刻度, 每2根K线显示一个时间
+      case '1h': return 10;   // 1小时图: 10个时间刻度, 每2根K线显示一个时间
+      case '1d': return 20;   // 日线图: 20个时间刻度, 每根K线显示一个日期
+      default: return 10;     // 默认10个刻度
     }
   }
 
