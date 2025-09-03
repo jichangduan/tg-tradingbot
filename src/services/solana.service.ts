@@ -1,7 +1,6 @@
 import { apiService } from './api.service';
 import { logger } from '../utils/logger';
 import { 
-  SolanaWalletBalance, 
   TokenBalance, 
   FormattedWalletBalance,
   SolanaRPCResponse,
@@ -32,7 +31,7 @@ export class SolanaService {
    */
   public async getWalletBalance(walletAddress: string): Promise<FormattedWalletBalance> {
     const startTime = Date.now();
-    const requestId = `sol_balance_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const requestId = `sol_balance_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 
     try {
       // 验证钱包地址格式
@@ -319,7 +318,7 @@ export class SolanaService {
   /**
    * 处理服务错误
    */
-  private handleServiceError(error: any, requestId: string): DetailedError {
+  private handleServiceError(error: any, _requestId: string): DetailedError {
     // 如果已经是DetailedError，直接返回
     if (error && typeof error.code === 'string' && error.retryable !== undefined) {
       return error as DetailedError;
@@ -356,7 +355,7 @@ export class SolanaService {
    */
   private createDetailedError(
     code: ApiErrorCode,
-    originalMessage: string,
+    _originalMessage: string,
     userFriendlyMessage: string,
     retryable: boolean = true
   ): DetailedError {

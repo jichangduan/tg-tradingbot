@@ -361,6 +361,26 @@ export class CacheService {
       throw error;
     }
   }
+
+  /**
+   * 获取匹配模式的所有键
+   */
+  public async getKeys(pattern: string): Promise<string[]> {
+    try {
+      if (!this.isReady()) {
+        logger.warn('Redis not connected, returning empty keys array');
+        return [];
+      }
+
+      const keys = await this.client!.keys(pattern);
+      return keys;
+
+    } catch (error) {
+      const errorMessage = (error as Error).message;
+      logger.error(`Cache getKeys failed for pattern: ${pattern}`, { error: errorMessage });
+      return [];
+    }
+  }
 }
 
 // 导出单例实例

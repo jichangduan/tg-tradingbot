@@ -14,6 +14,12 @@ export class PushSchedulerService {
   private scheduleTask?: cron.ScheduledTask;
   private readonly cachePrefix = 'push_scheduler';
   private readonly lastPushCacheKey = 'last_push_time';
+  
+  // 内存存储fallback - 跟踪启用推送的用户
+  private enabledUsersMemoryStore = new Map<string, {
+    settings: PushSettings;
+    lastUpdated: number;
+  }>();
 
   /**
    * 启动定时推送调度器
@@ -194,7 +200,7 @@ export class PushSchedulerService {
 
   /**
    * 获取启用推送的用户列表
-   * 从后端API获取所有启用推送的用户
+   * 使用本地缓存跟踪启用推送的用户
    */
   private async getEnabledPushUsers(): Promise<Array<{
     userId: string;
@@ -202,7 +208,7 @@ export class PushSchedulerService {
     pushData?: PushData;
   }>> {
     try {
-      logger.info('Fetching enabled push users from backend API');
+      logger.info('Getting enabled push users from local cache tracking');
       
       const enabledUsers: Array<{
         userId: string;
@@ -210,69 +216,43 @@ export class PushSchedulerService {
         pushData?: PushData;
       }> = [];
       
-      // 1. 调用后端API获取所有启用推送的用户列表
-      try {
-        const response = await apiService.get<{
-          code: string;
-          message: string;
-          data: Array<{
-            user_id: string;
-            telegram_id: string;
-            settings: {
-              flash_enabled: boolean;
-              whale_enabled: boolean;
-              fund_enabled: boolean;
-            };
-          }>;
-        }>('/api/tgbot/push/users/enabled');
-        
-        if (response.code === '0' && response.data && response.data.length > 0) {
-          // 2. 对于每个用户，获取其推送设置和推送数据
-          for (const user of response.data) {
-            try {
-              // 获取用户的推送设置（使用已有的pushService）
-              // TODO: 需要用户的access token，现在先跳过这个用户
-              logger.debug('Skipping user - need access token for push settings', {
-                telegramId: user.telegram_id
+      // 从缓存中获取所有有推送设置的用户列表
+      const userCacheKeys = await this.getUsersWithPushSettings();
+      
+      for (const userId of userCacheKeys) {
+        try {
+          // 获取用户的推送设置
+          const userSettingsResult = await this.getCachedUserPushSettings(userId);
+          
+          if (userSettingsResult) {
+            // 检查是否至少有一项推送功能启用
+            const hasAnyEnabled = userSettingsResult.flash_enabled || 
+                                userSettingsResult.whale_enabled || 
+                                userSettingsResult.fund_enabled;
+            
+            if (hasAnyEnabled) {
+              // 获取推送内容数据
+              const pushDataResult = await this.getPushDataForUser(userId);
+              
+              enabledUsers.push({
+                userId: userId,
+                settings: userSettingsResult,
+                pushData: pushDataResult
               });
               
-              // 临时使用默认设置
-              const settings: PushSettings = {
-                flash_enabled: true,
-                whale_enabled: true,
-                fund_enabled: true
-              };
-              
-              if (settings) {
-                // 获取推送内容数据
-                const pushDataResult = await this.getPushDataForUser(user.telegram_id);
-                
-                enabledUsers.push({
-                  userId: user.telegram_id,
-                  settings: settings,
-                  pushData: pushDataResult
-                });
-                
-                logger.debug('Added user for push notifications', {
-                  telegramId: user.telegram_id,
-                  settings: settings
-                });
-              }
-            } catch (userError) {
-              logger.warn('Failed to process user for push', {
-                telegramId: user.telegram_id,
-                error: (userError as Error).message
+              logger.debug('Added user for push notifications', {
+                telegramId: userId,
+                settings: userSettingsResult
               });
-              continue;
             }
           }
-        } else {
-          logger.info('No enabled push users found in database');
+        } catch (userError) {
+          logger.warn('Failed to process user for push', {
+            telegramId: userId,
+            error: (userError as Error).message
+          });
+          continue;
         }
-      } catch (apiError) {
-        logger.warn('Failed to fetch users from API, will continue with empty list', {
-          error: (apiError as Error).message
-        });
       }
 
       logger.info('Enabled push users fetched successfully', {
@@ -288,6 +268,127 @@ export class PushSchedulerService {
       });
       return [];
     }
+  }
+
+  /**
+   * 获取有推送设置的用户ID列表
+   */
+  private async getUsersWithPushSettings(): Promise<string[]> {
+    try {
+      // 首先尝试从Redis缓存获取
+      const pushSettingsPattern = 'push_settings:*';
+      const cacheKeys = await cacheService.getKeys(pushSettingsPattern);
+      
+      if (cacheKeys.length > 0) {
+        // 从key中提取用户ID
+        const userIds = cacheKeys
+          .map(key => key.replace('push_settings:', ''))
+          .filter(id => id && /^\d+$/.test(id));
+        
+        logger.debug('Found users with push settings in Redis cache', {
+          userCount: userIds.length,
+          userIds: userIds.slice(0, 5)
+        });
+        
+        return userIds;
+      }
+      
+      // 如果Redis没有数据，使用内存存储的fallback
+      const memoryUserIds = Array.from(this.enabledUsersMemoryStore.keys());
+      
+      if (memoryUserIds.length > 0) {
+        logger.debug('Using memory store fallback for push users', {
+          userCount: memoryUserIds.length,
+          userIds: memoryUserIds.slice(0, 5)
+        });
+        
+        return memoryUserIds;
+      }
+      
+      logger.info('No push users found in cache or memory store');
+      return [];
+      
+    } catch (error) {
+      logger.warn('Failed to get users with push settings from cache, trying memory store', {
+        error: (error as Error).message
+      });
+      
+      // 出错时使用内存存储
+      const memoryUserIds = Array.from(this.enabledUsersMemoryStore.keys());
+      
+      logger.debug('Using memory store fallback after error', {
+        userCount: memoryUserIds.length
+      });
+      
+      return memoryUserIds;
+    }
+  }
+
+  /**
+   * 从缓存获取用户的推送设置
+   */
+  private async getCachedUserPushSettings(userId: string): Promise<PushSettings | null> {
+    try {
+      // 首先尝试从Redis缓存获取
+      const cacheKey = `push_settings:${userId}`;
+      const cachedResult = await cacheService.get<{
+        data: { user_settings: PushSettings };
+      }>(cacheKey);
+      
+      if (cachedResult.success && cachedResult.data?.data?.user_settings) {
+        // 同时更新内存存储
+        this.enabledUsersMemoryStore.set(userId, {
+          settings: cachedResult.data.data.user_settings,
+          lastUpdated: Date.now()
+        });
+        
+        return cachedResult.data.data.user_settings;
+      }
+      
+      // 如果Redis没有，尝试从内存存储获取
+      const memoryData = this.enabledUsersMemoryStore.get(userId);
+      if (memoryData) {
+        logger.debug('Using memory store fallback for user push settings', { telegramId: userId });
+        return memoryData.settings;
+      }
+      
+      return null;
+      
+    } catch (error) {
+      logger.debug('Failed to get cached user push settings, trying memory store', {
+        telegramId: userId,
+        error: (error as Error).message
+      });
+      
+      // 出错时使用内存存储
+      const memoryData = this.enabledUsersMemoryStore.get(userId);
+      if (memoryData) {
+        logger.debug('Using memory store fallback after error', { telegramId: userId });
+        return memoryData.settings;
+      }
+      
+      return null;
+    }
+  }
+
+  /**
+   * 添加用户到推送跟踪（供外部调用）
+   */
+  public addUserToPushTracking(userId: string, settings: PushSettings): void {
+    this.enabledUsersMemoryStore.set(userId, {
+      settings,
+      lastUpdated: Date.now()
+    });
+    
+    logger.debug('User added to push tracking', { telegramId: userId, settings });
+  }
+
+  /**
+   * 从推送跟踪中移除用户
+   */
+  public removeUserFromPushTracking(userId: string): void {
+    this.enabledUsersMemoryStore.delete(userId);
+    logger.debug('User removed from push tracking', { telegramId: userId });
   }
 
   /**

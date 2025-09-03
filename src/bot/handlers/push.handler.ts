@@ -4,7 +4,8 @@ import { logger } from '../../utils/logger';
 import { messageFormatter } from '../utils/message.formatter';
 import { pushService, PushSettings, PushData } from '../../services/push.service';
 import { ApiError } from '../../services/api.service';
-import { getUserToken } from '../../utils/auth';
+import { getUserToken, getUserAccessToken } from '../../utils/auth';
+import { pushScheduler } from '../../services/push-scheduler.service';
 
 /**
  * Push命令处理器
@@ -106,10 +107,22 @@ export class PushHandler {
     pushData?: PushData;
   }> {
     try {
-      // 获取用户的访问令牌
-      const accessToken = await getUserToken(userId);
+      // 首先尝试从缓存获取访问令牌
+      let accessToken = await getUserToken(userId);
+      
+      // 如果没有缓存的token，自动初始化用户
       if (!accessToken) {
-        throw new Error('用户未认证，无法获取推送设置');
+        logger.info('No cached token found, initializing user', { telegramId: userId });
+        
+        // 从上下文获取用户信息
+        const userInfo = {
+          username: undefined, // 在这里我们无法直接获取，但API会处理
+          first_name: undefined,
+          last_name: undefined
+        };
+        
+        accessToken = await getUserAccessToken(userId, userInfo);
+        logger.info('User initialized and token obtained', { telegramId: userId });
       }
 
       // 调用推送服务获取设置和数据
@@ -282,10 +295,21 @@ export class PushHandler {
    */
   private async updateUserPushSetting(userId: string, type: string, enabled: boolean): Promise<void> {
     try {
-      // 获取用户的访问令牌
-      const accessToken = await getUserToken(userId);
+      // 首先尝试从缓存获取访问令牌
+      let accessToken = await getUserToken(userId);
+      
+      // 如果没有缓存的token，自动初始化用户
       if (!accessToken) {
-        throw new Error('用户未认证，无法更新推送设置');
+        logger.info('No cached token found, initializing user for update', { telegramId: userId });
+        
+        const userInfo = {
+          username: undefined,
+          first_name: undefined,
+          last_name: undefined
+        };
+        
+        accessToken = await getUserAccessToken(userId, userInfo);
+        logger.info('User initialized and token obtained for update', { telegramId: userId });
       }
 
       // 构造更新请求
@@ -305,7 +329,12 @@ export class PushHandler {
       }
 
       // 调用推送服务更新设置
-      await pushService.updateUserPushSettings(userId, accessToken, updateRequest);
+      const response = await pushService.updateUserPushSettings(userId, accessToken, updateRequest);
+
+      // 更新推送调度器的内存跟踪
+      if (response.data?.user_settings) {
+        pushScheduler.addUserToPushTracking(userId, response.data.user_settings);
+      }
 
       logger.info('Push setting updated successfully', {
         userId: parseInt(userId || '0'),
