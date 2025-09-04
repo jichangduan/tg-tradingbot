@@ -34,17 +34,37 @@ npm start
 ## 📋 核心功能
 
 - 指令集：`/price`、`/chart`、`/positions`、`/orders`、`/pnl`、`/markets`、`/wallet`、`/invite`、`/points`、`/long`、`/short`、`/close`、`/start`。
+- **🔥 双模式交易**：支持引导式和快捷式交易，适配不同用户习惯。
+- **📊 智能状态管理**：Redis驱动的交易会话管理，支持多步骤交互。
+- **🎯 交互式界面**：内联键盘、实时消息更新，提供流畅用户体验。
 - 缓存：Redis（价格/蜡烛图数据缓存，默认 TTL 5 分钟）。
 - 健康检查：可选内置 `/health`（最小化，返回 healthy/degraded/unavailable）。
 - 日志：Winston 文件与控制台（结构化 JSON，生产写入 `logs/`）。
 
+### 🚀 交易功能亮点
+
+#### 引导式交易 (新手友好)
+```
+/long                    # 启动做多交易引导
+/short                   # 启动做空交易引导
+/cancel                  # 取消当前交易流程
+```
+
+#### 快捷式交易 (高效便捷)
+```
+/long BTC 3x 100         # 直接做多BTC，3倍杠杆，100USDC
+/short ETH 2x 50         # 直接做空ETH，2倍杠杆，50USDC
+```
+
 ### 使用示例（Telegram）
 ```
-/price BTC      # 查询 BTC 实时价格
-/chart ETH 1h   # ETH 的 1 小时 K 线图
-/positions      # 当前持仓
-/orders         # 历史订单
-/pnl            # 收益情况
+/price BTC               # 查询 BTC 实时价格
+/chart ETH 1h            # ETH 的 1 小时 K 线图
+/positions               # 当前持仓
+/orders                  # 历史订单
+/pnl                     # 收益情况
+/long                    # 引导式做多交易
+/long BTC 3x 100         # 快捷式做多交易
 ```
 
 ### 健康检查响应示例
@@ -213,7 +233,11 @@ CI 已配置：
 
 ## 📚 文档
 
-详细的开发文档请参考：
+### 核心文档
+- **[双模式交易系统架构](docs/TRADING_SYSTEM_ARCHITECTURE.md)** - 完整的系统架构和技术实现
+- **[用户使用指南](docs/TRADING_USER_GUIDE.md)** - 详细的交易功能使用说明
+
+### 开发文档
 - [开发实施计划](../docs/development/tgbot_price_implementation_plan.md)
 - [架构设计文档](../docs/architecture/tgbot_price_architecture.md)
 - [后端任务交接](../docs/development/backend_task_handoff.md)
@@ -224,5 +248,6 @@ CI 已配置：
 
 ---
 
-**版本**: v1.0.0  
-**最后更新**: 2025-08-21
+**版本**: v2.0.0 - 双模式交易系统  
+**最后更新**: 2025-09-04  
+**新增功能**: 引导式/快捷式交易、Redis状态管理、交互式界面

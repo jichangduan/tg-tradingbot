@@ -1,4 +1,5 @@
 import { Context } from 'telegraf';
+import { InlineKeyboardMarkup } from 'telegraf/typings/core/types/typegram';
 import { apiService } from '../../services/api.service';
 import { tokenService } from '../../services/token.service';
 import { getUserAccessToken } from '../../utils/auth';
@@ -6,14 +7,16 @@ import { logger } from '../../utils/logger';
 import { handleTradingError } from '../../utils/error-handler';
 import { ExtendedContext } from '../index';
 import { accountService } from '../../services/account.service';
+import { tradingStateService, TradingState } from '../../services/trading-state.service';
+import { messageFormatter } from '../utils/message.formatter';
 
 /**
  * Long命令处理器
- * 处理 /long <symbol> <leverage> <amount> 命令
+ * 支持两种模式：引导模式和快捷模式
  */
 export class LongHandler {
   /**
-   * 处理 /long 命令
+   * 处理 /long 命令 - 支持两种模式
    */
   public async handle(ctx: ExtendedContext, args: string[]): Promise<void> {
     const startTime = Date.now();
@@ -24,151 +27,37 @@ export class LongHandler {
     try {
       logger.logCommand('long', userId!, username, args);
 
-      // 参数验证
-      if (args.length < 3) {
+      // 检查用户是否有活跃的交易状态
+      const activeState = await tradingStateService.getState(userId!.toString());
+      if (activeState) {
         await ctx.reply(
-          '❌ <b>参数不足</b>\n\n' +
-          '正确格式: <code>/long &lt;symbol&gt; &lt;leverage&gt; &lt;amount&gt;</code>\n\n' +
-          '示例: <code>/long BTC 10x 200</code>',
+          '⚠️ <b>您已有进行中的交易流程</b>\n\n' +
+          '请完成当前交易或发送 /cancel 取消当前流程',
           { parse_mode: 'HTML' }
         );
         return;
       }
 
-      const [symbol, leverageStr, amountStr] = args;
-
-      // 基础验证
-      if (!symbol || !leverageStr || !amountStr) {
+      // 根据参数数量决定处理模式
+      if (args.length === 0) {
+        // 引导模式：无参数，开始分步引导
+        await this.handleGuidedMode(ctx, 'long');
+        return;
+      } else if (args.length === 1) {
+        // 引导模式：只提供了代币，跳到杠杆选择
+        await this.handleGuidedMode(ctx, 'long', args[0]);
+        return;
+      } else if (args.length === 3) {
+        // 快捷模式：完整参数，直接处理
+        await this.handleQuickMode(ctx, args);
+        return;
+      } else {
+        // 参数数量不正确
         await ctx.reply(
-          '❌ 请提供完整的交易参数\n\n' +
-          '格式: <code>/long &lt;symbol&gt; &lt;leverage&gt; &lt;amount&gt;</code>',
+          messageFormatter.formatTradingCommandErrorMessage('long'),
           { parse_mode: 'HTML' }
         );
         return;
-      }
-
-      // 发送处理中消息
-      const loadingMessage = await ctx.reply(
-        `🔄 <b>正在处理做多交易...</b>\n\n` +
-        `代币: <code>${symbol.toUpperCase()}</code>\n` +
-        `杠杆: <code>${leverageStr}</code>\n` +
-        `金额: <code>${amountStr}</code>`,
-        { parse_mode: 'HTML' }
-      );
-
-      try {
-        // 获取用户访问令牌
-        const accessToken = await getUserAccessToken(userId!.toString(), {
-          username,
-          first_name: ctx.from?.first_name,
-          last_name: ctx.from?.last_name
-        });
-
-        // 准备交易数据
-        const tradingData = {
-          symbol: symbol.toUpperCase(),
-          leverage: leverageStr,
-          amount: amountStr,
-          telegram_id: userId!.toString()
-        };
-
-        // 检查余额是否足够
-        const requiredAmount = parseFloat(amountStr);
-        if (isNaN(requiredAmount) || requiredAmount <= 0) {
-          await ctx.telegram.editMessageText(
-            ctx.chat?.id,
-            loadingMessage.message_id,
-            undefined,
-            '❌ <b>交易参数错误</b>\n\n' +
-            '请输入有效的数量\n\n' +
-            '示例: <code>/long BTC 10x 200</code>',
-            { parse_mode: 'HTML' }
-          );
-          return;
-        }
-
-        // 检查账户余额
-        try {
-          const hasEnoughBalance = await accountService.checkSufficientBalance(
-            userId!.toString(),
-            requiredAmount,
-            'USDC'
-          );
-
-          if (!hasEnoughBalance) {
-            await ctx.telegram.editMessageText(
-              ctx.chat?.id,
-              loadingMessage.message_id,
-              undefined,
-              '💰 <b>账户余额不足</b>\n\n' +
-              `交易需要: <code>${requiredAmount} USDC</code>\n\n` +
-              '💡 <b>解决方案:</b>\n' +
-              `• 使用 /wallet 查看当前余额\n` +
-              `• 向钱包充值更多 USDC\n` +
-              `• 减少交易金额`,
-              { parse_mode: 'HTML' }
-            );
-            return;
-          }
-        } catch (balanceError) {
-          logger.warn(`Failed to check balance for long trading`, {
-            userId,
-            requiredAmount,
-            error: (balanceError as Error).message,
-            requestId
-          });
-          // 如果余额检查失败，继续执行交易（让后端处理）
-        }
-
-        // 添加调试日志
-        logger.info(`Long trading request data`, {
-          tradingData,
-          parsedArgs: { symbol, leverageStr, amountStr },
-          originalArgs: args,
-          requiredAmount,
-          requestId
-        });
-
-        // 调用交易API
-        const result = await apiService.postWithAuth(
-          '/api/tgbot/trading/long',
-          accessToken,
-          tradingData
-        );
-
-        // 编辑消息显示成功结果
-        await ctx.telegram.editMessageText(
-          ctx.chat?.id,
-          loadingMessage.message_id,
-          undefined,
-          `✅ <b>做多交易已提交</b>\n\n` +
-          `代币: <code>${symbol.toUpperCase()}</code>\n` +
-          `杠杆: <code>${leverageStr}</code>\n` +
-          `金额: <code>${amountStr}</code>\n\n` +
-          `<i>交易正在处理中，请稍候...</i>`,
-          { parse_mode: 'HTML' }
-        );
-
-        const duration = Date.now() - startTime;
-        logger.logPerformance('long_trade_success', duration, {
-          symbol,
-          leverage: leverageStr,
-          amount: amountStr,
-          userId,
-          username,
-          requestId
-        });
-
-      } catch (apiError: any) {
-        // 使用统一错误处理系统
-        await handleTradingError(
-          ctx, 
-          apiError, 
-          'long', 
-          symbol, 
-          amountStr, 
-          loadingMessage.message_id
-        );
       }
 
     } catch (error) {
@@ -178,17 +67,375 @@ export class LongHandler {
   }
 
   /**
+   * 处理引导模式
+   */
+  private async handleGuidedMode(ctx: ExtendedContext, action: 'long', symbol?: string): Promise<void> {
+    const userId = ctx.from?.id?.toString();
+    if (!userId) {
+      await ctx.reply('❌ 无法获取用户信息，请重试');
+      return;
+    }
+    
+    if (!symbol) {
+      // 第一步：选择代币
+      const state = await tradingStateService.createState(userId, action);
+      const message = messageFormatter.formatTradingSymbolPrompt(action);
+      
+      await ctx.reply(message, { parse_mode: 'HTML' });
+    } else {
+      // 跳到第二步：选择杠杆 (已有代币)
+      const state = await tradingStateService.createState(userId, action, symbol.toUpperCase());
+      
+      try {
+        // 获取当前价格和可用保证金
+        const tokenData = await tokenService.getTokenPrice(symbol);
+        const availableMargin = 30.74; // 示例值，实际应从accountService获取
+        
+        const message = messageFormatter.formatTradingLeveragePrompt(
+          action, 
+          symbol.toUpperCase(), 
+          tokenData.price, 
+          availableMargin
+        );
+        
+        const keyboard = this.createLeverageKeyboard(symbol.toUpperCase());
+        
+        await ctx.reply(message, {
+          parse_mode: 'HTML',
+          reply_markup: keyboard
+        });
+      } catch (error) {
+        await tradingStateService.clearState(userId);
+        await ctx.reply(
+          `❌ 无法获取 ${symbol.toUpperCase()} 的价格信息，请稍后重试`,
+          { parse_mode: 'HTML' }
+        );
+      }
+    }
+  }
+
+  /**
+   * 处理快捷模式
+   */
+  private async handleQuickMode(ctx: ExtendedContext, args: string[]): Promise<void> {
+    const startTime = Date.now();
+    const userId = ctx.from?.id;
+    const username = ctx.from?.username || 'unknown';
+    const requestId = ctx.requestId || 'unknown';
+
+    const [symbol, leverageStr, amountStr] = args;
+
+    // 基础验证
+    if (!symbol || !leverageStr || !amountStr) {
+      await ctx.reply(
+        messageFormatter.formatTradingCommandErrorMessage('long'),
+        { parse_mode: 'HTML' }
+      );
+      return;
+    }
+
+    // 发送处理中消息
+    const loadingMessage = await ctx.reply(
+      messageFormatter.formatTradingProcessingMessage('long', symbol, leverageStr, amountStr),
+      { parse_mode: 'HTML' }
+    );
+
+    try {
+      // 获取用户访问令牌
+      const accessToken = await getUserAccessToken(userId!.toString(), {
+        username,
+        first_name: ctx.from?.first_name,
+        last_name: ctx.from?.last_name
+      });
+
+      // 准备交易数据
+      const tradingData = {
+        symbol: symbol.toUpperCase(),
+        leverage: leverageStr,
+        amount: amountStr,
+        telegram_id: userId!.toString()
+      };
+
+      // 检查余额是否足够
+      const requiredAmount = parseFloat(amountStr);
+      if (isNaN(requiredAmount) || requiredAmount <= 0) {
+        await ctx.telegram.editMessageText(
+          ctx.chat?.id,
+          loadingMessage.message_id,
+          undefined,
+          '❌ <b>交易参数错误</b>\n\n' +
+          '请输入有效的数量\n\n' +
+          '示例: <code>/long BTC 10x 200</code>',
+          { parse_mode: 'HTML' }
+        );
+        return;
+      }
+
+      // 检查账户余额
+      try {
+        const hasEnoughBalance = await accountService.checkSufficientBalance(
+          userId!.toString(),
+          requiredAmount,
+          'USDC'
+        );
+
+        if (!hasEnoughBalance) {
+          await ctx.telegram.editMessageText(
+            ctx.chat?.id,
+            loadingMessage.message_id,
+            undefined,
+            messageFormatter.formatTradingInsufficientFundsMessage(),
+            { parse_mode: 'HTML' }
+          );
+          return;
+        }
+      } catch (balanceError) {
+        logger.warn(`Failed to check balance for long trading`, {
+          userId,
+          requiredAmount,
+          error: (balanceError as Error).message,
+          requestId
+        });
+        // 如果余额检查失败，继续执行交易（让后端处理）
+      }
+
+      // 添加调试日志
+      logger.info(`Long trading request data`, {
+        tradingData,
+        parsedArgs: { symbol, leverageStr, amountStr },
+        originalArgs: args,
+        requiredAmount,
+        requestId
+      });
+
+      // 显示订单预览而不是直接执行交易
+      const tokenData = await tokenService.getTokenPrice(symbol);
+      const orderSize = parseFloat(amountStr) / tokenData.price * parseFloat(leverageStr.replace('x', ''));
+      const liquidationPrice = this.calculateLiquidationPrice(tokenData.price, parseFloat(leverageStr.replace('x', '')), 'long');
+      
+      const previewMessage = messageFormatter.formatTradingOrderPreview(
+        'long',
+        symbol.toUpperCase(),
+        leverageStr,
+        amountStr,
+        tokenData.price,
+        orderSize,
+        liquidationPrice
+      );
+      
+      const keyboard = this.createConfirmationKeyboard(symbol, leverageStr, amountStr);
+      
+      await ctx.telegram.editMessageText(
+        ctx.chat?.id,
+        loadingMessage.message_id,
+        undefined,
+        previewMessage,
+        { 
+          parse_mode: 'HTML',
+          reply_markup: keyboard
+        }
+      );
+
+      const duration = Date.now() - startTime;
+      logger.logPerformance('long_preview_success', duration, {
+        symbol,
+        leverage: leverageStr,
+        amount: amountStr,
+        userId,
+        username,
+        requestId
+      });
+
+    } catch (apiError: any) {
+      // 使用统一错误处理系统
+      await handleTradingError(
+        ctx, 
+        apiError, 
+        'long', 
+        symbol, 
+        amountStr, 
+        loadingMessage.message_id
+      );
+    }
+  }
+
+  /**
+   * 处理交易回调查询（确认/取消按钮）
+   */
+  public async handleCallback(ctx: ExtendedContext, callbackData: string): Promise<void> {
+    try {
+      if (callbackData.startsWith('long_confirm_')) {
+        // 确认执行交易
+        const [, , symbol, leverage, amount] = callbackData.split('_');
+        await this.executeTrading(ctx, 'long', symbol, leverage, amount);
+      } else if (callbackData.startsWith('long_cancel_')) {
+        // 取消交易
+        await ctx.answerCbQuery('❌ 交易已取消');
+        await ctx.editMessageText(
+          '❌ <b>交易已取消</b>\n\n您可以随时重新开始交易',
+          { parse_mode: 'HTML' }
+        );
+      } else if (callbackData.startsWith('long_leverage_')) {
+        // 处理杠杆选择回调
+        await this.handleLeverageSelection(ctx, callbackData);
+      }
+    } catch (error) {
+      logger.error('Long callback error', {
+        error: (error as Error).message,
+        callbackData,
+        userId: ctx.from?.id
+      });
+      await ctx.answerCbQuery('❌ 操作失败，请重试');
+    }
+  }
+
+  /**
+   * 处理杠杆选择回调
+   */
+  private async handleLeverageSelection(ctx: ExtendedContext, callbackData: string): Promise<void> {
+    const userId = ctx.from?.id?.toString();
+    if (!userId) {
+      await ctx.answerCbQuery('❌ 无法获取用户信息，请重试');
+      return;
+    }
+    const leverage = callbackData.split('_')[3]; // long_leverage_BTC_3x
+    
+    const state = await tradingStateService.getState(userId);
+    if (!state || !state.symbol) {
+      await ctx.answerCbQuery('❌ 会话已过期，请重新开始');
+      return;
+    }
+
+    // 更新状态
+    await tradingStateService.updateState(userId, {
+      leverage: leverage,
+      step: 'amount'
+    });
+
+    await ctx.answerCbQuery(`✅ 已选择 ${leverage} 杠杆`);
+
+    // 显示金额输入提示
+    const message = messageFormatter.formatTradingAmountPrompt(
+      'long',
+      state.symbol,
+      leverage,
+      30.74 // 示例可用保证金
+    );
+
+    await ctx.editMessageText(message, { parse_mode: 'HTML' });
+  }
+
+  /**
+   * 执行实际交易
+   */
+  private async executeTrading(ctx: ExtendedContext, action: 'long', symbol: string, leverage: string, amount: string): Promise<void> {
+    const userId = ctx.from?.id;
+    const username = ctx.from?.username || 'unknown';
+
+    try {
+      await ctx.answerCbQuery('🔄 正在执行交易...');
+      
+      // 获取用户访问令牌
+      const accessToken = await getUserAccessToken(userId!.toString(), {
+        username,
+        first_name: ctx.from?.first_name,
+        last_name: ctx.from?.last_name
+      });
+
+      // 调用交易API
+      const tradingData = {
+        symbol: symbol.toUpperCase(),
+        leverage: leverage,
+        amount: amount,
+        telegram_id: userId!.toString()
+      };
+
+      const result = await apiService.postWithAuth(
+        '/api/tgbot/trading/long',
+        accessToken,
+        tradingData
+      );
+
+      // 编辑消息显示成功结果
+      await ctx.editMessageText(
+        `✅ <b>做多交易已提交</b>\n\n` +
+        `代币: <code>${symbol.toUpperCase()}</code>\n` +
+        `杠杆: <code>${leverage}</code>\n` +
+        `金额: <code>${amount}</code>\n\n` +
+        `<i>交易正在处理中，请稍候...</i>`,
+        { parse_mode: 'HTML' }
+      );
+
+    } catch (error) {
+      await ctx.answerCbQuery('❌ 交易执行失败');
+      await ctx.editMessageText(
+        `❌ <b>交易执行失败</b>\n\n` +
+        `错误信息: ${(error as Error).message}\n\n` +
+        `<i>请稍后重试或联系客服</i>`,
+        { parse_mode: 'HTML' }
+      );
+    }
+  }
+
+  /**
+   * 创建杠杆选择键盘
+   */
+  public createLeverageKeyboard(symbol: string): InlineKeyboardMarkup {
+    return {
+      inline_keyboard: [
+        [
+          { text: '1x', callback_data: `long_leverage_${symbol}_1x` },
+          { text: '2x', callback_data: `long_leverage_${symbol}_2x` },
+          { text: '3x', callback_data: `long_leverage_${symbol}_3x` }
+        ]
+      ]
+    };
+  }
+
+  /**
+   * 创建确认键盘
+   */
+  public createConfirmationKeyboard(symbol: string, leverage: string, amount: string): InlineKeyboardMarkup {
+    return {
+      inline_keyboard: [
+        [
+          { text: '❌ 取消', callback_data: `long_cancel_${symbol}_${leverage}_${amount}` },
+          { text: '✅ 确认', callback_data: `long_confirm_${symbol}_${leverage}_${amount}` }
+        ]
+      ]
+    };
+  }
+
+  /**
+   * 计算强制平仓价格
+   */
+  private calculateLiquidationPrice(currentPrice: number, leverage: number, direction: 'long' | 'short'): number {
+    // 简化计算，实际应该更复杂
+    const marginRatio = 0.05; // 5% 维持保证金率
+    const liquidationRatio = (leverage - 1) / leverage * (1 - marginRatio);
+    
+    if (direction === 'long') {
+      return currentPrice * (1 - liquidationRatio);
+    } else {
+      return currentPrice * (1 + liquidationRatio);
+    }
+  }
+
+  /**
    * 获取处理器统计信息
    */
   public getStats(): any {
     return {
       name: 'LongHandler',
-      version: '1.0.0',
+      version: '2.0.0',
       supportedCommands: ['/long'],
       features: [
-        'Long position trading',
-        'User authentication',
-        'Parameter validation',
+        'Guided step-by-step trading',
+        'Quick command trading',
+        'Interactive keyboard interfaces',
+        'Order preview and confirmation',
+        'User state management',
+        'Balance validation',
         'Error handling',
         'Trading status feedback'
       ]

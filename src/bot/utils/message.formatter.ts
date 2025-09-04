@@ -1065,6 +1065,129 @@ BTC, ETH, SOL, ETC, LINK, AVAX, UNI等主流币种
     
     return timeFrameMap[timeFrame] || timeFrame;
   }
+
+  /**
+   * 格式化交易引导消息 - 选择代币
+   */
+  public formatTradingSymbolPrompt(action: 'long' | 'short'): string {
+    const actionText = action === 'long' ? '做多' : '做空';
+    const actionEmoji = action === 'long' ? '📈' : '📉';
+    
+    let message = `${actionEmoji} <b>开始${actionText}交易</b>\n\n`;
+    message += `请回复您想要${actionText}的代币符号\n\n`;
+    message += `💡 <b>例如:</b> HYPE, BTC, ETH, SOL\n\n`;
+    message += `<b>支持的代币:</b>\n`;
+    message += `• 主流币: BTC, ETH, SOL, BNB\n`;
+    message += `• 热门币: HYPE, PEPE, DOGE\n`;
+    message += `• DeFi: UNI, LINK, AAVE\n\n`;
+    message += `<i>💬 直接回复代币符号即可，不区分大小写</i>`;
+    
+    return message;
+  }
+
+  /**
+   * 格式化交易引导消息 - 选择杠杆
+   */
+  public formatTradingLeveragePrompt(action: 'long' | 'short', symbol: string, currentPrice: number, availableMargin: number): string {
+    const actionText = action === 'long' ? '做多' : '做空';
+    const actionEmoji = action === 'long' ? '📈' : '📉';
+    
+    let message = `${actionEmoji} <b>${actionText} ${symbol}</b>\n`;
+    message += `当前价格: <b>${this.formatPrice(currentPrice, this.defaultOptions)}</b>\n\n`;
+    
+    message += `<b>选择您的杠杆倍数:</b>\n`;
+    message += `可用保证金: <b>${this.formatPrice(availableMargin, this.defaultOptions)}</b>\n`;
+    message += `最大杠杆: <b>3x</b>\n\n`;
+    
+    return message;
+  }
+
+  /**
+   * 格式化交易引导消息 - 输入金额
+   */
+  public formatTradingAmountPrompt(action: 'long' | 'short', symbol: string, leverage: string, availableMargin: number): string {
+    const actionText = action === 'long' ? '做多' : '做空';
+    const actionEmoji = action === 'long' ? '📈' : '📉';
+    
+    let message = `${actionEmoji} <b>${actionText} ${symbol}</b>\n`;
+    message += `杠杆倍数: <b>${leverage}</b>\n\n`;
+    
+    message += `<b>选择仓位大小</b>\n\n`;
+    message += `可用保证金: <b>${this.formatPrice(availableMargin, this.defaultOptions)}</b>\n\n`;
+    message += `请回复您要用于${actionText} ${symbol} 的保证金金额($)\n\n`;
+    message += `<i>💡 直接回复数字即可，例如: 30</i>`;
+    
+    return message;
+  }
+
+  /**
+   * 格式化交易订单预览
+   */
+  public formatTradingOrderPreview(
+    action: 'long' | 'short', 
+    symbol: string, 
+    leverage: string, 
+    amount: string,
+    currentPrice: number,
+    orderSize: number,
+    liquidationPrice: number
+  ): string {
+    const actionText = action === 'long' ? 'LONG' : 'SHORT';
+    const actionEmoji = action === 'long' ? '📈' : '📉';
+    
+    let message = `💰 <b>订单预览</b>\n\n`;
+    message += `市场: <b>${actionText} ${symbol}</b> ${actionEmoji}\n`;
+    message += `杠杆: <b>${leverage}</b>\n`;
+    message += `订单大小: <b>${orderSize.toFixed(2)} ${symbol} / ${this.formatPrice(parseFloat(amount), this.defaultOptions)}</b>\n`;
+    message += `当前价格: <b>${this.formatPrice(currentPrice, this.defaultOptions)}</b>\n`;
+    message += `强制平仓价格: <b>${this.formatPrice(liquidationPrice, this.defaultOptions)}</b>\n\n`;
+    message += `点击下方按钮确认您的交易`;
+    
+    return message;
+  }
+
+  /**
+   * 格式化余额不足的交易错误消息
+   */
+  public formatTradingInsufficientFundsMessage(): string {
+    let message = `💰 <b>账户余额不足</b>\n\n`;
+    message += `您的账户暂时无法进行交易。您可能需要先向账户充值。\n\n`;
+    message += `💡 <b>解决方案:</b>\n`;
+    message += `• 使用 /wallet 查看当前余额\n`;
+    message += `• 向钱包充值更多资金\n`;
+    message += `• 减少交易金额`;
+    
+    return message;
+  }
+
+  /**
+   * 格式化交易命令格式错误消息
+   */
+  public formatTradingCommandErrorMessage(action: 'long' | 'short'): string {
+    const actionText = action === 'long' ? 'Long' : 'Short';
+    const actionLower = action.toLowerCase();
+    
+    let message = `❌ <b>命令格式错误</b>\n\n`;
+    message += `正确格式: <code>/${actionLower} &lt;Symbol&gt; &lt;Leverage&gt; &lt;Amount&gt;</code>\n\n`;
+    message += `示例: <code>/${actionLower} BTC 10x 100</code>`;
+    
+    return message;
+  }
+
+  /**
+   * 格式化交易处理中消息
+   */
+  public formatTradingProcessingMessage(action: 'long' | 'short', symbol: string, leverage: string, amount: string): string {
+    const actionText = action === 'long' ? '做多' : '做空';
+    const actionEmoji = action === 'long' ? '📈' : '📉';
+    
+    let message = `🔄 <b>正在处理${actionText}交易...</b>\n\n`;
+    message += `${actionEmoji} 代币: <code>${symbol.toUpperCase()}</code>\n`;
+    message += `📊 杠杆: <code>${leverage}</code>\n`;
+    message += `💰 金额: <code>${amount}</code>`;
+    
+    return message;
+  }
 }
 
 // 导出单例实例

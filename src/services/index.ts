@@ -9,3 +9,4 @@ export { tokenService } from './token.service';
 export { chartService } from './chart.service';
 export { chartImageService } from './chart-image.service';
 export { userService } from './user.service';
+export { tradingStateService } from './trading-state.service';

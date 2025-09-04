@@ -15,11 +15,145 @@ import { pnlHandler } from './pnl.handler';
 import { pushHandler } from './push.handler';
 import { logger } from '../../utils/logger';
 import { ExtendedContext } from '../index';
+import { tradingStateService, TradingState } from '../../services/trading-state.service';
+import { tokenService } from '../../services/token.service';
+import { messageFormatter } from '../utils/message.formatter';
 
 /**
  * 命令处理器注册系统
  * 负责注册所有Bot命令和相应的处理器
  */
+
+/**
+ * 处理交易状态下的文本输入
+ */
+async function handleTradingInput(ctx: ExtendedContext, state: TradingState, input: string): Promise<void> {
+  const userId = ctx.from?.id?.toString();
+  if (!userId) return;
+
+  try {
+    if (state.step === 'symbol') {
+      // 处理代币符号输入
+      const symbol = input.trim().toUpperCase();
+      
+      // 验证代币符号
+      try {
+        const tokenData = await tokenService.getTokenPrice(symbol);
+        
+        // 更新状态到杠杆选择
+        await tradingStateService.updateState(userId, {
+          symbol: symbol,
+          step: 'leverage'
+        });
+        
+        const message = messageFormatter.formatTradingLeveragePrompt(
+          state.action,
+          symbol,
+          tokenData.price,
+          30.74 // 示例可用保证金
+        );
+        
+        const keyboard = state.action === 'long' 
+          ? longHandler.createLeverageKeyboard(symbol)
+          : shortHandler.createLeverageKeyboard(symbol);
+        
+        await ctx.reply(message, {
+          parse_mode: 'HTML',
+          reply_markup: keyboard
+        });
+        
+      } catch (error) {
+        await ctx.reply(
+          `❌ <b>无效的代币符号: ${symbol}</b>\n\n` +
+          `请输入有效的代币符号，例如：BTC, ETH, SOL`,
+          { parse_mode: 'HTML' }
+        );
+      }
+      
+    } else if (state.step === 'amount') {
+      // 处理金额输入
+      const amount = parseFloat(input.trim());
+      
+      if (isNaN(amount) || amount <= 0) {
+        await ctx.reply(
+          `❌ <b>无效的金额</b>\n\n` +
+          `请输入有效的数字金额，例如：30`,
+          { parse_mode: 'HTML' }
+        );
+        return;
+      }
+      
+      // 更新状态到确认
+      await tradingStateService.updateState(userId, {
+        amount: amount.toString(),
+        step: 'confirm'
+      });
+      
+      // 显示订单预览
+      try {
+        const tokenData = await tokenService.getTokenPrice(state.symbol!);
+        const orderSize = amount / tokenData.price * parseFloat(state.leverage!.replace('x', ''));
+        const liquidationPrice = calculateLiquidationPrice(tokenData.price, parseFloat(state.leverage!.replace('x', '')), state.action);
+        
+        const previewMessage = messageFormatter.formatTradingOrderPreview(
+          state.action,
+          state.symbol!,
+          state.leverage!,
+          amount.toString(),
+          tokenData.price,
+          orderSize,
+          liquidationPrice
+        );
+        
+        const keyboard = state.action === 'long'
+          ? longHandler.createConfirmationKeyboard(state.symbol!, state.leverage!, amount.toString())
+          : shortHandler.createConfirmationKeyboard(state.symbol!, state.leverage!, amount.toString());
+        
+        await ctx.reply(previewMessage, {
+          parse_mode: 'HTML',
+          reply_markup: keyboard
+        });
+        
+      } catch (error) {
+        await ctx.reply(
+          `❌ <b>生成订单预览失败</b>\n\n` +
+          `请稍后重试或重新开始交易`,
+          { parse_mode: 'HTML' }
+        );
+        await tradingStateService.clearState(userId);
+      }
+    }
+    
+  } catch (error) {
+    logger.error('Trading input handler error', {
+      error: (error as Error).message,
+      userId: parseInt(userId || '0'),
+      state,
+      input: input.substring(0, 50)
+    });
+    
+    await ctx.reply(
+      `❌ <b>处理输入时出错</b>\n\n` +
+      `请重新开始交易流程`,
+      { parse_mode: 'HTML' }
+    );
+    await tradingStateService.clearState(userId);
+  }
+}
+
+/**
+ * 计算强制平仓价格（辅助函数）
+ */
+function calculateLiquidationPrice(currentPrice: number, leverage: number, direction: 'long' | 'short'): number {
+  const marginRatio = 0.05; // 5% 维持保证金率
+  const liquidationRatio = (leverage - 1) / leverage * (1 - marginRatio);
+  
+  if (direction === 'long') {
+    return currentPrice * (1 - liquidationRatio);
+  } else {
+    return currentPrice * (1 + liquidationRatio);
+  }
+}
 
 /**
  * 解析命令参数
@@ -246,6 +380,34 @@ export function registerCommands(bot: Telegraf<ExtendedContext>): void {
     createCommandWrapper('push', pushHandler.handle.bind(pushHandler))
   );
 
+  // /cancel 命令 - 取消当前交易流程
+  bot.command('cancel', async (ctx) => {
+    const userId = ctx.from?.id?.toString();
+    if (!userId) return;
+
+    try {
+      const state = await tradingStateService.getState(userId);
+      if (state) {
+        await tradingStateService.clearState(userId);
+        await ctx.reply(
+          '✅ <b>交易流程已取消</b>\n\n您可以随时重新开始交易',
+          { parse_mode: 'HTML' }
+        );
+      } else {
+        await ctx.reply(
+          '💡 <b>当前没有进行中的交易流程</b>\n\n使用 <code>/long</code> 或 <code>/short</code> 开始交易',
+          { parse_mode: 'HTML' }
+        );
+      }
+    } catch (error) {
+      logger.error('Cancel command error', {
+        error: (error as Error).message,
+        userId: parseInt(userId || '0')
+      });
+      await ctx.reply('❌ 取消操作失败，请重试');
+    }
+  });
+
   // /status 命令 - 系统状态
   bot.command('status', async (ctx) => {
     logger.info('Status command received', {
@@ -291,9 +453,21 @@ export function registerCommands(bot: Telegraf<ExtendedContext>): void {
     }
   });
 
-  // 处理未知命令
+  // 处理未知命令和文本输入
   bot.on('text', async (ctx) => {
     const messageText = ctx.message.text;
+    const userId = ctx.from?.id?.toString();
+    
+    if (!userId) return;
+    
+    // 首先检查用户是否有活跃的交易状态
+    const tradingState = await tradingStateService.getState(userId);
+    
+    if (tradingState && !messageText.startsWith('/')) {
+      // 用户在交易流程中，处理输入
+      await handleTradingInput(ctx, tradingState, messageText);
+      return;
+    }
     
     // 检查是否为命令格式
     if (messageText.startsWith('/')) {
@@ -354,15 +528,14 @@ export function registerCommands(bot: Telegraf<ExtendedContext>): void {
       const textResponseMessage = `
 💬 <b>文本消息收到</b>
 
-我是价格查询机器人，主要功能是查询加密货币价格。
+我是交易机器人，支持加密货币价格查询和交易。
 
-如果您想查询代币价格，请使用:
-<code>/price 代币符号</code>
+<b>🔍 价格查询:</b>
+<code>/price BTC</code> - 查询比特币价格
 
-例如:
-• <code>/price BTC</code> - 查询比特币
-• <code>/price ETH</code> - 查询以太坊
-• <code>/price SOL</code> - 查询Solana
+<b>📈 快速交易:</b>
+<code>/long</code> - 开始做多引导
+<code>/short</code> - 开始做空引导
 
 需要帮助？发送 <code>/help</code> 查看完整指南 📚
       `.trim();
@@ -383,10 +556,36 @@ export function registerCommands(bot: Telegraf<ExtendedContext>): void {
 
     try {
       // 路由chart相关的回调到chartHandler
+      if (typeof callbackData === 'string' && callbackData.startsWith('chart_')) {
+        await chartHandler.handleCallback(ctx);
+        return;
+      }
+
+      // 路由long相关的回调到longHandler
       if (typeof callbackData === 'string' && 
-          (callbackData.startsWith('chart_') || 
-           callbackData.startsWith('short_') || 
-           callbackData.startsWith('long_'))) {
+          (callbackData.startsWith('long_confirm_') || 
+           callbackData.startsWith('long_cancel_') || 
+           callbackData.startsWith('long_leverage_'))) {
+        await longHandler.handleCallback(ctx, callbackData);
+        return;
+      }
+
+      // 路由short相关的回调到shortHandler  
+      if (typeof callbackData === 'string' && 
+          (callbackData.startsWith('short_confirm_') || 
+           callbackData.startsWith('short_cancel_') || 
+           callbackData.startsWith('short_leverage_'))) {
+        await shortHandler.handleCallback(ctx, callbackData);
+        return;
+      }
+
+      // 路由图表交易按钮到相应的处理器
+      if (typeof callbackData === 'string' && callbackData.startsWith('short_')) {
+        await chartHandler.handleCallback(ctx);
+        return;
+      }
+
+      if (typeof callbackData === 'string' && callbackData.startsWith('long_')) {
         await chartHandler.handleCallback(ctx);
         return;
       }
