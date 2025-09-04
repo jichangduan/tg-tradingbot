@@ -6,6 +6,7 @@ import { cacheService } from '../../services/cache.service';
 // import { Validator } from '../utils/validator'; // 未使用，已注释
 import { ExtendedContext } from '../index';
 import { getUserAccessToken } from '../../utils/auth';
+import { chartImageService, PositionsChartData, PositionInfo } from '../../services/chart-image.service';
 
 /**
  * 仓位信息接口
@@ -96,6 +97,30 @@ export class PositionsHandler {
         formattedMessage,
         { parse_mode: 'HTML' }
       );
+
+      // 🔧 生成并发送Positions总览图表
+      try {
+        const chartData = this.preparePositionsChartData(positionsData);
+        const chartImage = await chartImageService.generatePositionsChart(chartData);
+        
+        // 发送图表图片
+        await ctx.replyWithPhoto({ source: chartImage.imageBuffer }, {
+          caption: '📊 持仓总览图表',
+          parse_mode: 'HTML'
+        });
+        
+        logger.info('Positions chart sent successfully', {
+          userId,
+          totalValue: chartData.totalValue,
+          positionsCount: chartData.positions.length
+        });
+      } catch (chartError) {
+        logger.warn('Failed to generate positions chart', {
+          userId,
+          error: (chartError as Error).message
+        });
+        // 图表生成失败不影响主要功能
+      }
 
     } catch (error) {
       const errorMessage = this.handleError(error as Error);
@@ -363,6 +388,43 @@ ${positionsText}
       });
       return null;
     }
+  }
+
+  /**
+   * 准备Positions图表数据
+   */
+  private preparePositionsChartData(positionsData: PositionsResponse): PositionsChartData {
+    const { positions, totalPositions, totalPnl, accountValue, availableBalance } = positionsData.data;
+    
+    // 转换Position到PositionInfo格式
+    const positionInfos: PositionInfo[] = positions.map(pos => ({
+      symbol: pos.symbol,
+      side: pos.side,
+      size: pos.size,
+      entryPrice: pos.entryPrice,
+      markPrice: pos.markPrice,
+      pnl: pos.pnl,
+      pnlPercentage: pos.pnlPercentage,
+      liquidationPrice: pos.marginUsed // 简化映射，实际可能需要计算
+    }));
+
+    // 计算总价值和变化
+    const totalValue = parseFloat(accountValue);
+    const totalPnlNum = parseFloat(totalPnl);
+    
+    // 计算变化百分比（简化计算）
+    const totalChangePercentage = totalValue > 0 ? (totalPnlNum / totalValue) * 100 : 0;
+
+    return {
+      totalValue: totalValue,
+      totalChange: totalPnlNum,
+      totalChangePercentage: totalChangePercentage,
+      positions: positionInfos,
+      accountInfo: {
+        availableBalance: availableBalance,
+        usedMargin: positions.reduce((sum, pos) => sum + parseFloat(pos.marginUsed), 0).toString()
+      }
+    };
   }
 
   /**

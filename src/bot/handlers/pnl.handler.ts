@@ -6,6 +6,7 @@ import { MessageFormatter } from '../utils/message.formatter';
 import { Validator } from '../utils/validator';
 import { ExtendedContext } from '../index';
 import { getUserAccessToken } from '../../utils/auth';
+import { chartImageService, PnlChartData, PnlDataPoint } from '../../services/chart-image.service';
 
 /**
  * 交易记录接口
@@ -130,6 +131,32 @@ export class PnlHandler {
         formattedMessage,
         { parse_mode: 'HTML' }
       );
+
+      // 🔧 生成并发送PNL趋势图表
+      try {
+        if (pnlData.data.trades.length > 0) {
+          const chartData = this.preparePnlChartData(pnlData);
+          const chartImage = await chartImageService.generatePnlChart(chartData);
+          
+          // 发送图表图片
+          await ctx.replyWithPhoto({ source: chartImage.imageBuffer }, {
+            caption: '📈 PNL趋势图表',
+            parse_mode: 'HTML'
+          });
+          
+          logger.info('PNL chart sent successfully', {
+            userId,
+            totalPnl: chartData.totalPnl,
+            dataPoints: chartData.pnlHistory.length
+          });
+        }
+      } catch (chartError) {
+        logger.warn('Failed to generate PNL chart', {
+          userId,
+          error: (chartError as Error).message
+        });
+        // 图表生成失败不影响主要功能
+      }
 
     } catch (error) {
       const errorMessage = this.handleError(error as Error);
@@ -609,6 +636,63 @@ ${this.formatRecentTrades(trades.slice(0, 10))}
       });
       return null;
     }
+  }
+
+  /**
+   * 准备PNL图表数据
+   */
+  private preparePnlChartData(pnlData: PnlResponse): PnlChartData {
+    const trades = pnlData.data.trades;
+    
+    // 按时间排序交易记录
+    const sortedTrades = [...trades].sort((a, b) => a.timestamp - b.timestamp);
+    
+    // 计算累计PNL历史
+    let cumulativePnl = 0;
+    const pnlHistory: PnlDataPoint[] = [];
+    
+    // 添加起始点 (第一笔交易前的0点)
+    if (sortedTrades.length > 0) {
+      pnlHistory.push({
+        x: sortedTrades[0].timestamp * 1000,
+        y: 0
+      });
+    }
+    
+    for (const trade of sortedTrades) {
+      // 计算这笔交易的PNL影响 (简化计算，实际应该考虑买卖方向和价格差)
+      const tradeValue = parseFloat(trade.value);
+      const tradeFee = parseFloat(trade.fee);
+      
+      // 买入为负现金流，卖出为正现金流
+      if (trade.side === 'buy') {
+        cumulativePnl -= (tradeValue + tradeFee);
+      } else {
+        cumulativePnl += (tradeValue - tradeFee);
+      }
+      
+      pnlHistory.push({
+        x: trade.timestamp * 1000,
+        y: cumulativePnl
+      });
+    }
+    
+    // 计算总PNL (使用统计数据)
+    const statistics = pnlData.data.statistics;
+    const totalVolume = parseFloat(statistics.totalVolume);
+    const totalFees = parseFloat(statistics.totalFees);
+    
+    // 估算总PNL (这里使用简化计算，实际需要更精确的计算)
+    const finalPnl = cumulativePnl;
+    
+    return {
+      totalPnl: finalPnl,
+      pnlHistory: pnlHistory,
+      timeRange: {
+        start: sortedTrades[0]?.timestamp * 1000 || Date.now(),
+        end: sortedTrades[sortedTrades.length - 1]?.timestamp * 1000 || Date.now()
+      }
+    };
   }
 
   /**

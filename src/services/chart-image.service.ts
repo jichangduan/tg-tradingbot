@@ -8,11 +8,21 @@ import {
 } from '../types/api.types';
 
 /**
+ * 图表类型枚举
+ */
+export enum ChartType {
+  CANDLESTICK = 'candlestick',
+  PNL_TREND = 'pnl_trend',
+  POSITIONS_OVERVIEW = 'positions_overview'
+}
+
+/**
  * QuickChart.io图表配置接口
  */
 interface QuickChartConfig {
-  symbol: string;
-  timeFrame: TimeFrame;
+  type: ChartType;
+  symbol?: string;
+  timeFrame?: TimeFrame;
   theme?: 'light' | 'dark';
   width?: number;
   height?: number;
@@ -28,6 +38,54 @@ interface OHLCDataPoint {
   h: number;    // 最高价 (High)
   l: number;    // 最低价 (Low)
   c: number;    // 收盘价 (Close)
+}
+
+/**
+ * PNL趋势数据点
+ */
+interface PnlDataPoint {
+  x: number;    // 时间戳
+  y: number;    // 盈亏金额
+}
+
+/**
+ * PNL图表数据
+ */
+interface PnlChartData {
+  totalPnl: number;
+  pnlHistory: PnlDataPoint[];
+  timeRange: {
+    start: number;
+    end: number;
+  };
+}
+
+/**
+ * 持仓信息
+ */
+interface PositionInfo {
+  symbol: string;
+  side: 'long' | 'short';
+  size: string;
+  entryPrice: string;
+  markPrice: string;
+  pnl: string;
+  pnlPercentage: string;
+  liquidationPrice?: string;
+}
+
+/**
+ * Positions图表数据
+ */
+interface PositionsChartData {
+  totalValue: number;
+  totalChange: number;
+  totalChangePercentage: number;
+  positions: PositionInfo[];
+  accountInfo: {
+    availableBalance: string;
+    usedMargin: string;
+  };
 }
 
 /**
@@ -139,6 +197,7 @@ export class ChartImageService {
 
       // 构建图表配置
       const chartConfig: QuickChartConfig = {
+        type: ChartType.CANDLESTICK,
         symbol: normalizedSymbol,
         timeFrame,
         theme: 'dark',
@@ -187,6 +246,114 @@ export class ChartImageService {
   }
 
   /**
+   * 生成PNL趋势图表
+   */
+  public async generatePnlChart(pnlData: PnlChartData): Promise<CachedChartImage> {
+    const cacheKey = `${this.cacheKeyPrefix}pnl_${Date.now()}`;
+    
+    logger.info('Generating PNL trend chart', {
+      totalPnl: pnlData.totalPnl,
+      dataPoints: pnlData.pnlHistory.length
+    });
+
+    try {
+      const chartConfig: QuickChartConfig = {
+        type: ChartType.PNL_TREND,
+        theme: 'dark',
+        width: 800,
+        height: 400
+      };
+
+      // 生成图表图像
+      const imageResult = await this.generatePnlQuickChart(chartConfig, pnlData);
+      
+      if (!imageResult.success || !imageResult.imageBuffer) {
+        throw new Error(`PNL chart generation failed: ${imageResult.error || 'Unknown error'}`);
+      }
+
+      const chartImage: CachedChartImage = {
+        imageBuffer: imageResult.imageBuffer,
+        imageUrl: imageResult.imageUrl,
+        config: chartConfig,
+        generatedAt: new Date(),
+        isCached: false
+      };
+
+      // 短期缓存PNL图表 (5分钟)
+      await cacheService.set(cacheKey, chartImage, 300);
+
+      logger.info('PNL chart generated successfully', {
+        totalPnl: pnlData.totalPnl,
+        dataPoints: pnlData.pnlHistory.length,
+        imageSize: imageResult.imageBuffer.length
+      });
+
+      return chartImage;
+
+    } catch (error) {
+      logger.error('Failed to generate PNL chart', {
+        error: (error as Error).message,
+        totalPnl: pnlData.totalPnl
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * 生成Positions总览图表
+   */
+  public async generatePositionsChart(positionsData: PositionsChartData): Promise<CachedChartImage> {
+    const cacheKey = `${this.cacheKeyPrefix}positions_${Date.now()}`;
+    
+    logger.info('Generating positions overview chart', {
+      totalValue: positionsData.totalValue,
+      positionsCount: positionsData.positions.length
+    });
+
+    try {
+      const chartConfig: QuickChartConfig = {
+        type: ChartType.POSITIONS_OVERVIEW,
+        theme: 'dark',
+        width: 800,
+        height: 300
+      };
+
+      // 生成图表图像
+      const imageResult = await this.generatePositionsQuickChart(chartConfig, positionsData);
+      
+      if (!imageResult.success || !imageResult.imageBuffer) {
+        throw new Error(`Positions chart generation failed: ${imageResult.error || 'Unknown error'}`);
+      }
+
+      const chartImage: CachedChartImage = {
+        imageBuffer: imageResult.imageBuffer,
+        imageUrl: imageResult.imageUrl,
+        config: chartConfig,
+        generatedAt: new Date(),
+        isCached: false
+      };
+
+      // 短期缓存Positions图表 (2分钟)
+      await cacheService.set(cacheKey, chartImage, 120);
+
+      logger.info('Positions chart generated successfully', {
+        totalValue: positionsData.totalValue,
+        positionsCount: positionsData.positions.length,
+        imageSize: imageResult.imageBuffer.length
+      });
+
+      return chartImage;
+
+    } catch (error) {
+      logger.error('Failed to generate positions chart', {
+        error: (error as Error).message,
+        totalValue: positionsData.totalValue
+      });
+      throw error;
+    }
+  }
+
+  /**
    * 使用QuickChart.io生成K线图表
    */
   private async generateQuickChart(config: QuickChartConfig, candleData: CachedCandleData): Promise<ChartImageResponse> {
@@ -224,6 +391,54 @@ export class ChartImageService {
         error: (error as Error).message,
         config,
         candleCount: candleData.candles.length
+      });
+      
+      return {
+        success: false,
+        error: (error as Error).message
+      };
+    }
+  }
+
+  /**
+   * 使用QuickChart.io生成PNL趋势图表
+   */
+  private async generatePnlQuickChart(config: QuickChartConfig, pnlData: PnlChartData): Promise<ChartImageResponse> {
+    try {
+      // 生成Chart.js配置 - PNL折线图
+      const chartJsConfig = this.createPnlChartJsConfig(config, pnlData);
+      
+      // 调用QuickChart.io API
+      return await this.callQuickChartApi(chartJsConfig);
+      
+    } catch (error) {
+      logger.error('PNL QuickChart generation failed', {
+        error: (error as Error).message,
+        totalPnl: pnlData.totalPnl
+      });
+      
+      return {
+        success: false,
+        error: (error as Error).message
+      };
+    }
+  }
+
+  /**
+   * 使用QuickChart.io生成Positions总览图表
+   */
+  private async generatePositionsQuickChart(config: QuickChartConfig, positionsData: PositionsChartData): Promise<ChartImageResponse> {
+    try {
+      // 生成Chart.js配置 - Positions概览
+      const chartJsConfig = this.createPositionsChartJsConfig(config, positionsData);
+      
+      // 调用QuickChart.io API
+      return await this.callQuickChartApi(chartJsConfig);
+      
+    } catch (error) {
+      logger.error('Positions QuickChart generation failed', {
+        error: (error as Error).message,
+        totalValue: positionsData.totalValue
       });
       
       return {
@@ -442,6 +657,276 @@ export class ChartImageService {
         // TradingView style background
         backgroundColor: isDark ? '#0d1421' : '#ffffff',
         color: isDark ? '#ffffff' : '#0f172a'
+      }
+    };
+  }
+
+  /**
+   * 创建PNL折线图Chart.js配置
+   */
+  private createPnlChartJsConfig(config: QuickChartConfig, pnlData: PnlChartData): ChartJsConfig {
+    const isDark = config.theme === 'dark';
+    
+    // 计算Y轴范围
+    const pnlValues = pnlData.pnlHistory.map(p => p.y);
+    const minPnl = Math.min(...pnlValues, 0); // 确保包含0线
+    const maxPnl = Math.max(...pnlValues, 0);
+    const range = Math.max(Math.abs(maxPnl), Math.abs(minPnl));
+    
+    // 设置合理的Y轴范围
+    const padding = range * 0.1;
+    const yAxisMin = minPnl - padding;
+    const yAxisMax = maxPnl + padding;
+
+    return {
+      type: 'line',
+      data: {
+        datasets: [{
+          label: 'PNL',
+          data: pnlData.pnlHistory,
+          borderColor: '#ff9500',      // 橙色线条，匹配参考图
+          backgroundColor: 'rgba(255, 149, 0, 0.1)', // 半透明填充
+          borderWidth: 3,
+          fill: true,
+          tension: 0.1,               // 平滑曲线
+          pointRadius: 0,             // 不显示数据点
+          pointHoverRadius: 6,        // 悬停时显示点
+          pointHoverBorderColor: '#ff9500',
+          pointHoverBackgroundColor: '#ffffff'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          title: {
+            display: true,
+            text: `总盈亏: ${pnlData.totalPnl >= 0 ? '+' : ''}$${pnlData.totalPnl.toFixed(2)}`,
+            color: pnlData.totalPnl >= 0 ? '#00ff88' : '#ff3366',
+            font: {
+              size: 18,
+              weight: 'bold'
+            },
+            padding: 20
+          },
+          legend: {
+            display: false
+          },
+          tooltip: {
+            enabled: true,
+            mode: 'index',
+            intersect: false,
+            backgroundColor: isDark ? 'rgba(0, 0, 0, 0.8)' : 'rgba(255, 255, 255, 0.9)',
+            titleColor: isDark ? '#ffffff' : '#000000',
+            bodyColor: isDark ? '#ffffff' : '#000000',
+            borderColor: '#ff9500',
+            borderWidth: 1,
+            callbacks: {
+              label: (context: any) => {
+                const value = context.parsed.y;
+                return `PNL: ${value >= 0 ? '+' : ''}$${value.toFixed(2)}`;
+              },
+              title: (context: any) => {
+                const timestamp = context[0].parsed.x;
+                return new Date(timestamp).toLocaleString('zh-CN', {
+                  timeZone: 'Asia/Shanghai',
+                  month: '2-digit',
+                  day: '2-digit',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                });
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            type: 'time',
+            time: {
+              unit: 'hour',
+              displayFormats: {
+                hour: 'MM-DD HH:mm'
+              }
+            },
+            grid: {
+              display: true,
+              color: isDark ? '#2a2e39' : '#e2e8f0'
+            },
+            ticks: {
+              color: isDark ? '#9ca3af' : '#6b7280',
+              font: {
+                size: 10
+              }
+            }
+          },
+          y: {
+            type: 'linear',
+            min: yAxisMin,
+            max: yAxisMax,
+            grid: {
+              display: true,
+              color: isDark ? '#2a2e39' : '#e2e8f0',
+              drawBorder: true
+            },
+            ticks: {
+              color: isDark ? '#9ca3af' : '#6b7280',
+              font: {
+                size: 10
+              },
+              callback: (value: any) => {
+                const num = Number(value);
+                return `${num >= 0 ? '+' : ''}$${num.toFixed(2)}`;
+              }
+            }
+          }
+        },
+        backgroundColor: isDark ? '#0d1421' : '#ffffff',
+        interaction: {
+          intersect: false,
+          mode: 'index'
+        }
+      }
+    };
+  }
+
+  /**
+   * 创建Positions总览图表Chart.js配置
+   */
+  private createPositionsChartJsConfig(config: QuickChartConfig, positionsData: PositionsChartData): ChartJsConfig {
+    const isDark = config.theme === 'dark';
+    
+    // 如果没有持仓，显示空状态图表
+    if (positionsData.positions.length === 0) {
+      return {
+        type: 'bar',
+        data: {
+          datasets: []
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            title: {
+              display: true,
+              text: `总价值: $${positionsData.totalValue.toFixed(2)} (${positionsData.totalChangePercentage >= 0 ? '+' : ''}${positionsData.totalChangePercentage.toFixed(2)}%)`,
+              color: isDark ? '#ffffff' : '#000000',
+              font: {
+                size: 16,
+                weight: 'bold'
+              },
+              padding: 20
+            },
+            legend: {
+              display: false
+            }
+          },
+          scales: {
+            x: { display: false },
+            y: { display: false }
+          },
+          backgroundColor: isDark ? '#0d1421' : '#ffffff'
+        }
+      };
+    }
+
+    // 准备持仓数据用于展示
+    const labels = positionsData.positions.map(pos => pos.symbol);
+    const pnlValues = positionsData.positions.map(pos => parseFloat(pos.pnl));
+    const colors = pnlValues.map(pnl => pnl >= 0 ? '#00ff88' : '#ff3366');
+    
+    return {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'PNL',
+          data: pnlValues,
+          backgroundColor: colors,
+          borderColor: colors,
+          borderWidth: 1,
+          barThickness: 40
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        indexAxis: 'y', // 水平条形图
+        plugins: {
+          title: {
+            display: true,
+            text: `总价值: $${positionsData.totalValue.toFixed(2)} (${positionsData.totalChange >= 0 ? '+' : ''}$${positionsData.totalChange.toFixed(2)})`,
+            color: positionsData.totalChange >= 0 ? '#00ff88' : '#ff3366',
+            font: {
+              size: 16,
+              weight: 'bold'
+            },
+            padding: 20
+          },
+          legend: {
+            display: false
+          },
+          tooltip: {
+            enabled: true,
+            backgroundColor: isDark ? 'rgba(0, 0, 0, 0.8)' : 'rgba(255, 255, 255, 0.9)',
+            titleColor: isDark ? '#ffffff' : '#000000',
+            bodyColor: isDark ? '#ffffff' : '#000000',
+            borderColor: '#666666',
+            borderWidth: 1,
+            callbacks: {
+              label: (context: any) => {
+                const pos = positionsData.positions[context.dataIndex];
+                const value = context.parsed.x;
+                return [
+                  `${pos.symbol} ${pos.side.toUpperCase()}`,
+                  `PNL: ${value >= 0 ? '+' : ''}$${value.toFixed(2)}`,
+                  `Size: ${pos.size}`,
+                  `Entry: $${pos.entryPrice}`,
+                  `Mark: $${pos.markPrice}`
+                ];
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            type: 'linear',
+            grid: {
+              display: true,
+              color: isDark ? '#2a2e39' : '#e2e8f0'
+            },
+            ticks: {
+              color: isDark ? '#9ca3af' : '#6b7280',
+              font: {
+                size: 10
+              },
+              callback: (value: any) => {
+                const num = Number(value);
+                return `${num >= 0 ? '+' : ''}$${num.toFixed(0)}`;
+              }
+            }
+          },
+          y: {
+            grid: {
+              display: false
+            },
+            ticks: {
+              color: isDark ? '#9ca3af' : '#6b7280',
+              font: {
+                size: 12,
+                weight: 'bold'
+              }
+            }
+          }
+        },
+        backgroundColor: isDark ? '#0d1421' : '#ffffff',
+        layout: {
+          padding: {
+            left: 20,
+            right: 20,
+            top: 10,
+            bottom: 10
+          }
+        }
       }
     };
   }
@@ -849,6 +1334,9 @@ export class ChartImageService {
     };
   }
 }
+
+// 导出接口类型
+export type { PnlChartData, PositionsChartData, PositionInfo, PnlDataPoint };
 
 // 导出单例实例
 export const chartImageService = new ChartImageService();
