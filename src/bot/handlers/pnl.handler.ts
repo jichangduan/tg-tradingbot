@@ -176,6 +176,9 @@ export class PnlHandler {
       throw new Error(response.message || '获取盈亏分析失败');
     }
 
+    // 🔧 数据质量验证和清理
+    this.validateAndCleanPnlData(response, userId);
+
     return response;
   }
 
@@ -286,9 +289,27 @@ ${this.formatRecentTrades(trades.slice(0, 10))}
       return '暂无数据';
     }
 
-    return trades.map((trade, index) => {
+    // 🔧 去重处理：根据组合键去除重复交易
+    const uniqueTrades = this.deduplicateTrades(trades);
+    
+    // 🔧 数据质量检查
+    const duplicateCount = trades.length - uniqueTrades.length;
+    if (duplicateCount > 0) {
+      logger.warn('PNL: Detected duplicate trades', {
+        originalCount: trades.length,
+        uniqueCount: uniqueTrades.length,
+        duplicatesRemoved: duplicateCount
+      });
+    }
+
+    // 限制显示最新10笔不重复的交易
+    const displayTrades = uniqueTrades.slice(0, 10);
+
+    let tradesText = displayTrades.map((trade, index) => {
       const sideIcon = trade.side === 'buy' ? '🟢' : '🔴';
       const sideText = trade.side === 'buy' ? '买' : '卖';
+      
+      // 🔧 改进时间显示，包含秒数避免相同时间
       const tradeTime = new Date(trade.timestamp * 1000).toLocaleString('zh-CN', { 
         timeZone: 'Asia/Shanghai',
         month: '2-digit',
@@ -299,6 +320,122 @@ ${this.formatRecentTrades(trades.slice(0, 10))}
       
       return `${sideIcon} <b>${trade.symbol}</b> ${sideText} ${this.formatNumber(trade.quantity)} @$${this.formatNumber(trade.price)} (${tradeTime})`;
     }).join('\n');
+
+    // 🔧 如果检测到重复数据，添加说明
+    if (duplicateCount > 0) {
+      tradesText += `\n\n⚠️ <i>已过滤${duplicateCount}条重复记录</i>`;
+    }
+
+    return tradesText;
+  }
+
+  /**
+   * 去除重复的交易记录
+   */
+  private deduplicateTrades(trades: Trade[]): Trade[] {
+    const seen = new Set<string>();
+    const uniqueTrades: Trade[] = [];
+
+    for (const trade of trades) {
+      // 创建唯一标识符：如果有tradeId使用tradeId，否则使用组合键
+      const uniqueKey = trade.tradeId || 
+        `${trade.symbol}_${trade.side}_${trade.quantity}_${trade.price}_${trade.timestamp}`;
+      
+      if (!seen.has(uniqueKey)) {
+        seen.add(uniqueKey);
+        uniqueTrades.push(trade);
+      }
+    }
+
+    return uniqueTrades;
+  }
+
+  /**
+   * 验证和清理PNL数据质量
+   */
+  private validateAndCleanPnlData(response: PnlResponse, userId: number): void {
+    const { data } = response;
+    
+    if (!data || !data.trades) {
+      logger.warn('PNL: Invalid response data structure', { userId });
+      return;
+    }
+
+    const trades = data.trades;
+    const issues: string[] = [];
+
+    // 🔧 检查重复交易
+    const uniqueTradeIds = new Set<string>();
+    let duplicateCount = 0;
+    
+    for (const trade of trades) {
+      const key = trade.tradeId || `${trade.symbol}_${trade.side}_${trade.quantity}_${trade.price}_${trade.timestamp}`;
+      if (uniqueTradeIds.has(key)) {
+        duplicateCount++;
+      } else {
+        uniqueTradeIds.add(key);
+      }
+    }
+
+    if (duplicateCount > trades.length * 0.3) { // 超过30%重复
+      issues.push(`High duplicate rate: ${duplicateCount}/${trades.length} (${((duplicateCount/trades.length)*100).toFixed(1)}%)`);
+    }
+
+    // 🔧 检查时间戳异常
+    let sameTimestampCount = 0;
+    const timestamps = trades.map(t => t.timestamp);
+    const uniqueTimestamps = new Set(timestamps);
+    
+    if (uniqueTimestamps.size < timestamps.length * 0.7) { // 少于70%的唯一时间戳
+      sameTimestampCount = timestamps.length - uniqueTimestamps.size;
+      issues.push(`Many trades with same timestamp: ${sameTimestampCount}/${timestamps.length}`);
+    }
+
+    // 🔧 检查价格异常
+    const priceGroups = new Map<string, number>();
+    for (const trade of trades) {
+      const priceKey = `${trade.symbol}_${trade.price}`;
+      priceGroups.set(priceKey, (priceGroups.get(priceKey) || 0) + 1);
+    }
+
+    let highRepeatPriceCount = 0;
+    for (const [key, count] of priceGroups) {
+      if (count > 5) { // 同一个价格出现超过5次
+        highRepeatPriceCount += count;
+      }
+    }
+
+    if (highRepeatPriceCount > trades.length * 0.4) { // 超过40%
+      issues.push(`High price repetition: ${highRepeatPriceCount}/${trades.length} trades with repeated prices`);
+    }
+
+    // 🔧 记录数据质量问题
+    if (issues.length > 0) {
+      logger.warn('PNL: Data quality issues detected', {
+        userId,
+        totalTrades: trades.length,
+        uniqueTrades: uniqueTradeIds.size,
+        duplicates: duplicateCount,
+        sameTimestamp: sameTimestampCount,
+        issues,
+        dataQuality: issues.length > 2 ? 'POOR' : 'MODERATE'
+      });
+
+      // 🔧 如果数据质量很差，添加警告到响应中
+      if (issues.length > 2) {
+        logger.error('PNL: Poor data quality detected - likely backend API issue', {
+          userId,
+          issues,
+          suggestion: 'Contact backend team to check /api/tgbot/trading/pnl endpoint'
+        });
+      }
+    } else {
+      logger.debug('PNL: Data quality check passed', {
+        userId,
+        totalTrades: trades.length,
+        uniqueTrades: uniqueTradeIds.size
+      });
+    }
   }
 
   /**
@@ -346,6 +483,37 @@ ${this.formatRecentTrades(trades.slice(0, 10))}
 请检查网络连接后重试，或稍后再试。
 
 <i>如果问题持续存在，请联系管理员。</i>
+      `.trim();
+    }
+
+    // 🔧 判断是否为外部接口问题（API返回400/500等状态码）
+    if (error.message.includes('status code 400')) {
+      return `
+❌ <b>外部接口错误 (400)</b>
+
+盈亏分析接口暂时不可用，这是后端API接口问题。
+
+💡 <b>建议操作:</b>
+• 稍后重试此命令
+• 联系管理员报告接口故障
+• 使用其他命令如 /positions 查看持仓
+
+⚠️ <i>这不是您的操作问题，而是系统接口需要修复。</i>
+      `.trim();
+    }
+
+    if (error.message.includes('status code 500') || error.message.includes('status code 502') || error.message.includes('status code 503')) {
+      return `
+❌ <b>服务器错误</b>
+
+后端服务暂时不可用，请稍后重试。
+
+💡 <b>建议操作:</b>
+• 等待5-10分钟后重试
+• 检查其他命令是否正常工作
+• 联系管理员确认服务状态
+
+⚠️ <i>这是临时性服务问题，通常会自动恢复。</i>
       `.trim();
     }
 
