@@ -1,7 +1,5 @@
-import { apiService } from './api.service';
 import { cacheService } from './cache.service';
 import { logger } from '../utils/logger';
-import { config } from '../config';
 import {
   TimeFrame,
   DetailedError,
@@ -376,8 +374,8 @@ export class ChartImageService {
             type: 'time',
             time: {
               unit: this.getTimeUnit(config.timeFrame),
-              displayFormats: this.getTimeDisplayFormats(config.timeFrame),
-              stepSize: this.getTimeStepSize(config.timeFrame)
+              displayFormats: this.getTimeDisplayFormats(config.timeFrame)
+              // 移除 stepSize，让Chart.js根据数据点显示时间
             },
             grid: {
               display: true,
@@ -387,6 +385,7 @@ export class ChartImageService {
             },
             ticks: {
               display: true,  // 显示时间标签
+              source: 'data',  // 强制使用数据点的时间，显示真实时间戳
               maxTicksLimit: this.getMaxTimeTicks(config.timeFrame),
               color: isDark ? '#9ca3af' : '#6b7280',
               font: {
@@ -504,20 +503,6 @@ export class ChartImageService {
     };
 
     return timeUnitMap[timeFrame] || 'hour';
-  }
-
-  /**
-   * 获取时间步长用于Chart.js时间轴 - 针对4个支持时间框架的刻度间隔
-   */
-  private getTimeStepSize(timeFrame: TimeFrame): number | undefined {
-    // 根据当前支持的4个时间框架: 1m, 5m, 1h, 1d 和20根K线数据
-    switch (timeFrame) {
-      case '1m': return 5;    // 1分钟图: 每5分钟一个刻度 (20根K线显示~4个刻度)
-      case '5m': return 4;    // 5分钟图: 每20分钟一个刻度 (20根K线显示5个刻度)  
-      case '1h': return 4;    // 1小时图: 每4小时一个刻度 (20根K线显示5个刻度)
-      case '1d': return 3;    // 日线图: 每3天一个刻度 (20根K线显示~7个刻度)
-      default: return undefined; // 让Chart.js自动决定
-    }
   }
 
   /**
@@ -710,22 +695,6 @@ export class ChartImageService {
   }
 
   /**
-   * 格式化时间范围显示文本
-   */
-  private formatTimeFrameDisplay(timeFrame: TimeFrame): string {
-    const displayMap: { [key in TimeFrame]: string } = {
-      '1m': '1分钟',
-      '5m': '5分钟',
-      '15m': '15分钟', 
-      '1h': '1小时',
-      '4h': '4小时',
-      '1d': '日线'
-    };
-
-    return displayMap[timeFrame] || timeFrame;
-  }
-
-  /**
    * 清除特定交易对的图表缓存
    */
   public async clearChartImageCache(symbol: string, timeFrame?: TimeFrame): Promise<boolean> {
@@ -762,7 +731,7 @@ export class ChartImageService {
   /**
    * 处理图表图像相关错误
    */
-  private handleChartImageError(error: Error, symbol: string, timeFrame: TimeFrame): DetailedError {
+  private handleChartImageError(error: Error, symbol: string, _timeFrame: TimeFrame): DetailedError {
     let code: ApiErrorCode;
     let message: string;
     let retryable: boolean = false;
@@ -819,42 +788,6 @@ export class ChartImageService {
       });
       return false;
     }
-  }
-
-  /**
-   * 智能价格格式化 - 根据价格范围和数据分布自适应
-   */
-  private formatSmartPrice(price: number, data: OHLCDataPoint[]): string {
-    // 计算价格范围以确定最佳显示精度
-    const prices = data.flatMap(d => [d.o, d.h, d.l, d.c]);
-    const minPrice = Math.min(...prices);
-    const maxPrice = Math.max(...prices);
-    const priceRange = maxPrice - minPrice;
-    const avgPrice = (minPrice + maxPrice) / 2;
-    
-    // 基于价格范围的动态精度
-    let decimals: number;
-    if (avgPrice < 0.01) {
-      decimals = 8;  // 非常小的币种 (如一些山寨币)
-    } else if (avgPrice < 0.1) {
-      decimals = 6;  // 小价格币种
-    } else if (avgPrice < 1) {
-      decimals = 4;  // 中小价格币种
-    } else if (avgPrice < 100) {
-      decimals = 2;  // 主流币种价格范围
-    } else if (avgPrice < 10000) {
-      decimals = 1;  // 高价币种 (如BTC)
-    } else {
-      decimals = 0;  // 非常高价币种
-    }
-    
-    // 如果价格范围很小，增加精度以显示变化
-    const rangePercent = (priceRange / avgPrice) * 100;
-    if (rangePercent < 0.1 && decimals < 6) {
-      decimals += 2;  // 增加精度来显示微小变化
-    }
-    
-    return `$${price.toFixed(decimals)}`;
   }
 
   /**
