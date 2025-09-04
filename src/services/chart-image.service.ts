@@ -385,7 +385,7 @@ export class ChartImageService {
             },
             ticks: {
               display: true,  // 显示时间标签
-              source: 'data',  // 强制使用数据点的时间，显示真实时间戳
+              source: 'auto',  // 改为auto，让Chart.js自动选择合适的时间点
               maxTicksLimit: this.getMaxTimeTicks(config.timeFrame),
               color: isDark ? '#9ca3af' : '#6b7280',
               font: {
@@ -542,13 +542,13 @@ export class ChartImageService {
         return {
           millisecond: 'HH:mm:ss',
           second: 'HH:mm:ss',
-          minute: 'HH:mm',
-          hour: 'MM-DD',             // 1小时图只显示: 12-25 (不显示时间)
-          day: 'MM-DD',
-          week: 'MM-DD',
-          month: 'MM-DD',
-          quarter: 'MM-DD',
-          year: 'MM-DD'              // 移除年份显示
+          minute: 'HH:00',           // 1小时图显示整点小时: 14:00, 15:00
+          hour: 'HH:00',             // 强制显示整点小时格式
+          day: 'HH:00',              // 确保所有级别都显示整点小时
+          week: 'HH:00',
+          month: 'HH:00',
+          quarter: 'HH:00',
+          year: 'HH:00'              // 1h图统一显示整点小时
         };
       
       case '1d':
@@ -556,12 +556,12 @@ export class ChartImageService {
           millisecond: 'HH:mm:ss',
           second: 'HH:mm:ss',
           minute: 'HH:mm',
-          hour: 'MM-DD',
-          day: 'MM-DD',              // 日线图显示: 12-25, 12-26
-          week: 'MM-DD',
-          month: 'MM-DD',
-          quarter: 'MM-DD',
-          year: 'MM-DD'              // 移除年份显示
+          hour: 'DD日',              // 1d图显示: 16日, 17日, 18日
+          day: 'DD日',               // 日线图显示日期格式: 16日, 17日
+          week: 'DD日',
+          month: 'DD日',
+          quarter: 'DD日',
+          year: 'DD日'               // 1d图统一显示日期格式
         };
       
       default:

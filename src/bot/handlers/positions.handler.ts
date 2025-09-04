@@ -1,9 +1,9 @@
-import { Context } from 'telegraf';
+// import { Context } from 'telegraf'; // 未使用，已注释
 import { logger } from '../../utils/logger';
 import { apiService } from '../../services/api.service';
 import { cacheService } from '../../services/cache.service';
-import { MessageFormatter } from '../utils/message.formatter';
-import { Validator } from '../utils/validator';
+// import { MessageFormatter } from '../utils/message.formatter'; // 未使用，已注释
+// import { Validator } from '../utils/validator'; // 未使用，已注释
 import { ExtendedContext } from '../index';
 import { getUserAccessToken } from '../../utils/auth';
 
@@ -41,20 +41,20 @@ interface PositionsResponse {
  * 处理用户的 /positions 命令，查询并显示当前所有开放仓位
  */
 export class PositionsHandler {
-  private formatter: MessageFormatter;
-  private validator: Validator;
+  // private formatter: MessageFormatter; // 未使用，已注释
+  // private validator: Validator; // 未使用，已注释
   private readonly cacheKey = 'tgbot:positions:';
   private readonly cacheTTL = 30; // 30秒缓存
 
   constructor() {
-    this.formatter = new MessageFormatter();
-    this.validator = new Validator();
+    // this.formatter = new MessageFormatter(); // 未使用，已注释
+    // this.validator = new Validator(); // 未使用，已注释
   }
 
   /**
    * 处理 /positions 命令
    */
-  public async handle(ctx: ExtendedContext, args: string[]): Promise<void> {
+  public async handle(ctx: ExtendedContext, _args: string[]): Promise<void> {
     const userId = ctx.from?.id;
     if (!userId) {
       await ctx.reply('❌ 无法识别用户身份');
@@ -237,6 +237,37 @@ ${positionsText}
 请检查网络连接后重试，或稍后再试。
 
 <i>如果问题持续存在，请联系管理员。</i>
+      `.trim();
+    }
+
+    // 判断是否为外部接口问题（API返回400/500等状态码）
+    if (error.message.includes('status code 400')) {
+      return `
+❌ <b>外部接口错误 (400)</b>
+
+持仓查询接口暂时不可用，这是后端API接口问题。
+
+💡 <b>建议操作:</b>
+• 稍后重试此命令
+• 联系管理员报告接口故障
+• 使用其他命令如 /wallet 查看账户信息
+
+⚠️ <i>这不是您的操作问题，而是系统接口需要修复。</i>
+      `.trim();
+    }
+
+    if (error.message.includes('status code 500') || error.message.includes('status code 502') || error.message.includes('status code 503')) {
+      return `
+❌ <b>服务器错误</b>
+
+后端服务暂时不可用，请稍后重试。
+
+💡 <b>建议操作:</b>
+• 等待5-10分钟后重试
+• 检查其他命令是否正常工作
+• 联系管理员确认服务状态
+
+⚠️ <i>这是临时性服务问题，通常会自动恢复。</i>
       `.trim();
     }
 
