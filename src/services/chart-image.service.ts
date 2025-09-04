@@ -96,9 +96,10 @@ interface ChartJsConfig {
   data: {
     datasets: Array<{
       label: string;
-      data: OHLCDataPoint[];
+      data: any[];  // 支持不同类型的数据点：OHLCDataPoint[]、PnlDataPoint[]、number[]等
       [key: string]: any;
     }>;
+    labels?: string[];  // 支持标签数组（用于柱状图）
   };
   options: {
     [key: string]: any;
@@ -359,7 +360,7 @@ export class ChartImageService {
   private async generateQuickChart(config: QuickChartConfig, candleData: CachedCandleData): Promise<ChartImageResponse> {
     try {
       // 🔧 集成数据质量分析
-      const qualityResult = this.analyzeDataQuality(candleData, config.timeFrame);
+      const qualityResult = this.analyzeDataQuality(candleData, config.timeFrame || '1h');
       
       logger.info(`Data quality analysis for ${config.symbol} ${config.timeFrame}`, {
         suitable: qualityResult.suitable,
@@ -588,8 +589,8 @@ export class ChartImageService {
           x: {
             type: 'time',
             time: {
-              unit: this.getTimeUnit(config.timeFrame),
-              displayFormats: this.getTimeDisplayFormats(config.timeFrame)
+              unit: this.getTimeUnit(config.timeFrame || '1h'),
+              displayFormats: this.getTimeDisplayFormats(config.timeFrame || '1h')
               // 移除 stepSize，让Chart.js根据数据点显示时间
             },
             grid: {
@@ -601,7 +602,7 @@ export class ChartImageService {
             ticks: {
               display: true,  // 显示时间标签
               source: 'auto',  // 改为auto，让Chart.js自动选择合适的时间点
-              maxTicksLimit: this.getMaxTimeTicks(config.timeFrame),
+              maxTicksLimit: this.getMaxTimeTicks(config.timeFrame || '1h'),
               color: isDark ? '#9ca3af' : '#6b7280',
               font: {
                 size: 10,

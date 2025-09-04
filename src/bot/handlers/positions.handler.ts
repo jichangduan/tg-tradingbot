@@ -394,7 +394,7 @@ ${positionsText}
    * 准备Positions图表数据
    */
   private preparePositionsChartData(positionsData: PositionsResponse): PositionsChartData {
-    const { positions, totalPositions, totalPnl, accountValue, availableBalance } = positionsData.data;
+    const { positions, totalPnl, accountValue, availableBalance } = positionsData.data;
     
     // 转换Position到PositionInfo格式
     const positionInfos: PositionInfo[] = positions.map(pos => ({
