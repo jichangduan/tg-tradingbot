@@ -140,11 +140,16 @@ export class ErrorClassifier {
   private static classify400Error(message: string, error: any, httpStatus: number): ErrorClassification {
     const lowerMessage = message.toLowerCase();
 
-    // 没有持仓相关
+    // 没有持仓相关 - 增强匹配规则
     if (lowerMessage.includes('no position') || 
         lowerMessage.includes('position not found') || 
         lowerMessage.includes('仓位不存在') ||
-        lowerMessage.includes('no positions found')) {
+        lowerMessage.includes('no positions found') ||
+        lowerMessage.includes('当前没有该代币的持仓') ||
+        lowerMessage.includes('no open position found') ||
+        lowerMessage.includes('📭') ||
+        lowerMessage.includes('empty position') ||
+        lowerMessage.includes('position does not exist')) {
       return {
         type: ErrorType.NO_POSITIONS,
         originalError: error,
@@ -154,9 +159,14 @@ export class ErrorClassifier {
       };
     }
 
-    // 持仓不足
+    // 持仓不足 - 增强匹配规则
     if (lowerMessage.includes('insufficient position') || 
-        lowerMessage.includes('仓位不足')) {
+        lowerMessage.includes('仓位不足') ||
+        lowerMessage.includes('position size too small') ||
+        lowerMessage.includes('仓位数量不足') ||
+        lowerMessage.includes('持仓数量不够') ||
+        lowerMessage.includes('position quantity insufficient') ||
+        lowerMessage.includes('close size exceeds position')) {
       return {
         type: ErrorType.INSUFFICIENT_POSITION,
         originalError: error,
@@ -166,11 +176,17 @@ export class ErrorClassifier {
       };
     }
 
-    // 余额不足
+    // 余额不足 - 增强匹配规则
     if (lowerMessage.includes('insufficient fund') || 
         lowerMessage.includes('insufficient balance') ||
         lowerMessage.includes('余额不足') ||
-        lowerMessage.includes('资金不足')) {
+        lowerMessage.includes('资金不足') ||
+        lowerMessage.includes('insufficient margin') ||
+        lowerMessage.includes('保证金不足') ||
+        lowerMessage.includes('insufficient collateral') ||
+        lowerMessage.includes('available balance too low') ||
+        lowerMessage.includes('not enough balance') ||
+        lowerMessage.includes('账户余额不足')) {
       return {
         type: ErrorType.INSUFFICIENT_FUNDS,
         originalError: error,
@@ -180,11 +196,20 @@ export class ErrorClassifier {
       };
     }
 
-    // 数量无效
+    // 数量无效 - 增强匹配规则
     if (lowerMessage.includes('invalid amount') || 
         lowerMessage.includes('invalid quantity') ||
         lowerMessage.includes('数量无效') ||
-        lowerMessage.includes('amount must be')) {
+        lowerMessage.includes('amount must be') ||
+        lowerMessage.includes('invalid size') ||
+        lowerMessage.includes('size must be') ||
+        lowerMessage.includes('平仓数量格式错误') ||
+        lowerMessage.includes('percentage must be') ||
+        lowerMessage.includes('百分比格式不正确') ||
+        lowerMessage.includes('amount too small') ||
+        lowerMessage.includes('minimum amount') ||
+        lowerMessage.includes('数量过小') ||
+        lowerMessage.includes('数量过大')) {
       return {
         type: ErrorType.INVALID_AMOUNT,
         originalError: error,
@@ -194,11 +219,19 @@ export class ErrorClassifier {
       };
     }
 
-    // 交易执行失败
+    // 交易执行失败 - 增强匹配规则
     if (lowerMessage.includes('hyperliquid api returned null') ||
         lowerMessage.includes('execution failed') ||
         lowerMessage.includes('trade failed') ||
-        lowerMessage.includes('交易失败')) {
+        lowerMessage.includes('交易失败') ||
+        lowerMessage.includes('failed to execute') ||
+        lowerMessage.includes('close order failed') ||
+        lowerMessage.includes('平仓失败') ||
+        lowerMessage.includes('order execution failed') ||
+        lowerMessage.includes('trading system error') ||
+        lowerMessage.includes('market order failed') ||
+        lowerMessage.includes('liquidity insufficient') ||
+        lowerMessage.includes('order rejected')) {
       return {
         type: ErrorType.TRADING_EXECUTION_FAILED,
         originalError: error,
@@ -208,11 +241,18 @@ export class ErrorClassifier {
       };
     }
 
-    // 代币符号无效
+    // 代币符号无效 - 增强匹配规则
     if (lowerMessage.includes('invalid symbol') ||
         lowerMessage.includes('unknown symbol') ||
         lowerMessage.includes('symbol not found') ||
-        lowerMessage.includes('代币不存在')) {
+        lowerMessage.includes('代币不存在') ||
+        lowerMessage.includes('unsupported symbol') ||
+        lowerMessage.includes('asset not found') ||
+        lowerMessage.includes('代币符号无效') ||
+        lowerMessage.includes('trading pair not found') ||
+        lowerMessage.includes('coin not supported') ||
+        lowerMessage.includes('invalid asset') ||
+        lowerMessage.includes('symbol does not exist')) {
       return {
         type: ErrorType.INVALID_SYMBOL,
         originalError: error,

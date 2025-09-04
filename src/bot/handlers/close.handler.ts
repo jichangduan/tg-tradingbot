@@ -95,11 +95,14 @@ export class CloseHandler {
         });
 
         // 调用平仓API
-        logger.info(`Close position auth attempt [${requestId}]`, {
+        logger.info(`Close position API call attempt [${requestId}]`, {
           userId,
-          symbol,
+          username,
+          symbol: symbol.toUpperCase(),
+          closeData,
           hasAccessToken: !!accessToken,
           tokenLength: accessToken?.length,
+          isPercentage,
           requestId
         });
 
@@ -124,6 +127,18 @@ export class CloseHandler {
         );
 
         const duration = Date.now() - startTime;
+        logger.info(`Close position success [${requestId}]`, {
+          symbol: symbol.toUpperCase(),
+          closeAmount,
+          isPercentage,
+          userId,
+          username,
+          duration,
+          durationMs: `${duration}ms`,
+          apiResult: result,
+          requestId
+        });
+        
         logger.logPerformance('close_position_success', duration, {
           symbol,
           closeAmount,
@@ -139,8 +154,14 @@ export class CloseHandler {
           // 401错误：尝试刷新Token并重试
           logger.warn(`Close position 401 error, attempting token refresh [${requestId}]`, {
             userId,
-            symbol,
+            username,
+            symbol: symbol.toUpperCase(),
+            closeAmount,
+            isPercentage,
+            closeData,
             originalError: apiError.message,
+            errorStatus: apiError.status,
+            errorResponse: apiError.response?.data,
             requestId
           });
 
@@ -180,16 +201,35 @@ export class CloseHandler {
               { parse_mode: 'HTML' }
             );
 
-            logger.info(`Close position retry success [${requestId}]`, {
+            logger.info(`Close position retry success after 401 [${requestId}]`, {
               userId,
-              symbol,
+              username,
+              symbol: symbol.toUpperCase(),
               closeAmount,
+              isPercentage,
+              closeData,
+              retryResult,
               requestId
             });
 
             return; // 成功，直接返回
           } catch (retryError: any) {
-            // 重试失败，使用统一错误处理
+            // 重试失败，记录详细日志
+            logger.error(`Close position retry failed after 401 [${requestId}]`, {
+              userId,
+              username,
+              symbol: symbol.toUpperCase(),
+              closeAmount,
+              isPercentage,
+              closeData,
+              originalError: apiError.message,
+              retryError: retryError.message,
+              retryErrorStatus: retryError.status,
+              retryErrorResponse: retryError.response?.data,
+              requestId
+            });
+            
+            // 使用统一错误处理
             await handleTradingError(
               ctx, 
               retryError, 
@@ -201,7 +241,22 @@ export class CloseHandler {
             return;
           }
         } else {
-          // 其他错误，使用统一错误处理
+          // 其他错误，记录详细日志
+          logger.error(`Close position API error [${requestId}]`, {
+            userId,
+            username,
+            symbol: symbol.toUpperCase(),
+            closeAmount,
+            isPercentage,
+            closeData,
+            errorStatus: apiError.status,
+            errorMessage: apiError.message,
+            errorResponse: apiError.response?.data,
+            errorStack: apiError.stack,
+            requestId
+          });
+          
+          // 使用统一错误处理
           await handleTradingError(
             ctx, 
             apiError, 
@@ -214,6 +269,18 @@ export class CloseHandler {
       }
 
     } catch (error) {
+      // 系统异常，记录详细日志
+      logger.error(`Close position system error [${requestId}]`, {
+        userId,
+        username,
+        args,
+        symbol: args[0],
+        closeAmount: args[1],
+        errorMessage: (error as Error).message,
+        errorStack: (error as Error).stack,
+        requestId
+      });
+      
       // 使用统一错误处理处理系统异常
       await handleTradingError(ctx, error, 'close', args[0], args[1]);
     }

@@ -21,16 +21,18 @@ export const ERROR_MESSAGES: Record<ErrorType, ErrorMessage> = {
   [ErrorType.NO_POSITIONS]: {
     icon: '📭',
     title: '当前没有该代币的持仓',
-    description: '您的账户中没有找到相关代币的持仓信息',
+    description: '您的账户中没有找到该代币的任何持仓信息',
     reasons: [
-      '当前没有该代币的持仓',
-      '仓位已被平掉',
-      '代币符号不正确'
+      '该代币目前没有持仓',
+      '仓位已被完全平掉',
+      '代币符号输入错误',
+      '可能在不同的钱包类型中（交易/策略）'
     ],
     suggestions: [
-      '使用 /positions 查看当前持仓',
-      '检查代币符号是否正确',
-      '确认是否在正确的交易对'
+      '使用 /positions 查看所有当前持仓',
+      '检查代币符号拼写（如：BTC、ETH、SOL）',
+      '确认是否使用正确的交易对名称',
+      '如最近有交易，请稍等数据同步'
     ],
     isUserFault: true
   },
@@ -56,52 +58,56 @@ export const ERROR_MESSAGES: Record<ErrorType, ErrorMessage> = {
   [ErrorType.INSUFFICIENT_POSITION]: {
     icon: '📉',
     title: '仓位数量不足',
-    description: '您要平仓的数量超过了当前持仓',
+    description: '您要平仓的数量超过了当前实际持仓',
     reasons: [
-      '持仓数量小于请求数量',
-      '部分仓位已被平仓',
-      '数据更新延迟'
+      '持仓数量小于请求平仓数量',
+      '部分仓位已被其他订单平掉',
+      '同时进行了多个平仓操作',
+      '数据同步存在延迟'
     ],
     suggestions: [
-      '使用 /positions 查看实际持仓数量',
-      '尝试较小的平仓数量',
-      '等待数据同步后重试'
+      '使用 /positions 查看最新持仓数量',
+      '尝试使用更小的平仓比例（如 50%）',
+      '先取消其他未成交的平仓订单',
+      '等待几秒钟后重试操作'
     ],
     isUserFault: true
   },
 
   [ErrorType.INVALID_AMOUNT]: {
     icon: '🔢',
-    title: '交易数量格式错误',
-    description: '您输入的交易数量格式不正确',
+    title: '平仓数量格式错误',
+    description: '您输入的平仓数量格式不正确或超出范围',
     reasons: [
       '数量格式不符合要求',
-      '数量超出限制范围',
-      '使用了无效字符'
+      '百分比不在有效范围内（0-100%）',
+      '数量为负数或零',
+      '包含无效字符或特殊符号'
     ],
     suggestions: [
-      '检查数量格式（支持小数、百分比）',
-      '确保数量大于0',
-      '参考示例：1.5、50%、100'
+      '百分比格式：30%、50%、100%',
+      '小数格式：0.5、1.0、2.5',
+      '整数格式：1、10、100',
+      '确保数值大于 0 且合理'
     ],
     isUserFault: true
   },
 
   [ErrorType.TRADING_EXECUTION_FAILED]: {
     icon: '⚠️',
-    title: '交易执行失败',
-    description: '交易请求已提交但执行时遇到问题',
+    title: '平仓执行失败',
+    description: '平仓请求已提交但在执行时遇到问题',
     reasons: [
-      '市场流动性不足',
-      '仓位被锁定或限制',
-      '交易系统繁忙',
-      '价格波动过大'
+      '市场流动性暂时不足',
+      '交易系统繁忙或维护中',
+      '价格波动过大导致执行困难',
+      '网络连接或API服务异常'
     ],
     suggestions: [
-      '稍后重试',
-      '尝试分批交易',
-      '调整价格参数',
-      '联系客服获取帮助'
+      '等待 10-30 秒后重试',
+      '尝试分批平仓（如先平 50%）',
+      '使用 /positions 确认当前状态',
+      '如持续失败，请联系技术支持'
     ],
     isUserFault: false
   },
@@ -160,17 +166,19 @@ export const ERROR_MESSAGES: Record<ErrorType, ErrorMessage> = {
   // 认证和权限错误
   [ErrorType.AUTH_FAILED]: {
     icon: '🔐',
-    title: '认证失败',
-    description: '无法验证您的身份信息',
+    title: '身份验证失败',
+    description: '无法验证您的身份信息，请重新登录',
     reasons: [
-      '用户会话已过期',
-      '认证令牌无效',
-      '账户状态异常'
+      '登录会话已过期',
+      '账户认证信息无效',
+      '系统正在进行安全验证',
+      '网络传输过程中token损坏'
     ],
     suggestions: [
-      '重新启动对话 /start',
-      '稍后重试',
-      '联系客服获取帮助'
+      '发送 /start 重新初始化账户',
+      '等待几秒钟后重试操作',
+      '检查网络连接是否稳定',
+      '如问题持续，请联系技术支持'
     ],
     isUserFault: false
   },
