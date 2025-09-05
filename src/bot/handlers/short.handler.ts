@@ -357,14 +357,41 @@ export class ShortHandler {
         { parse_mode: 'HTML' }
       );
 
-    } catch (error) {
+    } catch (error: any) {
       await ctx.answerCbQuery('❌ 交易执行失败');
-      await ctx.editMessageText(
-        `❌ <b>交易执行失败</b>\n\n` +
-        `错误信息: ${(error as Error).message}\n\n` +
-        `<i>请稍后重试或联系客服</i>`,
-        { parse_mode: 'HTML' }
-      );
+      
+      // 解析API错误，提供更友好的错误信息
+      let errorMessage = '❌ <b>交易执行失败</b>\n\n';
+      
+      // 检查是否是余额不足错误
+      if (error.response?.status === 400) {
+        const responseData = error.response?.data;
+        if (responseData?.message && responseData.message.includes('余额不足')) {
+          errorMessage = '❌ <b>余额不足</b>\n\n' +
+            `当前USDC余额不足以完成交易\n` +
+            `交易金额: <code>${amount} USDC</code>\n\n` +
+            `💡 <i>请先充值USDC到您的钱包</i>`;
+        } else if (responseData?.message && (responseData.message.includes('insufficient') || responseData.message.toLowerCase().includes('balance'))) {
+          errorMessage = '❌ <b>余额不足</b>\n\n' +
+            `当前USDC余额不足以完成交易\n` +
+            `交易金额: <code>${amount} USDC</code>\n\n` +
+            `💡 <i>请使用 /wallet 查看余额并充值</i>`;
+        } else {
+          errorMessage += `参数错误: ${responseData?.message || '请检查交易参数'}\n\n` +
+            `<i>请稍后重试或联系客服</i>`;
+        }
+      } else if (error.response?.status === 401) {
+        errorMessage += `认证失败，请重新登录\n\n` +
+          `<i>使用 /start 重新开始</i>`;
+      } else if (error.response?.status >= 500) {
+        errorMessage += `服务器暂时不可用\n\n` +
+          `<i>请稍后重试</i>`;
+      } else {
+        errorMessage += `${error.message}\n\n` +
+          `<i>请稍后重试或联系客服</i>`;
+      }
+      
+      await ctx.editMessageText(errorMessage, { parse_mode: 'HTML' });
     }
   }
 

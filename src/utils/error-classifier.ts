@@ -186,7 +186,14 @@ export class ErrorClassifier {
         lowerMessage.includes('insufficient collateral') ||
         lowerMessage.includes('available balance too low') ||
         lowerMessage.includes('not enough balance') ||
-        lowerMessage.includes('账户余额不足')) {
+        lowerMessage.includes('账户余额不足') ||
+        lowerMessage.includes('balance too low') ||
+        lowerMessage.includes('insufficient usdc') ||
+        lowerMessage.includes('usdc不足') ||
+        lowerMessage.includes('low balance') ||
+        lowerMessage.includes('balance insufficient') ||
+        lowerMessage.includes('not enough funds') ||
+        lowerMessage.includes('insufficient asset')) {
       return {
         type: ErrorType.INSUFFICIENT_FUNDS,
         originalError: error,
