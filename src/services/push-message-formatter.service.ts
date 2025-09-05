@@ -31,7 +31,7 @@ export interface WhaleActionData {
 }
 
 /**
- * 资金流向数据接口
+ * 资金流向数据接口（TGBot内部格式）
  */
 export interface FundFlowData {
   from: string;
@@ -39,6 +39,18 @@ export interface FundFlowData {
   amount: string;
   timestamp: string;
   symbol?: string;
+}
+
+/**
+ * AIW3资金流向数据接口（外部API格式）
+ */
+export interface AIW3FundFlowData {
+  message: string;
+  symbol: string;
+  price: string;
+  flow1h: string;
+  flow4h: string;
+  timestamp: string;
 }
 
 /**
@@ -147,12 +159,26 @@ export class PushMessageFormatterService {
 
   /**
    * 格式化资金流向推送消息
-   * @param flow 资金流向数据
+   * @param flow 资金流向数据（支持内部格式和AIW3格式）
    * @returns 格式化后的消息内容
    */
-  public formatFundFlowMessage(flow: FundFlowData): string {
-    if (!flow || !flow.from || !flow.to) {
-      logger.warn('Invalid fund flow data provided', { flow });
+  public formatFundFlowMessage(flow: FundFlowData | AIW3FundFlowData): string {
+    if (!flow) {
+      logger.warn('No fund flow data provided', { flow });
+      return '💰 <b>【资金流向】</b>\n\n无效的资金流向数据';
+    }
+
+    // 检查是否是AIW3格式的数据
+    const isAIW3Format = 'message' in flow && 'flow1h' in flow && 'flow4h' in flow;
+    
+    if (isAIW3Format) {
+      return this.formatAIW3FundFlowMessage(flow as AIW3FundFlowData);
+    }
+
+    // 传统格式验证
+    const traditionalFlow = flow as FundFlowData;
+    if (!traditionalFlow.from || !traditionalFlow.to) {
+      logger.warn('Invalid traditional fund flow data provided', { flow });
       return '💰 <b>【资金流向】</b>\n\n无效的资金流向数据';
     }
 
@@ -191,7 +217,46 @@ export class PushMessageFormatterService {
         error: (error as Error).message,
         flow
       });
-      return `💰 <b>【资金流向】</b>\n\n从: ${this.escapeHtml(flow.from)}\n到: ${this.escapeHtml(flow.to)}\n⏰ ${flow.timestamp}`;
+      const traditionalFlow = flow as FundFlowData;
+      return `💰 <b>【资金流向】</b>\n\n从: ${this.escapeHtml(traditionalFlow.from)}\n到: ${this.escapeHtml(traditionalFlow.to)}\n⏰ ${traditionalFlow.timestamp}`;
+    }
+  }
+
+  /**
+   * 格式化AIW3格式的资金流向推送消息
+   * @param flow AIW3资金流向数据
+   * @returns 格式化后的消息内容
+   */
+  public formatAIW3FundFlowMessage(flow: AIW3FundFlowData): string {
+    try {
+      const formattedTimestamp = this.formatTimestamp(flow.timestamp);
+      
+      let message = `💰 <b>【资金流向】</b>\n\n` +
+                   `<code>┌──────────────────────────────────────┐</code>\n` +
+                   `<code>│ </code>${this.escapeHtml(flow.message)}<code> │</code>\n` +
+                   `<code>│ </code>代币: ${this.escapeHtml(flow.symbol)}<code> │</code>\n` +
+                   `<code>│ </code>价格: $${this.escapeHtml(flow.price)}<code> │</code>\n` +
+                   `<code>│ </code>1h流入: ${this.escapeHtml(flow.flow1h)}<code> │</code>\n` +
+                   `<code>│ </code>4h流入: ${this.escapeHtml(flow.flow4h)}<code> │</code>\n` +
+                   `<code>│ ⏰ ${formattedTimestamp} │</code>\n` +
+                   `<code>└──────────────────────────────────────┘</code>`;
+
+      message += `\n\n💡 <i>代币: ${flow.symbol}</i>`;
+
+      logger.debug('AIW3 fund flow message formatted', {
+        hasMessage: !!flow.message,
+        hasSymbol: !!flow.symbol,
+        messageLength: flow.message.length
+      });
+
+      return message;
+      
+    } catch (error) {
+      logger.error('Failed to format AIW3 fund flow message', {
+        error: (error as Error).message,
+        flow
+      });
+      return `💰 <b>【资金流向】</b>\n\n${this.escapeHtml(flow.message)}\n代币: ${flow.symbol}\n⏰ ${flow.timestamp}`;
     }
   }
 
@@ -317,13 +382,13 @@ export class PushMessageFormatterService {
    * 批量格式化推送消息
    * @param newsItems 快讯数据数组
    * @param whaleActions 鲸鱼动向数据数组  
-   * @param fundFlows 资金流向数据数组
+   * @param fundFlows 资金流向数据数组（支持内部格式和AIW3格式）
    * @returns 格式化后的消息数组
    */
   public formatBatchMessages(
     newsItems: FlashNewsData[] = [],
     whaleActions: WhaleActionData[] = [],
-    fundFlows: FundFlowData[] = []
+    fundFlows: (FundFlowData | AIW3FundFlowData)[] = []
   ): FormattedPushMessage[] {
     const messages: FormattedPushMessage[] = [];
 
@@ -348,10 +413,11 @@ export class PushMessageFormatterService {
 
       // 处理资金流向
       for (const flow of fundFlows) {
+        const symbol = 'symbol' in flow ? flow.symbol : undefined;
         messages.push({
           content: this.formatFundFlowMessage(flow),
           type: 'fund_flow',
-          keyboard: flow.symbol ? this.createTradingKeyboard(flow.symbol) : undefined
+          keyboard: symbol ? this.createTradingKeyboard(symbol) : undefined
         });
       }
 

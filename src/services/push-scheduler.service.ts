@@ -5,6 +5,7 @@ import { pushDataService } from './push-data.service';
 import { cacheService } from './cache.service';
 import { logger } from '../utils/logger';
 import { PushLogger } from '../utils/push-logger';
+import { pushDeduplicator } from '../utils/push-deduplicator';
 import { telegramBot } from '../bot';
 
 /**
@@ -427,9 +428,22 @@ export class PushSchedulerService {
       const { flashNews, whaleActions, fundFlows } = pushDataService.filterPushContent(pushData, settings);
       
       PushLogger.logContentFiltering(userId, flashNews.length, whaleActions.length, fundFlows.length, settings);
+      
+      // 应用去重逻辑，过滤掉已推送过的内容
+      const [dedupFlashNews, dedupWhaleActions, dedupFundFlows] = await Promise.all([
+        pushDeduplicator.filterDuplicates(userId, flashNews, 'flash_news'),
+        pushDeduplicator.filterDuplicates(userId, whaleActions, 'whale_actions'),
+        pushDeduplicator.filterDuplicates(userId, fundFlows, 'fund_flows')
+      ]);
+      
+      logger.info(`🚫 [DEDUP] Deduplication results for user ${userId}`, {
+        flashNews: { original: flashNews.length, filtered: dedupFlashNews.length },
+        whaleActions: { original: whaleActions.length, filtered: dedupWhaleActions.length },
+        fundFlows: { original: fundFlows.length, filtered: dedupFundFlows.length }
+      });
 
-      // 使用消息格式化服务处理消息
-      const messages = pushMessageFormatterService.formatBatchMessages(flashNews, whaleActions, fundFlows);
+      // 使用消息格式化服务处理消息（使用去重后的数据）
+      const messages = pushMessageFormatterService.formatBatchMessages(dedupFlashNews, dedupWhaleActions, dedupFundFlows);
 
       PushLogger.logMessageFormatting(userId, messages);
 
@@ -474,6 +488,15 @@ export class PushSchedulerService {
         // API限制延迟
         await new Promise(resolve => setTimeout(resolve, 150));
       }
+      
+      // 标记所有内容为已推送
+      await Promise.all([
+        pushDeduplicator.markBatchAsPushed(userId, dedupFlashNews, 'flash_news'),
+        pushDeduplicator.markBatchAsPushed(userId, dedupWhaleActions, 'whale_actions'),
+        pushDeduplicator.markBatchAsPushed(userId, dedupFundFlows, 'fund_flows')
+      ]);
+      
+      logger.info(`✅ [DEDUP] Marked ${messages.length} messages as pushed for user ${userId}`);
 
       const duration = Date.now() - startTime;
       const totalContentLength = messages.reduce((total, msg) => total + (msg.content?.length || 0), 0);
