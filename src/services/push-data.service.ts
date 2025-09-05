@@ -58,10 +58,26 @@ export class PushDataService {
       
     } catch (error) {
       const duration = Date.now() - startTime;
+      
+      // 详细记录错误信息以便调试
+      logger.error(`🚨 [PUSH_DATA] Detailed error analysis for user ${userId}`, {
+        errorName: (error as Error).name,
+        errorMessage: (error as Error).message,
+        errorStack: (error as Error).stack,
+        durationMs: duration,
+        durationText: `${duration}ms`,
+        userIdStr: userId,
+        errorType: error instanceof Error ? error.constructor.name : typeof error
+      });
+      
       PushLogger.logDataFetchError(userId, duration, error as Error);
       
+      // 🚨 临时注释fallback数据，让错误直接暴露
+      logger.warn(`⚠️ [PUSH_DATA] Throwing error instead of using fallback data for debugging`);
+      throw error;
+      
       // 返回测试数据以便继续测试推送流程
-      return this.createFallbackTestData();
+      // return this.createFallbackTestData();
     }
   }
 
