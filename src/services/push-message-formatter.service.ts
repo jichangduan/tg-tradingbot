@@ -90,11 +90,7 @@ export class PushMessageFormatterService {
         message += `\n\n💡 <i>相关代币: ${news.symbol}</i>`;
       }
 
-      logger.debug('Flash news message formatted', {
-        hasContent: !!news.content,
-        hasSymbol: !!news.symbol,
-        titleLength: news.title.length
-      });
+      // 删除快讯消息格式化debug日志
 
       return message;
       
@@ -140,11 +136,7 @@ export class PushMessageFormatterService {
         message += `\n\n💡 <i>代币: ${action.symbol}</i>`;
       }
 
-      logger.debug('Whale action message formatted', {
-        hasAmount: !!action.amount,
-        hasSymbol: !!action.symbol,
-        addressLength: action.address.length
-      });
+      // 删除鲸鱼动向消息格式化debug日志
 
       return message;
       
@@ -203,12 +195,7 @@ export class PushMessageFormatterService {
         message += `\n\n💡 <i>代币: ${flow.symbol}</i>`;
       }
 
-      logger.debug('Fund flow message formatted', {
-        hasAmount: !!flow.amount,
-        hasSymbol: !!flow.symbol,
-        fromLength: flow.from.length,
-        toLength: flow.to.length
-      });
+      // 删除资金流向消息格式化debug日志
 
       return message;
       
@@ -243,11 +230,7 @@ export class PushMessageFormatterService {
 
       message += `\n\n💡 <i>代币: ${flow.symbol}</i>`;
 
-      logger.debug('AIW3 fund flow message formatted', {
-        hasMessage: !!flow.message,
-        hasSymbol: !!flow.symbol,
-        messageLength: flow.message.length
-      });
+      // 删除AIW3资金流向消息格式化debug日志
 
       return message;
       
@@ -273,7 +256,7 @@ export class PushMessageFormatterService {
 
     const upperSymbol = symbol.toUpperCase();
     
-    logger.debug('Creating trading keyboard', { symbol: upperSymbol });
+    // 删除创建交易键盘debug日志
     
     return [
       [
@@ -421,12 +404,11 @@ export class PushMessageFormatterService {
         });
       }
 
-      logger.info('Batch message formatting completed', {
-        newsCount: newsItems.length,
-        whaleActionsCount: whaleActions.length,
-        fundFlowsCount: fundFlows.length,
-        totalMessages: messages.length
-      });
+      // 保留批量格式化完成信息但简化
+      const totalCount = newsItems.length + whaleActions.length + fundFlows.length;
+      if (totalCount > 0) {
+        logger.info(`📝 [FORMATTER] Generated ${messages.length} messages from ${totalCount} items`);
+      }
 
       return messages;
       

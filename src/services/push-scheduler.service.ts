@@ -120,16 +120,12 @@ export class PushSchedulerService {
 
       for (const user of enabledUsers) {
         try {
-          logger.info(`🚀 [SCHEDULER] About to call sendPushToUser for user ${user.userId}`, {
-            hasSettings: !!user.settings,
-            hasPushData: !!user.pushData,
-            pushDataKeys: user.pushData ? Object.keys(user.pushData) : []
-          });
+            // 删除发送前的详细日志
           
           await this.sendPushToUser(user.userId, user.settings, user.pushData);
           successCount++;
           
-          logger.info(`✅ [SCHEDULER] sendPushToUser completed successfully for user ${user.userId}`);
+          // 删除发送完成的详细日志
         } catch (error) {
           failureCount++;
           logger.error(`❌ [SCHEDULER] Failed to send push to user ${user.userId}`, {
@@ -171,7 +167,7 @@ export class PushSchedulerService {
     pushData?: PushData;
   }>> {
     try {
-      logger.info('Getting enabled push users from local cache tracking');
+      // 删除获取用户的开始日志
       
       const enabledUsers: Array<{
         userId: string;
@@ -194,20 +190,13 @@ export class PushSchedulerService {
                                 userSettingsResult.fund_enabled;
             
             if (hasAnyEnabled) {
-              logger.info(`🔄 [SCHEDULER] About to call pushDataService.getPushDataForUser for user ${userId}`, {
-                pushDataServiceType: typeof pushDataService,
-                methodExists: typeof pushDataService.getPushDataForUser === 'function'
-              });
+              // 删除详细的调用前日志
               
               try {
                 // 获取推送内容数据
                 const pushDataResult = await pushDataService.getPushDataForUser(userId);
                 
-                logger.info(`✅ [SCHEDULER] pushDataService.getPushDataForUser completed for user ${userId}`, {
-                  hasResult: !!pushDataResult,
-                  resultType: typeof pushDataResult,
-                  resultKeys: pushDataResult ? Object.keys(pushDataResult) : []
-                });
+                // 删除详细的调用完成日志
                 
                 enabledUsers.push({
                   userId: userId,
@@ -215,10 +204,7 @@ export class PushSchedulerService {
                   pushData: pushDataResult
                 });
                 
-                logger.debug('Added user for push notifications', {
-                  telegramId: userId,
-                  settings: userSettingsResult
-                });
+                // 删除用户添加的debug日志
               } catch (pushDataError) {
                 logger.error(`❌ [SCHEDULER] Error calling pushDataService.getPushDataForUser for user ${userId}`, {
                   error: (pushDataError as Error).message,
@@ -265,7 +251,7 @@ export class PushSchedulerService {
     try {
       // 首先尝试从Redis缓存获取
       const pushSettingsPattern = 'push_settings:*';
-      logger.debug('Searching for push settings in Redis', { pattern: pushSettingsPattern });
+      // 删除Redis搜索日志
       
       const cacheKeys = await cacheService.getKeys(pushSettingsPattern);
       
@@ -319,22 +305,19 @@ export class PushSchedulerService {
       // 如果Redis没有，尝试从内存存储获取
       const memoryData = this.enabledUsersMemoryStore.get(userId);
       if (memoryData) {
-        logger.debug('Using memory store fallback for user push settings', { telegramId: userId });
+        // 删除内存存储fallback日志
         return memoryData.settings;
       }
       
       return null;
       
     } catch (error) {
-      logger.debug('Failed to get cached user push settings, trying memory store', {
-        telegramId: userId,
-        error: (error as Error).message
-      });
+      // 删除获取缓存设置失败的debug日志
       
       // 出错时使用内存存储
       const memoryData = this.enabledUsersMemoryStore.get(userId);
       if (memoryData) {
-        logger.debug('Using memory store fallback after error', { telegramId: userId });
+        // 删除错误后使用内存存储的debug日志
         return memoryData.settings;
       }
       
@@ -351,7 +334,7 @@ export class PushSchedulerService {
       lastUpdated: Date.now()
     });
     
-    logger.debug('User added to push tracking', { telegramId: userId, settings });
+    // 删除用户添加到跟踪的debug日志
   }
 
   /**
@@ -386,7 +369,7 @@ export class PushSchedulerService {
    */
   public removeUserFromPushTracking(userId: string): void {
     this.enabledUsersMemoryStore.delete(userId);
-    logger.debug('User removed from push tracking', { telegramId: userId });
+    // 删除用户移除跟踪的debug日志
   }
 
 
@@ -422,7 +405,7 @@ export class PushSchedulerService {
         return;
       }
 
-      logger.info(`✅ [MESSAGE_SEND] Push content validation passed for user ${userId}`);
+      // 删除内容验证通过日志
 
       // 根据用户设置筛选推送内容
       const { flashNews, whaleActions, fundFlows } = pushDataService.filterPushContent(pushData, settings);
@@ -452,15 +435,12 @@ export class PushSchedulerService {
         return;
       }
 
-      logger.info(`🚀 [MESSAGE_SEND] Starting to send ${messages.length} messages to user ${userId}`);
+      // 删除消息发送开始的详细日志
 
       // 发送所有消息
       for (let i = 0; i < messages.length; i++) {
         const message = messages[i];
-        logger.info(`📨 [MESSAGE_SEND] Sending message ${i + 1}/${messages.length} to user ${userId}`, {
-          contentPreview: message.content?.substring(0, 100) + '...',
-          hasKeyboard: !!message.keyboard
-        });
+        // 删除每条消息发送的详细日志
         
         const sendOptions: any = {
           parse_mode: 'HTML',
@@ -473,10 +453,7 @@ export class PushSchedulerService {
 
         try {
           const telegramResult = await bot.telegram.sendMessage(parseInt(userId), message.content, sendOptions);
-          logger.info(`✅ [MESSAGE_SEND] Message ${i + 1} sent successfully to user ${userId}`, {
-            messageId: telegramResult.message_id,
-            chatId: telegramResult.chat.id
-          });
+          // 删除每条消息发送成功的详细日志
         } catch (sendError) {
           logger.error(`❌ [MESSAGE_SEND] Failed to send message ${i + 1} to user ${userId}`, {
             error: (sendError as Error).message,
@@ -496,7 +473,7 @@ export class PushSchedulerService {
         pushDeduplicator.markBatchAsPushed(userId, dedupFundFlows, 'fund_flows')
       ]);
       
-      logger.info(`✅ [DEDUP] Marked ${messages.length} messages as pushed for user ${userId}`);
+      // 删除去重标记的详细日志
 
       const duration = Date.now() - startTime;
       const totalContentLength = messages.reduce((total, msg) => total + (msg.content?.length || 0), 0);
@@ -517,7 +494,7 @@ export class PushSchedulerService {
     try {
       const cacheKey = `${this.cachePrefix}:${this.lastPushCacheKey}`;
       await cacheService.set(cacheKey, new Date().toISOString(), 24 * 60 * 60);
-      logger.debug('Updated last push time');
+      // 删除更新推送时间的debug日志
     } catch (error) {
       logger.warn('Failed to update last push time', { error: (error as Error).message });
     }

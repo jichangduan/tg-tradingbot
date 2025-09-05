@@ -76,14 +76,7 @@ export class PushDeduplicator {
       
       const isDup = result.success && !!result.data;
       
-      if (isDup) {
-        logger.debug('Duplicate content detected', {
-          telegramId: parseInt(userId),
-          contentType,
-          contentHash,
-          cacheKey
-        });
-      }
+      // 保留去重结果但不显示详细信息
       
       return isDup;
     } catch (error) {
@@ -121,13 +114,7 @@ export class PushDeduplicator {
         contentHash
       }, this.defaultTtl);
       
-      logger.debug('Content marked as pushed', {
-        telegramId: parseInt(userId),
-        contentType,
-        contentHash,
-        cacheKey,
-        ttlSeconds: this.defaultTtl
-      });
+      // 删除内容标记为已推送的debug日志
     } catch (error) {
       logger.warn('Failed to mark content as pushed', {
         telegramId: parseInt(userId),
@@ -163,13 +150,11 @@ export class PushDeduplicator {
         }
       }
 
-      logger.info('Content deduplication completed', {
-        telegramId: parseInt(userId),
-        contentType,
-        originalCount: items.length,
-        filteredCount: filteredItems.length,
-        duplicatesRemoved: items.length - filteredItems.length
-      });
+      // 保留去重汇总信息但简化
+      const duplicatesRemoved = items.length - filteredItems.length;
+      if (duplicatesRemoved > 0) {
+        logger.info(`🚫 [DEDUP] Filtered ${duplicatesRemoved} duplicates for user ${userId} (${contentType})`);
+      }
 
       return filteredItems;
     } catch (error) {
@@ -205,11 +190,7 @@ export class PushDeduplicator {
       
       await Promise.all(markPromises);
       
-      logger.debug('Batch marked as pushed', {
-        telegramId: parseInt(userId),
-        contentType,
-        itemCount: items.length
-      });
+      // 删除批量标记为已推送的debug日志
     } catch (error) {
       logger.warn('Failed to mark batch as pushed', {
         telegramId: parseInt(userId),
