@@ -277,7 +277,15 @@ export class PushSchedulerService {
     try {
       // 首先尝试从Redis缓存获取
       const pushSettingsPattern = 'push_settings:*';
+      logger.debug('Searching for push settings in Redis', { pattern: pushSettingsPattern });
+      
       const cacheKeys = await cacheService.getKeys(pushSettingsPattern);
+      
+      logger.debug('Redis cache keys found', {
+        patternUsed: pushSettingsPattern,
+        totalKeys: cacheKeys.length,
+        keys: cacheKeys.slice(0, 10) // 显示前10个keys用于调试
+      });
       
       if (cacheKeys.length > 0) {
         // 从key中提取用户ID
@@ -287,7 +295,8 @@ export class PushSchedulerService {
         
         logger.debug('Found users with push settings in Redis cache', {
           userCount: userIds.length,
-          userIds: userIds.slice(0, 5)
+          userIds: userIds.slice(0, 5),
+          allKeys: cacheKeys
         });
         
         return userIds;
@@ -299,7 +308,8 @@ export class PushSchedulerService {
       if (memoryUserIds.length > 0) {
         logger.debug('Using memory store fallback for push users', {
           userCount: memoryUserIds.length,
-          userIds: memoryUserIds.slice(0, 5)
+          userIds: memoryUserIds.slice(0, 5),
+          reason: 'No Redis cache keys found'
         });
         
         return memoryUserIds;
@@ -310,14 +320,16 @@ export class PushSchedulerService {
       
     } catch (error) {
       logger.warn('Failed to get users with push settings from cache, trying memory store', {
-        error: (error as Error).message
+        error: (error as Error).message,
+        stack: (error as Error).stack
       });
       
       // 出错时使用内存存储
       const memoryUserIds = Array.from(this.enabledUsersMemoryStore.keys());
       
       logger.debug('Using memory store fallback after error', {
-        userCount: memoryUserIds.length
+        userCount: memoryUserIds.length,
+        error: (error as Error).message
       });
       
       return memoryUserIds;

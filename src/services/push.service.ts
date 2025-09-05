@@ -195,8 +195,8 @@ export class PushService {
         throw new ApiError('Invalid API response format', 500, 'INVALID_RESPONSE');
       }
 
-      // 清除缓存，强制下次重新获取
-      await cacheService.delete(cacheKey);
+      // 更新缓存而不是删除，确保推送调度器能读取到最新设置
+      await cacheService.set(cacheKey, response, this.cacheTTL);
 
       const duration = Date.now() - startTime;
       logger.info('Push settings updated successfully', {
