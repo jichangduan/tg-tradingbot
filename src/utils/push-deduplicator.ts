@@ -45,7 +45,7 @@ export class PushDeduplicator {
       return Math.abs(hash).toString(36);
     } catch (error) {
       logger.warn('Failed to generate content hash', { 
-        error: (error as Error).message,
+        errorMessage: (error as Error).message,
         content: typeof content === 'object' ? Object.keys(content) : content
       });
       return `fallback_${Date.now()}`;
@@ -74,11 +74,11 @@ export class PushDeduplicator {
       
       const result = await cacheService.get(cacheKey);
       
-      const isDup = result.success && result.data;
+      const isDup = result.success && !!result.data;
       
       if (isDup) {
         logger.debug('Duplicate content detected', {
-          userId,
+          telegramId: parseInt(userId),
           contentType,
           contentHash,
           cacheKey
@@ -88,9 +88,9 @@ export class PushDeduplicator {
       return isDup;
     } catch (error) {
       logger.warn('Failed to check for duplicate content', {
-        userId,
+        telegramId: parseInt(userId),
         contentType,
-        error: (error as Error).message
+        errorMessage: (error as Error).message
       });
       return false; // 出错时不阻止推送
     }
@@ -122,17 +122,17 @@ export class PushDeduplicator {
       }, this.defaultTtl);
       
       logger.debug('Content marked as pushed', {
-        userId,
+        telegramId: parseInt(userId),
         contentType,
         contentHash,
         cacheKey,
-        ttl: this.defaultTtl
+        ttlSeconds: this.defaultTtl
       });
     } catch (error) {
       logger.warn('Failed to mark content as pushed', {
-        userId,
+        telegramId: parseInt(userId),
         contentType,
-        error: (error as Error).message
+        errorMessage: (error as Error).message
       });
     }
   }
@@ -164,7 +164,7 @@ export class PushDeduplicator {
       }
 
       logger.info('Content deduplication completed', {
-        userId,
+        telegramId: parseInt(userId),
         contentType,
         originalCount: items.length,
         filteredCount: filteredItems.length,
@@ -174,9 +174,9 @@ export class PushDeduplicator {
       return filteredItems;
     } catch (error) {
       logger.error('Failed to filter duplicates', {
-        userId,
+        telegramId: parseInt(userId),
         contentType,
-        error: (error as Error).message,
+        errorMessage: (error as Error).message,
         itemCount: items.length
       });
       return items; // 出错时返回原数组，不影响推送
@@ -206,16 +206,16 @@ export class PushDeduplicator {
       await Promise.all(markPromises);
       
       logger.debug('Batch marked as pushed', {
-        userId,
+        telegramId: parseInt(userId),
         contentType,
         itemCount: items.length
       });
     } catch (error) {
       logger.warn('Failed to mark batch as pushed', {
-        userId,
+        telegramId: parseInt(userId),
         contentType,
         itemCount: items.length,
-        error: (error as Error).message
+        errorMessage: (error as Error).message
       });
     }
   }
@@ -237,18 +237,18 @@ export class PushDeduplicator {
       const keys = await cacheService.getKeys(pattern);
       
       if (keys.length > 0) {
-        await Promise.all(keys.map(key => cacheService.del(key)));
+        await Promise.all(keys.map(key => cacheService.delete(key)));
         logger.info('User deduplication cache cleared', {
-          userId,
+          telegramId: parseInt(userId),
           contentType,
-          clearedKeys: keys.length
+          clearedKeysCount: keys.length
         });
       }
     } catch (error) {
       logger.warn('Failed to clear user deduplication cache', {
-        userId,
+        telegramId: parseInt(userId),
         contentType,
-        error: (error as Error).message
+        errorMessage: (error as Error).message
       });
     }
   }
