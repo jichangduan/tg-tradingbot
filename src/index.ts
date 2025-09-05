@@ -145,15 +145,13 @@ function setupHealthCheckServer(): void {
         
         // 合并原有服务信息和推送调度器信息
         const schedulerStatus = pushScheduler.getStatus();
-        const lastPushTime = await pushScheduler.getLastPushTime();
         
         services = {
           ...botInfo.services,
           pushScheduler: {
             isRunning: schedulerStatus.isRunning,
             cronPattern: schedulerStatus.cronPattern,
-            environment: schedulerStatus.environment,
-            lastPushTime: lastPushTime
+            environment: schedulerStatus.environment
           }
         };
       } catch (_) {

@@ -1,9 +1,10 @@
 import * as cron from 'node-cron';
 import { PushSettings, PushData, pushService } from './push.service';
+import { pushContentService } from './push-content.service';
+import { pushMessageFormatterService } from './push-message-formatter.service';
 import { cacheService } from './cache.service';
 import { logger } from '../utils/logger';
 import { telegramBot } from '../bot';
-import { apiService } from './api.service';
 
 /**
  * 推送调度服务
@@ -36,12 +37,7 @@ export class PushSchedulerService {
       // 修复cron表达式：生产环境20分钟，开发环境1分钟
       const cronPattern = process.env.NODE_ENV === 'production' ? '*/20 * * * *' : '*/1 * * * *';
       
-      logger.info('🔧 Initializing push scheduler', {
-        cronPattern,
-        environment: process.env.NODE_ENV || 'development',
-        timezone: 'Asia/Shanghai',
-        description: process.env.NODE_ENV === 'production' ? 'Every 20 minutes' : 'Every 1 minute'
-      });
+      logger.info('Initializing push scheduler', { cronPattern, environment: process.env.NODE_ENV });
 
       this.scheduleTask = cron.schedule(cronPattern, async () => {
         await this.executeScheduledPush();
@@ -54,19 +50,10 @@ export class PushSchedulerService {
       this.scheduleTask.start();
       this.isRunning = true;
 
-      logger.info('✅ Push scheduler started successfully', {
-        isRunning: this.isRunning,
-        cronPattern,
-        nextExecutionEstimate: 'Within 1-20 minutes depending on environment'
-      });
+      logger.info('Push scheduler started successfully', { cronPattern });
 
-      // 立即执行一次推送任务用于测试
-      logger.info('🚀 Executing initial push task for immediate testing...');
-      setTimeout(() => {
-        this.executeScheduledPush().catch(error => {
-          logger.error('Initial push task failed', { error: error.message });
-        });
-      }, 5000); // 5秒后执行第一次推送
+      // 5秒后执行首次推送任务
+      setTimeout(() => this.executeScheduledPush().catch(() => {}), 5000);
 
     } catch (error) {
       this.isRunning = false;
@@ -405,62 +392,10 @@ export class PushSchedulerService {
 
   /**
    * 为用户获取推送数据
-   * 从各种数据源获取快讯、鲸鱼动向、资金流向等信息
+   * 使用推送内容服务获取和处理数据
    */
   private async getPushDataForUser(userId: string): Promise<PushData | undefined> {
-    try {
-      logger.debug('Fetching push data for user', { telegramId: userId });
-      
-      // 调用后端API获取推送内容
-      const response = await apiService.get<{
-        code: string;
-        message: string;
-        data: {
-          flash_news: Array<{
-            title: string;
-            content: string;
-            timestamp: string;
-          }>;
-          whale_actions: Array<{
-            address: string;
-            action: string;
-            amount: string;
-            timestamp: string;
-          }>;
-          fund_flows: Array<{
-            from: string;
-            to: string;
-            amount: string;
-            timestamp: string;
-          }>;
-        };
-      }>('/api/tgbot/push/content');
-      
-      if (response.code === '0' && response.data) {
-        logger.debug('Successfully fetched push data', {
-          telegramId: userId,
-          flashNewsCount: response.data.flash_news?.length || 0,
-          whaleActionsCount: response.data.whale_actions?.length || 0,
-          fundFlowsCount: response.data.fund_flows?.length || 0
-        });
-        
-        return {
-          flash_news: response.data.flash_news || [],
-          whale_actions: response.data.whale_actions || [],
-          fund_flows: response.data.fund_flows || []
-        };
-      }
-      
-      logger.debug('No push data available from API', { telegramId: userId });
-      return undefined;
-      
-    } catch (error) {
-      logger.warn('Failed to fetch push data for user', {
-        telegramId: userId,
-        error: (error as Error).message
-      });
-      return undefined;
-    }
+    return await pushContentService.getPushDataForUser(userId);
   }
 
   /**
@@ -472,193 +407,57 @@ export class PushSchedulerService {
     pushData?: PushData
   ): Promise<void> {
     try {
-      logger.debug(`🔧 Initializing message sending for user ${userId}`, {
-        userId: parseInt(userId || '0'),
-        settings,
-        hasData: !!pushData
-      });
-
       const bot = telegramBot.getBot();
-      
-      // 检查Bot实例是否可用
       if (!bot) {
         throw new Error('Telegram Bot instance is not available');
       }
 
       // 检查是否有新的推送内容
-      if (!pushData || !this.hasNewPushContent(pushData)) {
-        logger.debug('📭 No new push content for user', { 
-          userId: parseInt(userId || '0'),
-          hasData: !!pushData,
-          dataDetails: pushData ? {
-            flashCount: pushData.flash_news?.length || 0,
-            whaleCount: pushData.whale_actions?.length || 0,
-            fundCount: pushData.fund_flows?.length || 0
-          } : 'no data'
-        });
+      if (!pushData || !pushContentService.hasNewPushContent(pushData)) {
+        logger.debug('No new push content for user', { userId: parseInt(userId || '0') });
         return;
       }
 
-      let messages: string[] = [];
-      const messageTypes: string[] = [];
-
-      // 处理快讯推送
-      if (settings.flash_enabled && pushData.flash_news && pushData.flash_news.length > 0) {
-        for (const news of pushData.flash_news) {
-          messages.push(this.formatFlashNewsMessage(news));
-          messageTypes.push('flash_news');
-        }
-        logger.debug(`📰 Added ${pushData.flash_news.length} flash news messages`);
-      }
-
-      // 处理鲸鱼动向推送
-      if (settings.whale_enabled && pushData.whale_actions && pushData.whale_actions.length > 0) {
-        for (const action of pushData.whale_actions) {
-          messages.push(this.formatWhaleActionMessage(action));
-          messageTypes.push('whale_action');
-        }
-        logger.debug(`🐋 Added ${pushData.whale_actions.length} whale action messages`);
-      }
-
-      // 处理资金流向推送
-      if (settings.fund_enabled && pushData.fund_flows && pushData.fund_flows.length > 0) {
-        for (const flow of pushData.fund_flows) {
-          messages.push(this.formatFundFlowMessage(flow));
-          messageTypes.push('fund_flow');
-        }
-        logger.debug(`💰 Added ${pushData.fund_flows.length} fund flow messages`);
-      }
+      // 使用消息格式化服务处理消息
+      const messages = pushMessageFormatterService.formatBatchMessages(
+        settings.flash_enabled ? pushData.flash_news || [] : [],
+        settings.whale_enabled ? pushData.whale_actions || [] : [],
+        settings.fund_enabled ? pushData.fund_flows || [] : []
+      );
 
       if (messages.length === 0) {
-        logger.debug(`📭 No messages to send (settings disabled or no content)`, {
-          userId: parseInt(userId || '0'),
-          settings
-        });
+        logger.debug('No messages to send', { userId: parseInt(userId || '0') });
         return;
       }
 
-      logger.info(`📤 Sending ${messages.length} messages to user ${userId}`, {
-        userId: parseInt(userId || '0'),
-        messageCount: messages.length,
-        messageTypes
-      });
+      logger.info(`Sending ${messages.length} messages to user ${userId}`);
 
-      // 发送消息
-      for (let i = 0; i < messages.length; i++) {
-        const message = messages[i];
-        const messageType = messageTypes[i];
-        
-        try {
-          logger.debug(`📱 Sending message ${i + 1}/${messages.length} (${messageType})`, {
-            userId: parseInt(userId || '0'),
-            messageType,
-            messageLength: message.length
-          });
+      // 发送所有消息
+      for (const message of messages) {
+        const sendOptions: any = {
+          parse_mode: 'HTML',
+          disable_web_page_preview: true
+        };
 
-          await bot.telegram.sendMessage(parseInt(userId), message, {
-            parse_mode: 'HTML',
-            disable_web_page_preview: true
-          } as any);
-
-          logger.debug(`✅ Message ${i + 1}/${messages.length} sent successfully`, {
-            userId: parseInt(userId || '0'),
-            messageType
-          });
-
-          // 添加短暂延迟避免触发Telegram API限制
-          await new Promise(resolve => setTimeout(resolve, 150));
-          
-        } catch (messageError) {
-          logger.error(`❌ Failed to send message ${i + 1}/${messages.length}`, {
-            userId: parseInt(userId || '0'),
-            messageType,
-            error: (messageError as Error).message
-          });
-          throw messageError;
+        if (message.keyboard) {
+          sendOptions.reply_markup = { inline_keyboard: message.keyboard };
         }
+
+        await bot.telegram.sendMessage(parseInt(userId), message.content, sendOptions);
+        await new Promise(resolve => setTimeout(resolve, 150)); // API限制延迟
       }
 
-      logger.info(`🎉 All push messages sent successfully to user ${userId}`, {
-        userId: parseInt(userId || '0'),
-        totalMessages: messages.length,
-        messageTypes: messageTypes.join(', ')
-      });
+      logger.info(`All push messages sent successfully to user ${userId}`);
 
     } catch (error) {
-      logger.error(`💥 Failed to send push messages to user ${userId}`, {
-        userId: parseInt(userId || '0'),
-        error: (error as Error).message,
-        stack: (error as Error).stack
+      logger.error(`Failed to send push messages to user ${userId}`, {
+        error: (error as Error).message
       });
       throw error;
     }
   }
 
-  /**
-   * 检查是否有新的推送内容
-   */
-  private hasNewPushContent(pushData: PushData | undefined): boolean {
-    if (!pushData) return false;
-    
-    // 简化的检查逻辑：只要有任何数据就认为是新的
-    // 实际实现中应该检查时间戳或ID来判断是否为新内容
-    const hasFlashNews = pushData.flash_news && pushData.flash_news.length > 0;
-    const hasWhaleActions = pushData.whale_actions && pushData.whale_actions.length > 0;
-    const hasFundFlows = pushData.fund_flows && pushData.fund_flows.length > 0;
-    
-    return !!(hasFlashNews || hasWhaleActions || hasFundFlows);
-  }
 
-  /**
-   * 格式化快讯推送消息
-   */
-  private formatFlashNewsMessage(news: any): string {
-    return `🚨 <b>【快讯】</b>\n\n` +
-           `📰 ${news.title}\n` +
-           `${news.content ? news.content + '\n' : ''}` +
-           `⏰ ${this.formatTimestamp(news.timestamp)}`;
-  }
-
-  /**
-   * 格式化鲸鱼动向推送消息
-   */
-  private formatWhaleActionMessage(action: any): string {
-    return `🐋 <b>【鲸鱼动向】</b>\n\n` +
-           `地址: <code>${action.address}</code>\n` +
-           `操作: ${action.action}\n` +
-           `金额: ${action.amount}\n` +
-           `⏰ ${this.formatTimestamp(action.timestamp)}`;
-  }
-
-  /**
-   * 格式化资金流向推送消息
-   */
-  private formatFundFlowMessage(flow: any): string {
-    return `💰 <b>【资金流向】</b>\n\n` +
-           `从: ${flow.from}\n` +
-           `到: ${flow.to}\n` +
-           `金额: ${flow.amount}\n` +
-           `⏰ ${this.formatTimestamp(flow.timestamp)}`;
-  }
-
-  /**
-   * 格式化时间戳
-   */
-  private formatTimestamp(timestamp: string): string {
-    try {
-      const date = new Date(timestamp);
-      return date.toLocaleString('zh-CN', {
-        timeZone: 'Asia/Shanghai',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    } catch (error) {
-      return timestamp;
-    }
-  }
 
   /**
    * 更新最后推送时间
@@ -666,38 +465,13 @@ export class PushSchedulerService {
   private async updateLastPushTime(): Promise<void> {
     try {
       const cacheKey = `${this.cachePrefix}:${this.lastPushCacheKey}`;
-      const currentTime = new Date().toISOString();
-      
-      await cacheService.set(cacheKey, currentTime, 24 * 60 * 60); // 24小时缓存
-      
-      logger.debug('Updated last push time', { timestamp: currentTime });
+      await cacheService.set(cacheKey, new Date().toISOString(), 24 * 60 * 60);
+      logger.debug('Updated last push time');
     } catch (error) {
-      logger.warn('Failed to update last push time', {
-        error: (error as Error).message
-      });
+      logger.warn('Failed to update last push time', { error: (error as Error).message });
     }
   }
 
-  /**
-   * 获取最后推送时间
-   */
-  public async getLastPushTime(): Promise<string | null> {
-    try {
-      const cacheKey = `${this.cachePrefix}:${this.lastPushCacheKey}`;
-      const result = await cacheService.get<string>(cacheKey);
-      
-      if (result.success && result.data) {
-        return result.data;
-      }
-      
-      return null;
-    } catch (error) {
-      logger.error('Failed to get last push time', {
-        error: (error as Error).message
-      });
-      return null;
-    }
-  }
 
   /**
    * 获取调度器状态

@@ -28,6 +28,7 @@ export interface FlashNews {
   title: string;
   content: string;
   timestamp: string;
+  symbol?: string; // 相关代币符号（用于交易按钮）
 }
 
 /**
@@ -38,6 +39,7 @@ export interface WhaleAction {
   action: string;
   amount: string;
   timestamp: string;
+  symbol?: string; // 操作的代币符号（可选，用于交易按钮）
 }
 
 /**
@@ -48,6 +50,7 @@ export interface FundFlow {
   to: string;
   amount: string;
   timestamp: string;
+  symbol?: string; // 流向的代币符号（用于交易按钮）
 }
 
 /**

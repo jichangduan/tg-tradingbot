@@ -79,6 +79,11 @@ export const config = {
     batchSize: parseInt(process.env.PUSH_BATCH_SIZE || '50'),
     enableScheduler: process.env.PUSH_SCHEDULER_ENABLED !== 'false', // 默认启用
     timezone: process.env.PUSH_TIMEZONE || 'Asia/Shanghai'
+  },
+
+  // 交易配置
+  trading: {
+    defaultAmount: process.env.TRADING_DEFAULT_AMOUNT || '10' // 默认交易金额 (USDC)
   }
 };
 

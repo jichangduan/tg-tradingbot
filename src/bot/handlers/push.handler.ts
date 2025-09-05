@@ -6,6 +6,9 @@ import { pushService, PushSettings, PushData } from '../../services/push.service
 import { ApiError } from '../../services/api.service';
 import { getUserToken, getUserAccessToken } from '../../utils/auth';
 import { pushScheduler } from '../../services/push-scheduler.service';
+import { config } from '../../config';
+import { longHandler } from './long.handler';
+import { shortHandler } from './short.handler';
 
 /**
  * Push命令处理器
@@ -238,44 +241,55 @@ export class PushHandler {
       }
 
       // 解析回调数据
-      const [action, type, value] = callbackData.split('_').slice(1); // 移除 'push' 前缀
-      if (action !== 'toggle') {
-        await ctx.answerCbQuery('无效的操作');
+      const callbackParts = callbackData.split('_').slice(1); // 移除 'push' 前缀
+      const action = callbackParts[0];
+
+      // 处理推送交易按钮
+      if (action === 'trade') {
+        await this.handleTradingCallback(ctx, callbackParts);
         return;
       }
 
-      const enabled = value === 'true';
-      
-      // 更新用户设置
-      await this.updateUserPushSetting(userIdString, type, enabled);
+      // 处理推送设置按钮
+      if (action === 'toggle') {
+        const [, type, value] = callbackParts;
+        const enabled = value === 'true';
+        
+        // 更新用户设置
+        await this.updateUserPushSetting(userIdString, type, enabled);
 
-      // 获取更新后的设置
-      const { settings: updatedSettings, pushData } = await this.getUserPushSettings(userIdString);
+        // 获取更新后的设置
+        const { settings: updatedSettings, pushData } = await this.getUserPushSettings(userIdString);
 
-      // 更新消息
-      const message = this.formatPushSettingsMessage(updatedSettings, pushData);
-      const keyboard = this.createPushSettingsKeyboard(updatedSettings);
+        // 更新消息
+        const message = this.formatPushSettingsMessage(updatedSettings, pushData);
+        const keyboard = this.createPushSettingsKeyboard(updatedSettings);
 
-      await ctx.editMessageText(message, {
-        parse_mode: 'HTML',
-        reply_markup: {
-          inline_keyboard: keyboard
-        }
-      });
+        await ctx.editMessageText(message, {
+          parse_mode: 'HTML',
+          reply_markup: {
+            inline_keyboard: keyboard
+          }
+        });
 
-      // 反馈用户
-      const typeName = this.getTypeName(type);
-      const statusText = enabled ? '开启' : '关闭';
-      await ctx.answerCbQuery(`✅ ${typeName}推送已${statusText}`);
+        // 反馈用户
+        const typeName = this.getTypeName(type);
+        const statusText = enabled ? '开启' : '关闭';
+        await ctx.answerCbQuery(`✅ ${typeName}推送已${statusText}`);
 
-      const duration = Date.now() - startTime;
-      logger.info(`Push callback completed [${requestId}] - ${duration}ms`, {
-        userId,
-        type,
-        enabled,
-        duration,
-        requestId
-      });
+        const duration = Date.now() - startTime;
+        logger.info(`Push callback completed [${requestId}] - ${duration}ms`, {
+          userId,
+          type,
+          enabled,
+          duration,
+          requestId
+        });
+        return;
+      }
+
+      // 未识别的操作
+      await ctx.answerCbQuery('无效的操作');
 
     } catch (error) {
       const duration = Date.now() - startTime;
@@ -287,6 +301,60 @@ export class PushHandler {
       });
 
       await ctx.answerCbQuery('操作失败，请稍后重试');
+    }
+  }
+
+  /**
+   * 处理交易按钮回调
+   */
+  private async handleTradingCallback(ctx: ExtendedContext, callbackParts: string[]): Promise<void> {
+    const requestId = ctx.requestId || 'unknown';
+    const userId = ctx.from?.id;
+
+    try {
+      // callbackParts: ['trade', 'long'/'short', symbol]
+      const [, direction, symbol] = callbackParts;
+      
+      if (!symbol || (direction !== 'long' && direction !== 'short')) {
+        await ctx.answerCbQuery('交易参数无效');
+        return;
+      }
+
+      logger.info(`Trading callback received [${requestId}]`, {
+        userId,
+        direction,
+        symbol,
+        requestId
+      });
+
+      // 构造交易参数，使用配置中的默认交易金额
+      const tradingArgs = [symbol, config.trading.defaultAmount];
+
+      // 调用相应的交易处理器
+      if (direction === 'long') {
+        await longHandler.handle(ctx, tradingArgs);
+        await ctx.answerCbQuery(`✅ 正在执行 ${symbol} 做多交易`);
+      } else {
+        await shortHandler.handle(ctx, tradingArgs);
+        await ctx.answerCbQuery(`✅ 正在执行 ${symbol} 做空交易`);
+      }
+
+      logger.info(`Trading callback completed [${requestId}]`, {
+        userId,
+        direction,
+        symbol,
+        requestId
+      });
+
+    } catch (error) {
+      logger.error(`Trading callback failed [${requestId}]`, {
+        error: (error as Error).message,
+        userId,
+        callbackParts,
+        requestId
+      });
+
+      await ctx.answerCbQuery('交易执行失败，请稍后重试');
     }
   }
 
