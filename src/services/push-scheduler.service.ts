@@ -119,12 +119,21 @@ export class PushSchedulerService {
 
       for (const user of enabledUsers) {
         try {
+          logger.info(`🚀 [SCHEDULER] About to call sendPushToUser for user ${user.userId}`, {
+            hasSettings: !!user.settings,
+            hasPushData: !!user.pushData,
+            pushDataKeys: user.pushData ? Object.keys(user.pushData) : []
+          });
+          
           await this.sendPushToUser(user.userId, user.settings, user.pushData);
           successCount++;
+          
+          logger.info(`✅ [SCHEDULER] sendPushToUser completed successfully for user ${user.userId}`);
         } catch (error) {
           failureCount++;
-          logger.error(`Failed to send push to user ${user.userId}`, {
-            error: (error as Error).message
+          logger.error(`❌ [SCHEDULER] Failed to send push to user ${user.userId}`, {
+            error: (error as Error).message,
+            stack: (error as Error).stack
           });
         }
       }
@@ -184,19 +193,44 @@ export class PushSchedulerService {
                                 userSettingsResult.fund_enabled;
             
             if (hasAnyEnabled) {
-              // 获取推送内容数据
-              const pushDataResult = await pushDataService.getPushDataForUser(userId);
-              
-              enabledUsers.push({
-                userId: userId,
-                settings: userSettingsResult,
-                pushData: pushDataResult
+              logger.info(`🔄 [SCHEDULER] About to call pushDataService.getPushDataForUser for user ${userId}`, {
+                pushDataServiceType: typeof pushDataService,
+                methodExists: typeof pushDataService.getPushDataForUser === 'function'
               });
               
-              logger.debug('Added user for push notifications', {
-                telegramId: userId,
-                settings: userSettingsResult
-              });
+              try {
+                // 获取推送内容数据
+                const pushDataResult = await pushDataService.getPushDataForUser(userId);
+                
+                logger.info(`✅ [SCHEDULER] pushDataService.getPushDataForUser completed for user ${userId}`, {
+                  hasResult: !!pushDataResult,
+                  resultType: typeof pushDataResult,
+                  resultKeys: pushDataResult ? Object.keys(pushDataResult) : []
+                });
+                
+                enabledUsers.push({
+                  userId: userId,
+                  settings: userSettingsResult,
+                  pushData: pushDataResult
+                });
+                
+                logger.debug('Added user for push notifications', {
+                  telegramId: userId,
+                  settings: userSettingsResult
+                });
+              } catch (pushDataError) {
+                logger.error(`❌ [SCHEDULER] Error calling pushDataService.getPushDataForUser for user ${userId}`, {
+                  error: (pushDataError as Error).message,
+                  stack: (pushDataError as Error).stack
+                });
+                
+                // 仍然添加用户，但没有推送数据
+                enabledUsers.push({
+                  userId: userId,
+                  settings: userSettingsResult,
+                  pushData: undefined
+                });
+              }
             }
           }
         } catch (userError) {
