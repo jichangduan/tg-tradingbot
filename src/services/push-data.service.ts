@@ -1,5 +1,6 @@
 import { PushSettings, PushData, pushService } from './push.service';
 import { PushLogger } from '../utils/push-logger';
+import { logger } from '../utils/logger';
 import { getUserToken, getUserAccessToken } from '../utils/auth';
 
 /**
@@ -44,15 +45,41 @@ export class PushDataService {
       const duration = Date.now() - startTime;
       PushLogger.logApiResponse(userId, response, duration);
       
-      // 如果没有推送数据，创建测试数据
+      // 检查推送数据是否存在或内容为空
       if (!response?.data?.push_data) {
         const testPushData = this.createTestPushData();
         PushLogger.logTestDataCreated(userId, testPushData);
         return testPushData;
       }
       
+      // 🧪 MOCK测试：检查推送数据是否真正有内容，如果为空则使用测试数据
+      const pushData = response.data.push_data;
+      const hasActualContent = (
+        (pushData.flash_news && pushData.flash_news.length > 0) ||
+        (pushData.whale_actions && pushData.whale_actions.length > 0) ||  
+        (pushData.fund_flows && pushData.fund_flows.length > 0)
+      );
+      
+      if (!hasActualContent) {
+        const testPushData = this.createTestPushData();
+        logger.warn(`⚠️ [PUSH_DATA] API returned empty push data for user ${userId}, using MOCK test data`, {
+          originalData: {
+            flashCount: pushData.flash_news?.length || 0,
+            whaleCount: pushData.whale_actions?.length || 0,
+            fundCount: pushData.fund_flows?.length || 0
+          },
+          mockData: {
+            flashCount: testPushData.flash_news?.length || 0,
+            whaleCount: testPushData.whale_actions?.length || 0,
+            fundCount: testPushData.fund_flows?.length || 0
+          }
+        });
+        PushLogger.logTestDataCreated(userId, testPushData);
+        return testPushData;
+      }
+      
       PushLogger.logDataFetchSuccess(userId, duration);
-      return response.data.push_data;
+      return pushData;
       
     } catch (error) {
       const duration = Date.now() - startTime;
