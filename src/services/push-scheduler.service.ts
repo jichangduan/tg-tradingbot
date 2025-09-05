@@ -1,10 +1,11 @@
 import * as cron from 'node-cron';
-import { PushSettings, PushData, pushService } from './push.service';
+import { PushSettings, PushData } from './push.service';
 import { pushMessageFormatterService } from './push-message-formatter.service';
+import { pushDataService } from './push-data.service';
 import { cacheService } from './cache.service';
 import { logger } from '../utils/logger';
+import { PushLogger } from '../utils/push-logger';
 import { telegramBot } from '../bot';
-import { getUserToken, getUserAccessToken } from '../utils/auth';
 
 /**
  * 推送调度服务
@@ -184,7 +185,7 @@ export class PushSchedulerService {
             
             if (hasAnyEnabled) {
               // 获取推送内容数据
-              const pushDataResult = await this.getPushDataForUser(userId);
+              const pushDataResult = await pushDataService.getPushDataForUser(userId);
               
               enabledUsers.push({
                 userId: userId,
@@ -353,40 +354,6 @@ export class PushSchedulerService {
     logger.debug('User removed from push tracking', { telegramId: userId });
   }
 
-  /**
-   * 为用户获取推送数据
-   * 从push.service.ts的getUserPushSettings中获取推送数据
-   */
-  private async getPushDataForUser(userId: string): Promise<PushData | undefined> {
-    try {
-      // 获取访问令牌
-      let accessToken = await getUserToken(userId);
-      
-      if (!accessToken) {
-        logger.debug('No cached token found, initializing user', { telegramId: userId });
-        
-        const userInfo = {
-          username: undefined,
-          first_name: undefined,
-          last_name: undefined
-        };
-        
-        accessToken = await getUserAccessToken(userId, userInfo);
-      }
-
-      // 获取用户推送设置，其中包含推送数据
-      const response = await pushService.getUserPushSettings(userId, accessToken);
-      
-      return response.data.push_data;
-      
-    } catch (error) {
-      logger.warn('Failed to get push data for user', {
-        telegramId: userId,
-        error: (error as Error).message
-      });
-      return undefined;
-    }
-  }
 
   /**
    * 向用户发送推送消息
@@ -396,34 +363,57 @@ export class PushSchedulerService {
     settings: PushSettings,
     pushData?: PushData
   ): Promise<void> {
+    const startTime = Date.now();
+    
     try {
+      PushLogger.logMessageSendStart(userId, settings, !!pushData);
+      
       const bot = telegramBot.getBot();
       if (!bot) {
+        PushLogger.logTelegramBotStatus(userId, false);
         throw new Error('Telegram Bot instance is not available');
+      } else {
+        PushLogger.logTelegramBotStatus(userId, true);
       }
 
       // 检查是否有新的推送内容
-      if (!pushData || !this.hasNewPushContent(pushData)) {
-        logger.debug('No new push content for user', { userId: parseInt(userId || '0') });
+      PushLogger.logPushContentCheck(userId, !!pushData, pushData ? Object.keys(pushData) : []);
+      
+      if (!pushData || !pushDataService.hasNewPushContent(pushData)) {
+        logger.warn(`⚠️ [MESSAGE_SEND] No new push content for user ${userId} - stopping send process`, {
+          hasPushData: !!pushData,
+          contentCheckPassed: pushData ? pushDataService.hasNewPushContent(pushData) : false
+        });
         return;
       }
+
+      logger.info(`✅ [MESSAGE_SEND] Push content validation passed for user ${userId}`);
+
+      // 根据用户设置筛选推送内容
+      const { flashNews, whaleActions, fundFlows } = pushDataService.filterPushContent(pushData, settings);
+      
+      PushLogger.logContentFiltering(userId, flashNews.length, whaleActions.length, fundFlows.length, settings);
 
       // 使用消息格式化服务处理消息
-      const messages = pushMessageFormatterService.formatBatchMessages(
-        settings.flash_enabled ? pushData.flash_news || [] : [],
-        settings.whale_enabled ? pushData.whale_actions || [] : [],
-        settings.fund_enabled ? pushData.fund_flows || [] : []
-      );
+      const messages = pushMessageFormatterService.formatBatchMessages(flashNews, whaleActions, fundFlows);
+
+      PushLogger.logMessageFormatting(userId, messages);
 
       if (messages.length === 0) {
-        logger.debug('No messages to send', { userId: parseInt(userId || '0') });
+        logger.warn(`⚠️ [MESSAGE_SEND] No messages generated after formatting for user ${userId}`);
         return;
       }
 
-      logger.info(`Sending ${messages.length} messages to user ${userId}`);
+      logger.info(`🚀 [MESSAGE_SEND] Starting to send ${messages.length} messages to user ${userId}`);
 
       // 发送所有消息
-      for (const message of messages) {
+      for (let i = 0; i < messages.length; i++) {
+        const message = messages[i];
+        logger.info(`📨 [MESSAGE_SEND] Sending message ${i + 1}/${messages.length} to user ${userId}`, {
+          contentPreview: message.content?.substring(0, 100) + '...',
+          hasKeyboard: !!message.keyboard
+        });
+        
         const sendOptions: any = {
           parse_mode: 'HTML',
           disable_web_page_preview: true
@@ -433,33 +423,35 @@ export class PushSchedulerService {
           sendOptions.reply_markup = { inline_keyboard: message.keyboard };
         }
 
-        await bot.telegram.sendMessage(parseInt(userId), message.content, sendOptions);
-        await new Promise(resolve => setTimeout(resolve, 150)); // API限制延迟
+        try {
+          const telegramResult = await bot.telegram.sendMessage(parseInt(userId), message.content, sendOptions);
+          logger.info(`✅ [MESSAGE_SEND] Message ${i + 1} sent successfully to user ${userId}`, {
+            messageId: telegramResult.message_id,
+            chatId: telegramResult.chat.id
+          });
+        } catch (sendError) {
+          logger.error(`❌ [MESSAGE_SEND] Failed to send message ${i + 1} to user ${userId}`, {
+            error: (sendError as Error).message,
+            messageContent: message.content?.substring(0, 200)
+          });
+          throw sendError;
+        }
+        
+        // API限制延迟
+        await new Promise(resolve => setTimeout(resolve, 150));
       }
 
-      logger.info(`All push messages sent successfully to user ${userId}`);
+      const duration = Date.now() - startTime;
+      const totalContentLength = messages.reduce((total, msg) => total + (msg.content?.length || 0), 0);
+      PushLogger.logMessageSendComplete(userId, messages.length, duration, totalContentLength);
 
     } catch (error) {
-      logger.error(`Failed to send push messages to user ${userId}`, {
-        error: (error as Error).message
-      });
+      const duration = Date.now() - startTime;
+      PushLogger.logMessageSendError(userId, duration, error as Error, settings, !!pushData);
       throw error;
     }
   }
 
-  /**
-   * 检查是否有新的推送内容
-   */
-  private hasNewPushContent(pushData: PushData | undefined): boolean {
-    if (!pushData) return false;
-    
-    // 检查是否有任何推送内容
-    const hasFlashNews = pushData.flash_news && pushData.flash_news.length > 0;
-    const hasWhaleActions = pushData.whale_actions && pushData.whale_actions.length > 0;
-    const hasFundFlows = pushData.fund_flows && pushData.fund_flows.length > 0;
-    
-    return !!(hasFlashNews || hasWhaleActions || hasFundFlows);
-  }
 
   /**
    * 更新最后推送时间
