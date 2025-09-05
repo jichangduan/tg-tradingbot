@@ -44,7 +44,8 @@ export class PushLogger {
    */
   static logApiResponse(userId: string, response: any, duration: number): void {
     logger.info(`📦 [PUSH_DATA] API response received for user ${userId}`, {
-      duration: `${duration}ms`,
+      durationMs: duration,
+      durationText: `${duration}ms`,
       hasResponse: !!response,
       hasData: !!response?.data,
       hasPushData: !!response?.data?.push_data,
@@ -74,7 +75,8 @@ export class PushLogger {
    */
   static logDataFetchSuccess(userId: string, duration: number): void {
     logger.info(`✅ [PUSH_DATA] Successfully retrieved push data for user ${userId}`, {
-      duration: `${duration}ms`,
+      durationMs: duration,
+      durationText: `${duration}ms`,
       dataAvailable: true
     });
   }
@@ -84,7 +86,8 @@ export class PushLogger {
    */
   static logDataFetchError(userId: string, duration: number, error: Error): void {
     logger.error(`❌ [PUSH_DATA] Failed to get push data for user ${userId}`, {
-      duration: `${duration}ms`,
+      durationMs: duration,
+      durationText: `${duration}ms`,
       error: error.message,
       stack: error.stack
     });
@@ -235,7 +238,8 @@ export class PushLogger {
   static logMessageSendComplete(userId: string, messageCount: number, duration: number, totalContentLength: number): void {
     logger.info(`🎉 [MESSAGE_SEND] All push messages sent successfully to user ${userId}`, {
       messageCount,
-      duration: `${duration}ms`,
+      durationMs: duration,
+      durationText: `${duration}ms`,
       totalContentSent: totalContentLength
     });
   }
@@ -247,7 +251,8 @@ export class PushLogger {
     logger.error(`💥 [MESSAGE_SEND] Failed to send push messages to user ${userId}`, {
       error: error.message,
       stack: error.stack,
-      duration: `${duration}ms`,
+      durationMs: duration,
+      durationText: `${duration}ms`,
       settings,
       hasPushData
     });
