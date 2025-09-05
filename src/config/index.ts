@@ -27,6 +27,7 @@ export const config = {
   // Telegram Bot配置
   telegram: {
     botToken: process.env.TELEGRAM_BOT_TOKEN!,
+    botUsername: process.env.TELEGRAM_BOT_USERNAME,
     webhookUrl: process.env.WEBHOOK_URL,
     adminChatId: process.env.ADMIN_CHAT_ID
   },

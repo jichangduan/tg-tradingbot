@@ -1,4 +1,5 @@
-import { Context } from 'telegraf';
+import { Context, Markup } from 'telegraf';
+import { InlineKeyboardMarkup } from 'telegraf/typings/core/types/typegram';
 import { userService } from '../../services/user.service';
 import { messageFormatter } from '../utils/message.formatter';
 import { logger } from '../../utils/logger';
@@ -6,6 +7,7 @@ import { DetailedError } from '../../types/api.types';
 import { ExtendedContext } from '../index';
 import { UserInitRequest, UserInitData } from '../../types/api.types';
 import { cacheService } from '../../services/cache.service';
+import { config } from '../../config';
 
 /**
  * Start命令处理器
@@ -22,14 +24,30 @@ export class StartHandler {
     const userId = ctx.from?.id;
     const username = ctx.from?.username || 'unknown';
     const requestId = ctx.requestId || 'unknown';
+    const chatType = ctx.chat?.type;
 
     try {
       logger.logCommand('start', userId!, username, args);
 
+      // 检查是否为群组启动场景（通过startgroup参数识别）
+      const isGroupStart = args.length > 0 && args[0] === 'welcome' && chatType !== 'private';
+      
+      if (isGroupStart) {
+        // 处理群组启动场景
+        await this.handleGroupStart(ctx, args);
+        return;
+      }
+
       // 1. 发送欢迎消息（立即响应用户）
+      // 检查是否为私聊，只在私聊中显示"添加到群组"按钮
+      const isPrivateChat = ctx.chat?.type === 'private';
+      
       const welcomeMessage = await ctx.reply(
         this.getWelcomeMessage(),
-        { parse_mode: 'HTML' }
+        {
+          parse_mode: 'HTML',
+          reply_markup: isPrivateChat ? this.createAddToGroupKeyboard() : undefined
+        }
       );
 
       // 2. 后台进行用户初始化
@@ -158,6 +176,24 @@ export class StartHandler {
 
 <i>💡 正在为您创建专属钱包地址...</i>
     `.trim();
+  }
+
+  /**
+   * 创建添加到群组的内联键盘
+   */
+  private createAddToGroupKeyboard(): InlineKeyboardMarkup {
+    const botUsername = config.telegram.botUsername || 'aiw3_bot';
+    
+    return {
+      inline_keyboard: [
+        [
+          {
+            text: '🤖 添加到群组',
+            url: `tg://resolve?domain=${botUsername}&startgroup=welcome`
+          }
+        ]
+      ]
+    };
   }
 
   /**
@@ -293,6 +329,97 @@ export class StartHandler {
 
 <i>💡 正在为您创建专属钱包并处理邀请奖励...</i>
     `.trim();
+  }
+
+  /**
+   * 获取群组欢迎消息
+   */
+  private getGroupWelcomeMessage(): string {
+    return `
+👋 <b>AIW3 TGBot 已添加到群组！</b>
+
+🤖 我是您的专业加密货币助手，为群组成员提供：
+
+<b>🚀 主要功能:</b>
+• 💰 实时价格查询 - <code>/price BTC</code>
+• 📊 市场数据分析 - <code>/markets</code>
+• 📈 K线图表分析 - <code>/chart ETH</code>
+• 💹 交易提醒设置 - <code>/push</code>
+
+<b>📝 常用命令:</b>
+<code>/price [代币]</code> - 查询任意代币价格
+<code>/chart [代币]</code> - K线图表分析
+<code>/markets</code> - 查看热门市场行情
+<code>/help</code> - 查看完整功能列表
+
+<b>💡 群组使用技巧:</b>
+• 所有成员都可以使用价格查询功能
+• 管理员可设置推送提醒（需要管理员权限）
+• 支持100+主流加密货币实时查询
+
+<i>🎉 开始输入命令，享受专业的数字货币服务吧！</i>
+    `.trim();
+  }
+
+  /**
+   * 处理群组启动场景
+   */
+  public async handleGroupStart(ctx: ExtendedContext, args: string[]): Promise<void> {
+    const startTime = Date.now();
+    const userId = ctx.from?.id;
+    const username = ctx.from?.username || 'unknown';
+    const chatType = ctx.chat?.type;
+    const requestId = ctx.requestId || 'unknown';
+
+    try {
+      logger.info(`Group start command [${requestId}]`, {
+        userId,
+        username,
+        chatType,
+        args,
+        requestId
+      });
+
+      // 发送群组欢迎消息
+      await ctx.reply(
+        this.getGroupWelcomeMessage(),
+        { parse_mode: 'HTML' }
+      );
+
+      // 后台初始化用户（如果需要）
+      if (userId) {
+        await this.initializeUserInBackground(ctx, [], requestId);
+      }
+
+      const duration = Date.now() - startTime;
+      logger.info(`Group start completed [${requestId}] - ${duration}ms`, {
+        userId,
+        username,
+        chatType,
+        duration,
+        requestId
+      });
+
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.error(`Group start failed [${requestId}] - ${duration}ms`, {
+        error: (error as Error).message,
+        stack: (error as Error).stack,
+        duration,
+        userId,
+        username,
+        chatType,
+        args,
+        requestId
+      });
+
+      // 发送错误消息
+      await ctx.reply(
+        '❌ 群组初始化失败\n\n' +
+        '请稍后重试或联系管理员。',
+        { parse_mode: 'HTML' }
+      );
+    }
   }
 
   /**
