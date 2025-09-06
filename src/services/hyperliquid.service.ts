@@ -163,32 +163,83 @@ export async function getUserHyperliquidBalance(walletType: 1 | 2, telegramId?: 
     message: string;
   }>("/api/hyperliquid/getUserBalance", accessToken, requestBody);
 
+  // 详细记录API响应用于诊断
+  logger.info(`Hyperliquid balance API response for ${telegramId}`, {
+    telegramId,
+    walletType,
+    responseCode: response.code,
+    responseMessage: response.message,
+    hasData: !!response.data,
+    balancesCount: response.data?.balances?.length || 0,
+    balances: response.data?.balances || [],
+    fullResponse: JSON.stringify(response, null, 2)
+  });
+
   if (response.code === 200 && response.data) {
     // 找到USDC的余额
     const usdcBalance = response.data?.balances.find((balance: IBalanceItem) => balance.coin === "USDC");
+    
+    logger.info(`USDC balance search result for ${telegramId}`, {
+      telegramId,
+      walletType,
+      usdcBalanceFound: !!usdcBalance,
+      usdcBalance: usdcBalance || 'not found',
+      allCoins: response.data.balances.map(b => b.coin)
+    });
 
     if (usdcBalance) {
       // 返回简化的对象
       const simplifiedBalance: IUserBalanceData = {
         coin: usdcBalance.coin,
-        total: usdcBalance.total
+        total: usdcBalance.total || "0.0"
       };
+      
+      logger.info(`Returning USDC balance for ${telegramId}`, {
+        telegramId,
+        walletType,
+        coin: simplifiedBalance.coin,
+        total: simplifiedBalance.total,
+        originalTotal: usdcBalance.total
+      });
+      
       return {
         code: 200,
         data: simplifiedBalance,
         message: response.message
       };
+    } else {
+      // 如果没有找到USDC余额，也要记录日志
+      logger.warn(`No USDC balance found for ${telegramId}, returning default 0 balance`, {
+        telegramId,
+        walletType,
+        availableCoins: response.data.balances.map(b => `${b.coin}: ${b.total}`),
+        balancesCount: response.data.balances.length
+      });
     }
+  } else {
+    logger.error(`Hyperliquid balance API failed for ${telegramId}`, {
+      telegramId,
+      walletType,
+      responseCode: response.code,
+      responseMessage: response.message,
+      hasData: !!response.data
+    });
   }
 
   // 如果没有找到USDC余额或请求失败，返回默认值
+  logger.info(`Returning default 0 USDC balance for ${telegramId}`, {
+    telegramId,
+    walletType,
+    reason: response.code !== 200 ? 'API_ERROR' : 'NO_USDC_BALANCE'
+  });
+  
   return {
     code: 200,
     data: {
       coin: "USDC",
       total: "0.0"
     },
-    message: "successfully."
+    message: response.message || "No USDC balance found, returning default."
   };
 }
 

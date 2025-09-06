@@ -521,29 +521,36 @@ BTC, ETH, SOL, USDT, USDC, BNB, ADA, DOT, LINK, MATIC, AVAX, UNI
    * 格式化链上钱包余额消息
    */
   private formatOnChainWalletMessage(balance: FormattedWalletBalance, warnings?: string[]): string {
-    let message = `💰 <b>Solana钱包</b>\n\n`;
+    // 根据网络类型判断钱包名称
+    const walletName = balance.network.toLowerCase() === 'arbitrum' ? 'Hyperliquid钱包' : 'Solana钱包';
+    let message = `💰 <b>${walletName}</b>\n\n`;
     
     // 钱包地址信息
     message += `📍 <b>钱包地址:</b> <code>${this.truncateAddress(balance.address)}</code>\n`;
     message += `🌐 <b>网络:</b> ${balance.network.toUpperCase()}\n\n`;
     
-    // 主币余额
-    message += `💎 <b>${balance.nativeSymbol}余额:</b> ${balance.nativeBalance.toFixed(6)} ${balance.nativeSymbol}\n`;
+    // 主币余额 (合约账户余额)
+    message += `💎 <b>合约账户余额:</b> ${balance.nativeBalance.toFixed(6)} ${balance.nativeSymbol}\n`;
     
-    // 代币余额列表
+    // 代币余额列表 - 总是显示，即使为0
+    message += `\n💰 <b>现货余额:</b>\n`;
     if (balance.tokenBalances.length > 0) {
-      message += `\n💰 <b>代币余额:</b>\n`;
       balance.tokenBalances.forEach(token => {
-        const usdValue = token.usdValue ? ` ($${this.formatCurrency(token.usdValue)})` : '';
-        message += `• ${token.symbol}: ${token.uiAmount.toLocaleString()} ${token.symbol}${usdValue}\n`;
+        const usdValue = token.usdValue !== undefined ? ` ($${this.formatCurrency(token.usdValue)})` : '';
+        // 显示余额，即使为0也要显示
+        const formattedAmount = token.uiAmount === 0 ? '0.00' : token.uiAmount.toLocaleString();
+        message += `• ${token.symbol}: ${formattedAmount} ${token.symbol}${usdValue}\n`;
       });
     } else {
-      message += `\n📭 <b>代币余额:</b> 暂无代币\n`;
+      message += `• USDC: 0.00 USDC ($0.00)\n`;
     }
     
-    // 总价值
-    if (balance.totalUsdValue > 0) {
-      message += `\n📈 <b>总价值:</b> $${this.formatCurrency(balance.totalUsdValue)}\n`;
+    // 总价值 - 总是显示，即使为0
+    message += `\n📈 <b>总价值:</b> $${this.formatCurrency(balance.totalUsdValue)}\n`;
+    
+    // 如果总价值为0，添加提示信息
+    if (balance.totalUsdValue === 0) {
+      message += `\n💡 <b>提示:</b> 钱包暂无资产，请先充值USDC到交易钱包地址\n`;
     }
     
     // 最后更新时间

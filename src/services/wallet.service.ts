@@ -44,6 +44,14 @@ export class WalletService {
       // 步骤1: 获取Hyperliquid钱包地址，如果不存在则自动创建
       let walletData = await getUserWallet(telegramId);
       
+      logger.info(`User wallet query result [${requestId}]`, {
+        telegramId,
+        walletFound: !!walletData,
+        hasTradingWallet: !!(walletData?.tradingwalletaddress),
+        tradingWallet: walletData?.tradingwalletaddress,
+        requestId
+      });
+      
       // 如果钱包不存在，尝试创建新钱包
       if (!walletData || !walletData.tradingwalletaddress) {
         logger.info(`Hyperliquid wallet not found for user ${telegramId}, attempting to create new wallet`, {
@@ -127,21 +135,30 @@ export class WalletService {
   ): FormattedWalletBalance {
     const tokenBalances: TokenBalance[] = [];
     
-    // 添加USDC现货余额
-    if (spotBalance && parseFloat(spotBalance.total) > 0) {
-      tokenBalances.push({
-        mint: 'USDC',
-        symbol: 'USDC',
-        name: 'USD Coin',
-        balance: (parseFloat(spotBalance.total) * 1e6).toString(), // 转换为最小单位
-        decimals: 6,
-        uiAmount: parseFloat(spotBalance.total),
-        usdValue: parseFloat(spotBalance.total)
-      });
-    }
+    // 解析现货余额
+    const spotValue = spotBalance ? parseFloat(spotBalance.total || "0") : 0;
+    
+    // 总是添加USDC现货余额，即使为0也要显示
+    tokenBalances.push({
+      mint: 'USDC',
+      symbol: 'USDC',
+      name: 'USD Coin',
+      balance: (spotValue * 1e6).toString(), // 转换为最小单位
+      decimals: 6,
+      uiAmount: spotValue,
+      usdValue: spotValue
+    });
+
+    // 记录余额转换详情
+    logger.info(`Converting balance data to formatted balance`, {
+      walletAddress: walletData.tradingwalletaddress,
+      spotBalance: spotBalance,
+      spotValue,
+      contractBalance: contractBalance?.marginSummary?.accountValue,
+      tokenBalancesCount: tokenBalances.length
+    });
 
     // 计算总价值 (现货余额 + 合约账户价值)
-    const spotValue = spotBalance ? parseFloat(spotBalance.total) : 0;
     const contractValue = contractBalance?.marginSummary?.accountValue 
       ? parseFloat(contractBalance.marginSummary.accountValue) 
       : 0;
