@@ -181,20 +181,132 @@ export class WalletService {
                               contractData?.withdrawable ||
                               "0";
 
-    // 记录余额转换详情  
-    logger.info(`Converting balance data to formatted balance`, {
+    // 🔍 详细分析Hyperliquid合约数据结构
+    const rawContractData = contractData?.data?.data || contractData?.data || contractData;
+    const assetPositions = rawContractData?.assetPositions || [];
+    const marginSummary = rawContractData?.marginSummary || {};
+    const crossMarginSummary = rawContractData?.crossMarginSummary || {};
+    
+    // 记录完整的合约余额数据分析
+    logger.info(`🔍 Hyperliquid contract balance analysis`, {
+      telegramId,
       walletAddress: walletData.tradingwalletaddress,
-      spotBalance: spotBalance,
-      spotValue,
-      contractBalance: contractData?.data?.data || contractData?.data,
-      contractAccountValue,
-      contractValue,
-      withdrawableAmount,
-      tokenBalancesCount: tokenBalances.length
+      
+      // 原始数据结构
+      rawDataStructure: {
+        hasDataData: !!(contractData?.data?.data),
+        hasData: !!(contractData?.data),
+        topLevelKeys: contractData ? Object.keys(contractData) : [],
+        dataLevelKeys: contractData?.data ? Object.keys(contractData.data) : [],
+        dataDataLevelKeys: rawContractData ? Object.keys(rawContractData) : []
+      },
+      
+      // 账户价值分析
+      accountValues: {
+        contractAccountValue,
+        contractValueParsed: contractValue,
+        withdrawableAmount,
+        withdrawableAmountParsed: parseFloat(withdrawableAmount),
+        calculatedOccupiedMargin: contractValue - parseFloat(withdrawableAmount)
+      },
+      
+      // 保证金详情分析
+      marginAnalysis: {
+        marginSummary: {
+          accountValue: marginSummary.accountValue,
+          totalMarginUsed: marginSummary.totalMarginUsed,
+          totalNtlPos: marginSummary.totalNtlPos,
+          totalRawUsd: marginSummary.totalRawUsd
+        },
+        crossMarginSummary: {
+          accountValue: crossMarginSummary.accountValue,
+          totalMarginUsed: crossMarginSummary.totalMarginUsed,
+          totalNtlPos: crossMarginSummary.totalNtlPos,
+          totalRawUsd: crossMarginSummary.totalRawUsd
+        },
+        crossMaintenanceMarginUsed: rawContractData?.crossMaintenanceMarginUsed
+      },
+      
+      // 🎯 持仓分析 - 关键数据！
+      positionsAnalysis: {
+        assetPositionsCount: assetPositions.length,
+        assetPositions: assetPositions,
+        hasPositions: assetPositions.length > 0
+      },
+      
+      // 其他字段分析
+      otherFields: {
+        time: rawContractData?.time,
+        allAvailableFields: rawContractData ? Object.keys(rawContractData) : []
+      },
+      
+      // 现货余额对比
+      spotComparison: {
+        spotValue,
+        spotBalance: spotBalance
+      }
     });
 
     // 计算总价值 (现货余额 + 合约账户价值)
     const totalUsdValue = spotValue + contractValue;
+    const withdrawableAmountNum = parseFloat(withdrawableAmount);
+    
+    // 🔧 改进的保证金占用计算 - 优先使用Hyperliquid原生数据
+    const hyperliquidMarginUsed = parseFloat(marginSummary.totalMarginUsed || "0");
+    const calculatedOccupiedMargin = contractValue - withdrawableAmountNum;
+    
+    // 选择更准确的保证金占用值
+    const occupiedMargin = hyperliquidMarginUsed > 0 ? hyperliquidMarginUsed : calculatedOccupiedMargin;
+
+    // 🔍 保证金占用逻辑验证 - 改进后的分析
+    logger.info(`💰 Margin occupation analysis (improved)`, {
+      telegramId,
+      
+      // 改进后的计算方法
+      improvedCalculations: {
+        contractValue,
+        withdrawableAmount: withdrawableAmountNum,
+        hyperliquidMarginUsed,
+        calculatedOccupiedMargin,
+        finalOccupiedMargin: occupiedMargin,
+        useHyperliquidValue: hyperliquidMarginUsed > 0,
+        occupiedPercentage: contractValue > 0 ? ((occupiedMargin / contractValue) * 100).toFixed(2) + '%' : '0%'
+      },
+      
+      // 逻辑验证
+      validationChecks: {
+        hasContractValue: contractValue > 0,
+        hasWithdrawable: withdrawableAmountNum > 0,
+        hasOccupiedMargin: occupiedMargin > 0,
+        occupiedMoreThanHalf: occupiedMargin > (contractValue * 0.5),
+        
+        // 关键检查：使用Hyperliquid原生数据更准确判断
+        positionMarginConsistency: {
+          hasPositions: assetPositions.length > 0,
+          hasMarginUsed: hyperliquidMarginUsed > 0,
+          consistencyCheck: (assetPositions.length > 0) === (hyperliquidMarginUsed > 0),
+          possibleInconsistency: (assetPositions.length === 0) && (hyperliquidMarginUsed > 10)
+        }
+      },
+      
+      // Hyperliquid原生数据验证
+      hyperliquidValidation: {
+        totalMarginUsed: marginSummary.totalMarginUsed,
+        totalNtlPos: marginSummary.totalNtlPos,
+        crossMaintenanceMarginUsed: rawContractData?.crossMaintenanceMarginUsed,
+        
+        // 数据源选择逻辑
+        dataSourceSelection: {
+          preferHyperliquidValue: hyperliquidMarginUsed > 0,
+          hyperliquidVsCalculated: {
+            hyperliquid: hyperliquidMarginUsed,
+            calculated: calculatedOccupiedMargin,
+            difference: Math.abs(hyperliquidMarginUsed - calculatedOccupiedMargin),
+            significantDifference: Math.abs(hyperliquidMarginUsed - calculatedOccupiedMargin) > 1
+          }
+        }
+      }
+    });
 
     return {
       address: walletData.tradingwalletaddress,
@@ -203,7 +315,7 @@ export class WalletService {
       nativeSymbol: 'USDC',
       tokenBalances,
       totalUsdValue,
-      withdrawableAmount: parseFloat(withdrawableAmount), // 可提取金额
+      withdrawableAmount: withdrawableAmountNum, // 可提取金额
       lastUpdated: new Date()
     };
   }
@@ -276,10 +388,65 @@ export class WalletService {
     requiredAmount: number,
     leverage: number
   ): Promise<{sufficient: boolean, availableMargin: number, requiredMargin: number, reason?: string}> {
+    const requestId = `margin_check_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    
+    logger.info(`🔍 Starting margin check for trading [${requestId}]`, {
+      telegramId,
+      requiredAmount,
+      leverage,
+      requestId
+    });
+
     try {
+      // 获取账户余额
+      logger.info(`📊 Getting account balance [${requestId}]`, {
+        telegramId,
+        requestId
+      });
+      
       const balance = await this.getAccountBalance(telegramId);
+      
+      // 🔍 详细记录账户余额信息
+      logger.info(`💰 Account balance retrieved [${requestId}]`, {
+        telegramId,
+        accountBalance: {
+          nativeBalance: balance.nativeBalance,
+          withdrawableAmount: balance.withdrawableAmount,
+          totalUsdValue: balance.totalUsdValue,
+          address: balance.address
+        },
+        requestId
+      });
+      
+      // 计算保证金需求
       const availableMargin = balance.withdrawableAmount || 0;
       const requiredMargin = requiredAmount / leverage;
+      
+      // 🔍 详细的保证金计算分析
+      logger.info(`📈 Margin calculation analysis [${requestId}]`, {
+        telegramId,
+        tradingParameters: {
+          requiredAmount,
+          leverage,
+          requiredMargin: requiredMargin
+        },
+        marginAnalysis: {
+          availableMargin,
+          contractAccountValue: balance.nativeBalance,
+          occupiedMargin: balance.nativeBalance - availableMargin,
+          occupiedPercentage: balance.nativeBalance > 0 
+            ? (((balance.nativeBalance - availableMargin) / balance.nativeBalance) * 100).toFixed(2) + '%'
+            : '0%'
+        },
+        sufficientCheck: {
+          sufficient: availableMargin >= requiredMargin,
+          shortfall: requiredMargin - availableMargin,
+          shortfallPercentage: requiredMargin > 0 
+            ? (((requiredMargin - availableMargin) / requiredMargin) * 100).toFixed(2) + '%'
+            : '0%'
+        },
+        requestId
+      });
       
       const result = {
         sufficient: availableMargin >= requiredMargin,
@@ -288,30 +455,76 @@ export class WalletService {
         reason: undefined as string | undefined
       };
       
+      // 🎯 分析失败原因
       if (!result.sufficient) {
-        if (balance.nativeBalance > 0 && availableMargin < requiredMargin) {
-          result.reason = 'margin_occupied';
-        } else if (balance.nativeBalance === 0) {
+        logger.warn(`❌ Margin check failed - analyzing reason [${requestId}]`, {
+          telegramId,
+          failureAnalysis: {
+            hasContractFunds: balance.nativeBalance > 0,
+            availableVsRequired: {
+              available: availableMargin,
+              required: requiredMargin,
+              difference: requiredMargin - availableMargin
+            },
+            possibleReasons: {
+              noFundsAtAll: balance.nativeBalance === 0,
+              fundsButOccupied: balance.nativeBalance > 0 && availableMargin < requiredMargin,
+              insufficientTotal: balance.nativeBalance > 0 && balance.nativeBalance < requiredMargin
+            }
+          },
+          requestId
+        });
+        
+        if (balance.nativeBalance === 0) {
           result.reason = 'no_funds';
+          logger.info(`📋 Failure reason: no_funds [${requestId}]`, { telegramId, requestId });
+        } else if (balance.nativeBalance > 0 && availableMargin < requiredMargin) {
+          result.reason = 'margin_occupied';
+          logger.info(`📋 Failure reason: margin_occupied [${requestId}]`, {
+            telegramId,
+            occupiedMargin: balance.nativeBalance - availableMargin,
+            totalFunds: balance.nativeBalance,
+            availableFunds: availableMargin,
+            requestId
+          });
         } else {
           result.reason = 'insufficient_margin';
+          logger.info(`📋 Failure reason: insufficient_margin [${requestId}]`, { telegramId, requestId });
         }
+      } else {
+        logger.info(`✅ Margin check passed [${requestId}]`, {
+          telegramId,
+          marginSufficient: {
+            available: availableMargin,
+            required: requiredMargin,
+            surplus: availableMargin - requiredMargin
+          },
+          requestId
+        });
       }
       
-      logger.info('Contract account margin check', {
+      // 🔍 最终结果总结
+      logger.info(`🏁 Margin check completed [${requestId}]`, {
         telegramId,
-        requiredAmount,
-        leverage,
-        ...result
+        finalResult: {
+          sufficient: result.sufficient,
+          availableMargin: result.availableMargin,
+          requiredMargin: result.requiredMargin,
+          reason: result.reason || 'sufficient'
+        },
+        requestId
       });
       
       return result;
+      
     } catch (error) {
-      logger.warn('Failed to check available margin', {
+      logger.error(`💥 Margin check error [${requestId}]`, {
         telegramId,
         requiredAmount,
         leverage,
-        error: (error as Error).message
+        error: (error as Error).message,
+        errorStack: (error as Error).stack,
+        requestId
       });
       
       return {
