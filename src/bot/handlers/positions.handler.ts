@@ -254,6 +254,28 @@ export class PositionsHandler {
         requestId: reqId
       });
 
+      // 🔍 详细记录API完整响应数据用于诊断数据不一致问题
+      logger.info(`🔍 Complete API response analysis [${reqId}]`, {
+        userId,
+        fullResponse: JSON.stringify(response, null, 2),
+        responseStructure: {
+          hasCode: response.code !== undefined,
+          hasMessage: response.message !== undefined,
+          hasData: !!response.data,
+          dataType: typeof response.data,
+          dataKeys: response.data ? Object.keys(response.data) : []
+        },
+        specificDataAnalysis: response.data ? {
+          positions: response.data.positions || 'missing',
+          totalPositions: response.data.totalPositions || 'missing',
+          totalPnl: response.data.totalPnl || 'missing',
+          accountValue: response.data.accountValue || 'missing',
+          availableBalance: response.data.availableBalance || 'missing',
+          positionsLength: Array.isArray(response.data.positions) ? response.data.positions.length : 'not array'
+        } : null,
+        requestId: reqId
+      });
+
       if (response.code !== 200) {
         logger.error(`API returned non-200 code [${reqId}]`, {
           userId,
@@ -263,6 +285,131 @@ export class PositionsHandler {
           requestId: reqId
         });
         throw new Error(response.message || '获取仓位信息失败');
+      }
+
+      // 🔍 详细诊断：对比多个API数据源找出真正问题
+      try {
+        logger.info(`🔍 Starting comprehensive API data comparison [${reqId}]`, {
+          userId,
+          requestId: reqId
+        });
+
+        // 1. 并行调用所有相关API进行对比
+        const [walletBalance, hyperliquidContract] = await Promise.all([
+          (async () => {
+            const walletService = await import('../../services/wallet.service');
+            return await walletService.walletService.getAccountBalance(userId.toString());
+          })(),
+          (async () => {
+            const hyperliquidService = await import('../../services/hyperliquid.service');
+            return await hyperliquidService.getUserContractBalance(1, userId.toString());
+          })()
+        ]);
+
+        // 2. 提取Hyperliquid原始数据
+        const hyperliquidRawData = (hyperliquidContract.data as any)?.data || hyperliquidContract.data;
+        const assetPositions = hyperliquidRawData?.assetPositions || [];
+        const marginSummary = hyperliquidRawData?.marginSummary || {};
+
+        // 3. 详细对比分析
+        logger.info(`📊 Complete API data comparison analysis [${reqId}]`, {
+          userId,
+          
+          // Positions API 数据
+          positionsAPI: {
+            endpoint: '/api/tgbot/trading/positions',
+            totalPositions: response.data?.totalPositions || 'missing',
+            accountValue: response.data?.accountValue || 'missing',
+            availableBalance: response.data?.availableBalance || 'missing',
+            positions: response.data?.positions || 'missing',
+            hasPositionsArray: Array.isArray(response.data?.positions),
+            positionsArrayLength: Array.isArray(response.data?.positions) ? response.data.positions.length : 'not array'
+          },
+
+          // Wallet API 数据
+          walletAPI: {
+            endpoint: '/api/hyperliquid/getUserState (via wallet)',
+            nativeBalance: walletBalance.nativeBalance,
+            withdrawableAmount: walletBalance.withdrawableAmount,
+            totalUsdValue: walletBalance.totalUsdValue,
+            address: walletBalance.address
+          },
+
+          // Hyperliquid 原始数据
+          hyperliquidDirect: {
+            endpoint: '/api/hyperliquid/getUserState (direct)',
+            assetPositionsCount: assetPositions.length,
+            accountValue: marginSummary.accountValue,
+            totalMarginUsed: marginSummary.totalMarginUsed,
+            withdrawable: hyperliquidRawData?.withdrawable,
+            hasAssetPositions: assetPositions.length > 0,
+            assetPositions: assetPositions.map((pos: any) => ({
+              coin: pos.position?.coin,
+              szi: pos.position?.szi,
+              unrealizedPnl: pos.position?.unrealizedPnl,
+              marginUsed: pos.position?.marginUsed
+            }))
+          },
+
+          // 数据一致性分析
+          consistencyAnalysis: {
+            walletShowsFunds: walletBalance.nativeBalance > 0,
+            hyperliquidShowsPositions: assetPositions.length > 0,
+            positionsAPIShowsEmpty: (response.data?.totalPositions || 0) === 0,
+            
+            // 关键问题检测
+            criticalInconsistency: {
+              hyperliquidHasPositions: assetPositions.length > 0,
+              positionsAPIReturnsZero: (response.data?.totalPositions || 0) === 0,
+              problemDetected: assetPositions.length > 0 && (response.data?.totalPositions || 0) === 0
+            },
+
+            // 数值对比
+            valueComparison: {
+              hyperliquidAccountValue: marginSummary.accountValue,
+              positionsAPIAccountValue: response.data?.accountValue,
+              valuesMatch: marginSummary.accountValue === response.data?.accountValue,
+              
+              hyperliquidWithdrawable: hyperliquidRawData?.withdrawable,
+              positionsAPIAvailable: response.data?.availableBalance,
+              withdrawableMatch: hyperliquidRawData?.withdrawable === response.data?.availableBalance
+            }
+          },
+
+          requestId: reqId
+        });
+
+        // 4. 如果发现关键不一致，记录详细的问题报告
+        if (assetPositions.length > 0 && (response.data?.totalPositions || 0) === 0) {
+          logger.error(`🚨 CRITICAL DATA INCONSISTENCY DETECTED [${reqId}]`, {
+            userId,
+            issue: 'Positions API returns zero positions but Hyperliquid shows active positions',
+            
+            hyperliquidTruthSource: {
+              positionsCount: assetPositions.length,
+              accountValue: marginSummary.accountValue,
+              totalMarginUsed: marginSummary.totalMarginUsed,
+              positions: assetPositions.map((pos: any) => `${pos.position.coin}: ${pos.position.szi}`)
+            },
+
+            positionsAPIWrongData: {
+              totalPositions: response.data?.totalPositions,
+              accountValue: response.data?.accountValue,
+              availableBalance: response.data?.availableBalance
+            },
+
+            suggestedAction: 'Check /api/tgbot/trading/positions backend implementation',
+            requestId: reqId
+          });
+        }
+
+      } catch (comparisonError) {
+        logger.error(`Failed to perform API comparison [${reqId}]`, {
+          userId,
+          error: (comparisonError as Error).message,
+          errorStack: (comparisonError as Error).stack,
+          requestId: reqId
+        });
       }
 
       return response;
