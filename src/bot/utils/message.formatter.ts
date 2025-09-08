@@ -532,11 +532,15 @@ BTC, ETH, SOL, USDT, USDC, BNB, ADA, DOT, LINK, MATIC, AVAX, UNI
     // 针对Hyperliquid钱包的特殊显示
     if (balance.network.toLowerCase() === 'arbitrum') {
       // 合约账户余额 (主要资金)
-      message += `💎 <b>合约账户:</b> ${balance.nativeBalance.toFixed(2)} ${balance.nativeSymbol} ($${this.formatCurrency(balance.nativeBalance)})\n`;
+      message += `💎 <b>合约账户总价值:</b> ${balance.nativeBalance.toFixed(2)} ${balance.nativeSymbol} ($${this.formatCurrency(balance.nativeBalance)})\n`;
       
-      // 可提取金额
+      // 可提取金额 (可用保证金)
       if (balance.withdrawableAmount !== undefined) {
-        message += `💸 <b>可提取:</b> ${balance.withdrawableAmount.toFixed(2)} ${balance.nativeSymbol} ($${this.formatCurrency(balance.withdrawableAmount)})\n`;
+        const occupiedMargin = balance.nativeBalance - balance.withdrawableAmount;
+        message += `💸 <b>可用保证金:</b> ${balance.withdrawableAmount.toFixed(2)} ${balance.nativeSymbol} ($${this.formatCurrency(balance.withdrawableAmount)})\n`;
+        if (occupiedMargin > 0) {
+          message += `🔒 <b>占用保证金:</b> ${occupiedMargin.toFixed(2)} ${balance.nativeSymbol} ($${this.formatCurrency(occupiedMargin)})\n`;
+        }
       }
       
       // 现货余额
@@ -550,6 +554,13 @@ BTC, ETH, SOL, USDT, USDC, BNB, ADA, DOT, LINK, MATIC, AVAX, UNI
       } else {
         message += `• USDC: 0.00 ($0.00)\n`;
       }
+      
+      // 资金用途说明
+      message += `\n📝 <b>资金用途说明:</b>\n`;
+      message += `• <b>现货余额:</b> 用于1x杠杆交易\n`;
+      message += `• <b>合约账户:</b> 用于>1x杠杆交易\n`;
+      message += `• <b>可用保证金:</b> 新杠杆交易的可用额度\n`;
+      message += `• <b>占用保证金:</b> 当前持仓锁定的保证金\n`;
     } else {
       // 其他网络的原有显示方式
       message += `💎 <b>合约账户余额:</b> ${balance.nativeBalance.toFixed(6)} ${balance.nativeSymbol}\n`;
@@ -1192,12 +1203,20 @@ BTC, ETH, SOL, ETC, LINK, AVAX, UNI等主流币种
    * 格式化交易命令格式错误消息
    */
   public formatTradingCommandErrorMessage(action: 'long' | 'short'): string {
-    const actionText = action === 'long' ? 'Long' : 'Short';
+    const actionText = action === 'long' ? '做多' : '做空';
     const actionLower = action.toLowerCase();
     
     let message = `❌ <b>命令格式错误</b>\n\n`;
-    message += `正确格式: <code>/${actionLower} &lt;Symbol&gt; &lt;Leverage&gt; &lt;Amount&gt;</code>\n\n`;
-    message += `示例: <code>/${actionLower} BTC 10x 100</code>`;
+    message += `<b>正确格式:</b>\n`;
+    message += `<code>/${actionLower} &lt;代币&gt; &lt;杠杆&gt; &lt;金额&gt;</code>\n\n`;
+    message += `<b>示例:</b>\n`;
+    message += `<code>/${actionLower} BTC 10x 100</code> - ${actionText}BTC，10倍杠杆，$100\n`;
+    message += `<code>/${actionLower} ETH 5x 50</code> - ${actionText}ETH，5倍杠杆，$50\n\n`;
+    message += `<b>⚠️ 重要提醒:</b>\n`;
+    message += `• 最小交易金额: $10\n`;
+    message += `• 支持杠杆: 1x-20x\n`;
+    message += `• 支持代币: BTC, ETH, SOL 等主流币\n\n`;
+    message += `💡 首次交易建议先用小金额测试`;
     
     return message;
   }

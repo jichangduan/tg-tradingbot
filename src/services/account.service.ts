@@ -24,14 +24,28 @@ export class AccountService {
 
   /**
    * 检查钱包是否有足够余额进行交易
+   * 根据杠杆倍数决定检查现货余额还是合约余额
    */
   public async checkSufficientBalance(
     telegramId: string, 
     requiredAmount: number,
-    tokenSymbol: string = 'USDC'
+    tokenSymbol: string = 'USDC',
+    leverage: number = 1
   ): Promise<boolean> {
     // 直接委托给 walletService
-    return await walletService.checkSufficientBalance(telegramId, requiredAmount, tokenSymbol);
+    return await walletService.checkSufficientBalance(telegramId, requiredAmount, tokenSymbol, leverage);
+  }
+
+  /**
+   * 检查合约账户是否有足够的可用保证金进行杠杆交易
+   */
+  public async checkAvailableMargin(
+    telegramId: string,
+    requiredAmount: number,
+    leverage: number
+  ): Promise<{sufficient: boolean, availableMargin: number, requiredMargin: number, reason?: string}> {
+    // 直接委托给 walletService
+    return await walletService.checkAvailableMargin(telegramId, requiredAmount, leverage);
   }
 
 

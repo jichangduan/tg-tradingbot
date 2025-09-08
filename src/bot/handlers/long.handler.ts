@@ -134,6 +134,31 @@ export class LongHandler {
       return;
     }
 
+    // 验证交易金额格式
+    const amount = parseFloat(amountStr);
+    if (isNaN(amount) || amount <= 0) {
+      await ctx.reply(
+        `❌ <b>交易金额错误</b>\n\n` +
+        `请输入有效的数字金额\n\n` +
+        `示例: <code>/long BTC 10x 100</code>`,
+        { parse_mode: 'HTML' }
+      );
+      return;
+    }
+
+    // 验证Hyperliquid最小交易金额 ($10)
+    if (amount < 10) {
+      await ctx.reply(
+        `💰 <b>交易金额不足</b>\n\n` +
+        `Hyperliquid最小交易金额为 <b>$10</b>\n` +
+        `您的金额: <code>$${amount}</code>\n\n` +
+        `💡 <b>请调整为至少$10:</b>\n` +
+        `<code>/long ${symbol.toUpperCase()} ${leverageStr} 10</code>`,
+        { parse_mode: 'HTML' }
+      );
+      return;
+    }
+
     // 发送处理中消息
     const loadingMessage = await ctx.reply(
       messageFormatter.formatTradingProcessingMessage('long', symbol, leverageStr, amountStr),
@@ -171,28 +196,88 @@ export class LongHandler {
         return;
       }
 
-      // 检查账户余额
+      // 检查账户余额 - 考虑杠杆倍数
       try {
-        const hasEnoughBalance = await accountService.checkSufficientBalance(
-          userId!.toString(),
-          requiredAmount,
-          'USDC'
-        );
-
-        if (!hasEnoughBalance) {
-          await ctx.telegram.editMessageText(
-            ctx.chat?.id,
-            loadingMessage.message_id,
-            undefined,
-            messageFormatter.formatTradingInsufficientFundsMessage(),
-            { parse_mode: 'HTML' }
+        const leverageNum = parseFloat(leverageStr.replace('x', ''));
+        
+        if (leverageNum > 1) {
+          // 杠杆交易：检查合约账户可用保证金
+          const marginCheck = await accountService.checkAvailableMargin(
+            userId!.toString(),
+            requiredAmount,
+            leverageNum
           );
-          return;
+
+          if (!marginCheck.sufficient) {
+            let errorMessage = '';
+            const contractAccountValue = (await accountService.getAccountBalance(userId!.toString())).nativeBalance;
+            
+            switch (marginCheck.reason) {
+              case 'margin_occupied':
+                errorMessage = `💰 <b>可用保证金不足</b>\n\n` +
+                  `合约账户总价值: <code>$${contractAccountValue.toFixed(2)}</code>\n` +
+                  `可用保证金: <code>$${marginCheck.availableMargin.toFixed(2)}</code>\n` +
+                  `所需保证金: <code>$${marginCheck.requiredMargin.toFixed(2)}</code>\n\n` +
+                  `💡 <b>原因分析:</b>\n` +
+                  `• 您的资金被现有持仓占用作保证金\n` +
+                  `• 杠杆交易需要足够的可用保证金\n\n` +
+                  `🔧 <b>解决方案:</b>\n` +
+                  `• 平仓部分持仓释放保证金\n` +
+                  `• 降低交易金额: <code>/long ${symbol.toUpperCase()} ${leverageStr} ${Math.floor(marginCheck.availableMargin * leverageNum)}</code>\n` +
+                  `• 减少杠杆倍数\n` +
+                  `• 充值更多USDC到合约账户`;
+                break;
+              case 'no_funds':
+                errorMessage = `💰 <b>合约账户无资金</b>\n\n` +
+                  `杠杆交易需要使用合约账户资金\n` +
+                  `当前合约账户余额: <code>$0</code>\n\n` +
+                  `💡 <b>解决方案:</b>\n` +
+                  `• 向钱包充值USDC\n` +
+                  `• 使用 /wallet 查看账户状态`;
+                break;
+              default:
+                errorMessage = `💰 <b>保证金不足</b>\n\n` +
+                  `所需保证金: <code>$${marginCheck.requiredMargin.toFixed(2)}</code>\n` +
+                  `可用保证金: <code>$${marginCheck.availableMargin.toFixed(2)}</code>\n\n` +
+                  `💡 <b>解决方案:</b>\n` +
+                  `• 降低交易金额或杠杆倍数\n` +
+                  `• 向合约账户充值更多USDC`;
+            }
+
+            await ctx.telegram.editMessageText(
+              ctx.chat?.id,
+              loadingMessage.message_id,
+              undefined,
+              errorMessage,
+              { parse_mode: 'HTML' }
+            );
+            return;
+          }
+        } else {
+          // 现货交易：检查现货余额
+          const hasEnoughBalance = await accountService.checkSufficientBalance(
+            userId!.toString(),
+            requiredAmount,
+            'USDC',
+            1
+          );
+
+          if (!hasEnoughBalance) {
+            await ctx.telegram.editMessageText(
+              ctx.chat?.id,
+              loadingMessage.message_id,
+              undefined,
+              messageFormatter.formatTradingInsufficientFundsMessage(),
+              { parse_mode: 'HTML' }
+            );
+            return;
+          }
         }
       } catch (balanceError) {
         logger.warn(`Failed to check balance for long trading`, {
           userId,
           requiredAmount,
+          leverage: leverageStr,
           error: (balanceError as Error).message,
           requestId
         });
@@ -356,15 +441,24 @@ export class LongHandler {
         tradingData
       );
 
-      // 编辑消息显示成功结果
-      await ctx.editMessageText(
-        `✅ <b>做多交易已提交</b>\n\n` +
-        `代币: <code>${symbol.toUpperCase()}</code>\n` +
-        `杠杆: <code>${leverage}</code>\n` +
-        `金额: <code>${amount}</code>\n\n` +
-        `<i>交易正在处理中，请稍候...</i>`,
-        { parse_mode: 'HTML' }
-      );
+      // 检查API响应以确定是否真正成功
+      const apiResult = result as any; // 类型断言
+      let successMessage = '';
+      if (apiResult && apiResult.success !== false && !apiResult.error) {
+        // 只有确认成功才显示成功消息
+        successMessage = `✅ <b>做多开仓成功</b>\n\n` +
+          `代币: <code>${symbol.toUpperCase()}</code>\n` +
+          `杠杆: <code>${leverage}</code>\n` +
+          `金额: <code>$${amount}</code>\n\n` +
+          `🎯 <b>建议操作:</b>\n` +
+          `• 使用 /positions 查看持仓\n` +
+          `• 使用 /wallet 查看余额变化`;
+      } else {
+        // 如果响应表明失败，抛出错误
+        throw new Error(apiResult?.message || 'Hyperliquid API返回失败状态');
+      }
+
+      await ctx.editMessageText(successMessage, { parse_mode: 'HTML' });
 
     } catch (error: any) {
       await ctx.answerCbQuery('❌ 交易执行失败');
@@ -375,19 +469,25 @@ export class LongHandler {
       // 检查是否是余额不足错误
       if (error.response?.status === 400) {
         const responseData = error.response?.data;
-        if (responseData?.message && responseData.message.includes('余额不足')) {
-          errorMessage = '❌ <b>余额不足</b>\n\n' +
-            `当前USDC余额不足以完成交易\n` +
-            `交易金额: <code>${amount} USDC</code>\n\n` +
-            `💡 <i>请先充值USDC到您的钱包</i>`;
-        } else if (responseData?.message && (responseData.message.includes('insufficient') || responseData.message.toLowerCase().includes('balance'))) {
-          errorMessage = '❌ <b>余额不足</b>\n\n' +
-            `当前USDC余额不足以完成交易\n` +
-            `交易金额: <code>${amount} USDC</code>\n\n` +
-            `💡 <i>请使用 /wallet 查看余额并充值</i>`;
+        const errorMsg = responseData?.message || error.message || '';
+        
+        if (errorMsg.includes('余额不足') || errorMsg.includes('insufficient') || errorMsg.toLowerCase().includes('balance')) {
+          errorMessage = '💰 <b>账户余额不足</b>\n\n' +
+            `无法完成$${amount}的做多交易\n\n` +
+            `💡 <b>解决方案:</b>\n` +
+            `• 使用 /wallet 查看当前余额\n` +
+            `• 向钱包充值更多USDC\n` +
+            `• 减少交易金额\n\n` +
+            `<i>💸 提醒: Hyperliquid最小交易金额为$10</i>`;
+        } else if (errorMsg.includes('minimum') || errorMsg.includes('最小') || parseFloat(amount) < 10) {
+          errorMessage = '💰 <b>交易金额不符合要求</b>\n\n' +
+            `Hyperliquid最小交易金额为 <b>$10</b>\n` +
+            `您的金额: <code>$${amount}</code>\n\n` +
+            `💡 <b>请调整为至少$10:</b>\n` +
+            `<code>/long ${symbol.toUpperCase()} ${leverage} 10</code>`;
         } else {
-          errorMessage += `参数错误: ${responseData?.message || '请检查交易参数'}\n\n` +
-            `<i>请稍后重试或联系客服</i>`;
+          errorMessage += `参数错误: ${errorMsg}\n\n` +
+            `<i>请检查交易参数或稍后重试</i>`;
         }
       } else if (error.response?.status === 401) {
         errorMessage += `认证失败，请重新登录\n\n` +

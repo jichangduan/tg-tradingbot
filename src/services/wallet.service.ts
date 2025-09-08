@@ -78,18 +78,14 @@ export class WalletService {
         }
       }
 
-      // 步骤2: 并行查询现货余额、合约余额和可用资产数据
-      const [spotBalance, contractBalance, activeAssetData] = await Promise.all([
+      // 步骤2: 并行查询现货余额和合约余额
+      const [spotBalance, contractBalance] = await Promise.all([
         getUserHyperliquidBalance(1, telegramId), // 1 = trading wallet
-        getUserContractBalance(1, telegramId),
-        getUserActiveAssetData(1, telegramId).catch(err => {
-          logger.warn(`Failed to get active asset data for ${telegramId}`, { error: err.message });
-          return null;
-        })
+        getUserContractBalance(1, telegramId)
       ]);
 
-      // 记录所有API的返回结果进行对比
-      logger.info(`All balance APIs comparison for ${telegramId}`, {
+      // 记录API返回结果用于调试
+      logger.info(`Hyperliquid balance APIs result for ${telegramId}`, {
         telegramId,
         spotBalance: {
           success: !!spotBalance,
@@ -101,10 +97,6 @@ export class WalletService {
           success: !!contractBalance,
           data: contractBalance?.data,
           accountValue: contractBalance?.data?.marginSummary?.accountValue
-        },
-        activeAssetData: {
-          success: !!activeAssetData,
-          data: activeAssetData?.data || 'failed to fetch'
         },
         requestId
       });
@@ -218,23 +210,48 @@ export class WalletService {
 
   /**
    * 检查钱包是否有足够余额进行交易
+   * 根据杠杆倍数决定检查现货余额还是合约余额
    */
   public async checkSufficientBalance(
     telegramId: string, 
     requiredAmount: number,
-    tokenSymbol: string = 'USDC'
+    tokenSymbol: string = 'USDC',
+    leverage: number = 1
   ): Promise<boolean> {
     try {
       const balance = await this.getAccountBalance(telegramId);
       
       if (tokenSymbol === 'USDC') {
-        // 检查现货余额 + 合约余额
-        const usdcToken = balance.tokenBalances.find(t => t.symbol === 'USDC');
-        const spotBalance = usdcToken ? usdcToken.uiAmount : 0;
-        const contractBalance = balance.nativeBalance;
-        const totalBalance = spotBalance + contractBalance;
-        
-        return totalBalance >= requiredAmount;
+        if (leverage > 1) {
+          // 杠杆交易：检查合约账户可用保证金
+          const availableMargin = balance.withdrawableAmount || 0;
+          const requiredMargin = requiredAmount / leverage; // 保证金需求
+          
+          logger.info('Leveraged trading balance check', {
+            telegramId,
+            leverage,
+            requiredAmount,
+            requiredMargin,
+            availableMargin,
+            sufficient: availableMargin >= requiredMargin
+          });
+          
+          return availableMargin >= requiredMargin;
+        } else {
+          // 现货交易：检查现货余额
+          const usdcToken = balance.tokenBalances.find(t => t.symbol === 'USDC');
+          const spotBalance = usdcToken ? usdcToken.uiAmount : 0;
+          
+          logger.info('Spot trading balance check', {
+            telegramId,
+            leverage,
+            requiredAmount,
+            spotBalance,
+            sufficient: spotBalance >= requiredAmount
+          });
+          
+          return spotBalance >= requiredAmount;
+        }
       } else {
         const token = balance.tokenBalances.find(t => t.symbol === tokenSymbol);
         return token ? token.uiAmount >= requiredAmount : false;
@@ -244,9 +261,65 @@ export class WalletService {
         telegramId,
         requiredAmount,
         tokenSymbol,
+        leverage,
         error: (error as Error).message
       });
       return false;
+    }
+  }
+
+  /**
+   * 检查合约账户是否有足够的可用保证金进行杠杆交易
+   */
+  public async checkAvailableMargin(
+    telegramId: string,
+    requiredAmount: number,
+    leverage: number
+  ): Promise<{sufficient: boolean, availableMargin: number, requiredMargin: number, reason?: string}> {
+    try {
+      const balance = await this.getAccountBalance(telegramId);
+      const availableMargin = balance.withdrawableAmount || 0;
+      const requiredMargin = requiredAmount / leverage;
+      
+      const result = {
+        sufficient: availableMargin >= requiredMargin,
+        availableMargin,
+        requiredMargin,
+        reason: undefined as string | undefined
+      };
+      
+      if (!result.sufficient) {
+        if (balance.nativeBalance > 0 && availableMargin < requiredMargin) {
+          result.reason = 'margin_occupied';
+        } else if (balance.nativeBalance === 0) {
+          result.reason = 'no_funds';
+        } else {
+          result.reason = 'insufficient_margin';
+        }
+      }
+      
+      logger.info('Contract account margin check', {
+        telegramId,
+        requiredAmount,
+        leverage,
+        ...result
+      });
+      
+      return result;
+    } catch (error) {
+      logger.warn('Failed to check available margin', {
+        telegramId,
+        requiredAmount,
+        leverage,
+        error: (error as Error).message
+      });
+      
+      return {
+        sufficient: false,
+        availableMargin: 0,
+        requiredMargin: requiredAmount / leverage,
+        reason: 'check_failed'
+      };
     }
   }
 
