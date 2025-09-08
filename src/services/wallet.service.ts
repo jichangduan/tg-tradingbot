@@ -143,7 +143,7 @@ export class WalletService {
       mint: 'USDC',
       symbol: 'USDC',
       name: 'USD Coin',
-      balance: (spotValue * 1e6).toString(), // 转换为最小单位
+      balance: spotValue.toString(), // 直接使用USDC金额
       decimals: 6,
       uiAmount: spotValue,
       usdValue: spotValue

@@ -14,7 +14,11 @@
 - **接口**: `GET /api/hyperliquid/getUserWallet`
 - **认证**: 需要 JWT Token (`req.user`)
 - **参数**: 无
-- **状态**: ✅ **已修复** - hyperliquid.service.ts 已更新使用 `getWithAuth()` 方法
+- **状态**: ✅ **已修复** - 余额显示问题已解决 (2025-09-08)
+- **修复内容**:
+  - 移除wallet.service.ts中错误的1e6转换逻辑
+  - 优化余额显示格式为2位小数
+  - 现在正确显示实际USDC余额
 
 ### 3. `/price` - 代币价格
 - **接口**: `GET /api/birdeye/token_trending`  

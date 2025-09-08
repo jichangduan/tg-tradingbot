@@ -538,7 +538,7 @@ BTC, ETH, SOL, USDT, USDC, BNB, ADA, DOT, LINK, MATIC, AVAX, UNI
       balance.tokenBalances.forEach(token => {
         const usdValue = token.usdValue !== undefined ? ` ($${this.formatCurrency(token.usdValue)})` : '';
         // 显示余额，即使为0也要显示
-        const formattedAmount = token.uiAmount === 0 ? '0.00' : token.uiAmount.toLocaleString();
+        const formattedAmount = token.uiAmount.toFixed(2);
         message += `• ${token.symbol}: ${formattedAmount} ${token.symbol}${usdValue}\n`;
       });
     } else {
