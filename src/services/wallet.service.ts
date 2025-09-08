@@ -105,7 +105,8 @@ export class WalletService {
       const walletBalance = this.convertToFormattedBalance(
         walletData,
         spotBalance.data,
-        contractBalance.data
+        contractBalance.data,
+        telegramId
       );
 
       const duration = Date.now() - startTime;
@@ -149,7 +150,8 @@ export class WalletService {
   private convertToFormattedBalance(
     walletData: IUserWalletData,
     spotBalance: IUserBalanceData | undefined,
-    contractBalance: IUserStateData
+    contractBalance: IUserStateData,
+    telegramId?: string
   ): FormattedWalletBalance {
     const tokenBalances: TokenBalance[] = [];
     
@@ -189,7 +191,7 @@ export class WalletService {
     
     // 记录完整的合约余额数据分析
     logger.info(`🔍 Hyperliquid contract balance analysis`, {
-      telegramId,
+      telegramId: telegramId || 'unknown',
       walletAddress: walletData.tradingwalletaddress,
       
       // 原始数据结构
@@ -260,7 +262,7 @@ export class WalletService {
 
     // 🔍 保证金占用逻辑验证 - 改进后的分析
     logger.info(`💰 Margin occupation analysis (improved)`, {
-      telegramId,
+      telegramId: telegramId || 'unknown',
       
       // 改进后的计算方法
       improvedCalculations: {
