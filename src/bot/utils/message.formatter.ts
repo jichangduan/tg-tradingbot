@@ -529,20 +529,41 @@ BTC, ETH, SOL, USDT, USDC, BNB, ADA, DOT, LINK, MATIC, AVAX, UNI
     message += `📍 <b>钱包地址:</b> <code>${this.truncateAddress(balance.address)}</code>\n`;
     message += `🌐 <b>网络:</b> ${balance.network.toUpperCase()}\n\n`;
     
-    // 主币余额 (合约账户余额)
-    message += `💎 <b>合约账户余额:</b> ${balance.nativeBalance.toFixed(6)} ${balance.nativeSymbol}\n`;
-    
-    // 代币余额列表 - 总是显示，即使为0
-    message += `\n💰 <b>现货余额:</b>\n`;
-    if (balance.tokenBalances.length > 0) {
-      balance.tokenBalances.forEach(token => {
-        const usdValue = token.usdValue !== undefined ? ` ($${this.formatCurrency(token.usdValue)})` : '';
-        // 显示余额，即使为0也要显示
-        const formattedAmount = token.uiAmount.toFixed(2);
-        message += `• ${token.symbol}: ${formattedAmount} ${token.symbol}${usdValue}\n`;
-      });
+    // 针对Hyperliquid钱包的特殊显示
+    if (balance.network.toLowerCase() === 'arbitrum') {
+      // 合约账户余额 (主要资金)
+      message += `💎 <b>合约账户:</b> ${balance.nativeBalance.toFixed(2)} ${balance.nativeSymbol} ($${this.formatCurrency(balance.nativeBalance)})\n`;
+      
+      // 可提取金额
+      if (balance.withdrawableAmount !== undefined) {
+        message += `💸 <b>可提取:</b> ${balance.withdrawableAmount.toFixed(2)} ${balance.nativeSymbol} ($${this.formatCurrency(balance.withdrawableAmount)})\n`;
+      }
+      
+      // 现货余额
+      message += `\n💰 <b>现货余额:</b>\n`;
+      if (balance.tokenBalances.length > 0) {
+        balance.tokenBalances.forEach(token => {
+          const usdValue = token.usdValue !== undefined ? ` ($${this.formatCurrency(token.usdValue)})` : '';
+          const formattedAmount = token.uiAmount.toFixed(2);
+          message += `• ${token.symbol}: ${formattedAmount}${usdValue}\n`;
+        });
+      } else {
+        message += `• USDC: 0.00 ($0.00)\n`;
+      }
     } else {
-      message += `• USDC: 0.00 USDC ($0.00)\n`;
+      // 其他网络的原有显示方式
+      message += `💎 <b>合约账户余额:</b> ${balance.nativeBalance.toFixed(6)} ${balance.nativeSymbol}\n`;
+      
+      message += `\n💰 <b>现货余额:</b>\n`;
+      if (balance.tokenBalances.length > 0) {
+        balance.tokenBalances.forEach(token => {
+          const usdValue = token.usdValue !== undefined ? ` ($${this.formatCurrency(token.usdValue)})` : '';
+          const formattedAmount = token.uiAmount.toFixed(2);
+          message += `• ${token.symbol}: ${formattedAmount} ${token.symbol}${usdValue}\n`;
+        });
+      } else {
+        message += `• USDC: 0.00 USDC ($0.00)\n`;
+      }
     }
     
     // 总价值 - 总是显示，即使为0

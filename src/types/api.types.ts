@@ -343,6 +343,7 @@ export interface FormattedWalletBalance {
   nativeSymbol: string;       // 主币符号
   tokenBalances: TokenBalance[]; // 代币余额
   totalUsdValue: number;      // 总USD价值
+  withdrawableAmount?: number; // 可提取金额 (仅限Hyperliquid)
   lastUpdated: Date;          // 最后更新时间
 }
 

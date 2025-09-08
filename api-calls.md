@@ -11,16 +11,16 @@
 - **状态**: ✅ 正常
 
 ### 2. `/wallet` - 钱包查询  
-- **接口**: `GET /api/hyperliquid/getUserWallet` + `POST /api/hyperliquid/getUserBalance` + `POST /api/hyperliquid/getActiveAssetData`
+- **接口**: `GET /api/hyperliquid/getUserWallet` + `POST /api/hyperliquid/getUserBalance` + `POST /api/hyperliquid/getUserState`
 - **认证**: 需要 JWT Token (`req.user`)
 - **参数**: 无
-- **状态**: 🔧 **调试中** - 添加多API对比诊断 (2025-09-08)
+- **状态**: ✅ **已修复** - 合约账户余额显示问题解决 (2025-09-08)
+- **问题根源**: 用户资金在合约账户($178.66)，不在现货账户(0 USDC)
 - **修复内容**:
-  - 移除wallet.service.ts中错误的1e6转换逻辑
-  - 优化余额显示格式为2位小数
-  - **新增**: 同时调用 getActiveAssetData API 进行余额对比
-  - **新增**: 详细的API调用和响应日志
-  - 目标: 解决API返回空余额但链上有$176.83的问题
+  - 正确提取合约账户价值: `contractBalance.data.data.marginSummary.accountValue`
+  - 添加可提取金额显示: `withdrawableAmount`
+  - 优化Hyperliquid钱包显示格式，区分现货和合约余额
+  - 修复总价值计算逻辑
 
 ### 3. `/price` - 代币价格
 - **接口**: `GET /api/birdeye/token_trending`  

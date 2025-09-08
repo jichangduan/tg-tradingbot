@@ -175,19 +175,33 @@ export class WalletService {
       usdValue: spotValue
     });
 
-    // 记录余额转换详情
+    // 从嵌套结构中提取合约账户价值 - 需要类型断言
+    const contractData = contractBalance as any; // 临时类型断言
+    const contractAccountValue = contractData?.data?.data?.marginSummary?.accountValue || 
+                                 contractData?.data?.marginSummary?.accountValue ||
+                                 contractData?.marginSummary?.accountValue ||
+                                 "0";
+    const contractValue = parseFloat(contractAccountValue);
+    
+    // 提取可提取金额
+    const withdrawableAmount = contractData?.data?.data?.withdrawable ||
+                              contractData?.data?.withdrawable ||
+                              contractData?.withdrawable ||
+                              "0";
+
+    // 记录余额转换详情  
     logger.info(`Converting balance data to formatted balance`, {
       walletAddress: walletData.tradingwalletaddress,
       spotBalance: spotBalance,
       spotValue,
-      contractBalance: contractBalance?.marginSummary?.accountValue,
+      contractBalance: contractData?.data?.data || contractData?.data,
+      contractAccountValue,
+      contractValue,
+      withdrawableAmount,
       tokenBalancesCount: tokenBalances.length
     });
 
     // 计算总价值 (现货余额 + 合约账户价值)
-    const contractValue = contractBalance?.marginSummary?.accountValue 
-      ? parseFloat(contractBalance.marginSummary.accountValue) 
-      : 0;
     const totalUsdValue = spotValue + contractValue;
 
     return {
@@ -197,6 +211,7 @@ export class WalletService {
       nativeSymbol: 'USDC',
       tokenBalances,
       totalUsdValue,
+      withdrawableAmount: parseFloat(withdrawableAmount), // 可提取金额
       lastUpdated: new Date()
     };
   }
