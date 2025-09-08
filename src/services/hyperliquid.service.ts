@@ -2,6 +2,31 @@ import { apiService } from './api.service';
 import { logger } from '../utils/logger';
 import { getUserAccessToken } from '../utils/auth';
 
+/**
+ * 标准化以太坊地址格式
+ * @param address 原始地址
+ * @returns 标准化的小写地址
+ */
+function normalizeAddress(address: string): string {
+  if (!address) return address;
+  
+  // 移除0x前缀，转换为小写，再添加0x前缀
+  const cleanAddress = address.replace(/^0x/i, '').toLowerCase();
+  return `0x${cleanAddress}`;
+}
+
+/**
+ * 验证以太坊地址格式
+ * @param address 地址字符串
+ * @returns 是否为有效地址
+ */
+function isValidEthereumAddress(address: string): boolean {
+  if (!address) return false;
+  
+  // 检查格式：0x + 40个十六进制字符
+  return /^0x[a-fA-F0-9]{40}$/.test(address);
+}
+
 export interface IUserWalletData {
   tradingwalletaddress: string;
   strategywalletaddress: string;
@@ -77,6 +102,21 @@ export async function getUserWallet(telegramId?: string) {
     params
   );
   
+  // 标准化地址格式
+  if (response && response.tradingwalletaddress) {
+    response.tradingwalletaddress = normalizeAddress(response.tradingwalletaddress);
+    
+    logger.info(`Wallet address normalized for ${telegramId}`, {
+      telegramId,
+      normalizedTradingWallet: response.tradingwalletaddress,
+      normalizedStrategyWallet: response.strategywalletaddress ? normalizeAddress(response.strategywalletaddress) : undefined
+    });
+    
+    if (response.strategywalletaddress) {
+      response.strategywalletaddress = normalizeAddress(response.strategywalletaddress);
+    }
+  }
+  
   return response;
 }
 
@@ -116,11 +156,23 @@ export async function createUserHyperliquidWallet(telegramId: string): Promise<I
         strategyWallet: createWalletResponse.data.strategywalletaddress
       });
 
-      // 返回钱包数据
-      return {
-        tradingwalletaddress: createWalletResponse.data.tradingwalletaddress,
-        strategywalletaddress: createWalletResponse.data.strategywalletaddress || ''
+      // 返回标准化的钱包数据
+      const normalizedData: IUserWalletData = {
+        tradingwalletaddress: normalizeAddress(createWalletResponse.data.tradingwalletaddress),
+        strategywalletaddress: createWalletResponse.data.strategywalletaddress 
+          ? normalizeAddress(createWalletResponse.data.strategywalletaddress)
+          : ''
       };
+      
+      logger.info(`Wallet addresses normalized after creation for ${telegramId}`, {
+        telegramId,
+        originalTradingWallet: createWalletResponse.data.tradingwalletaddress,
+        normalizedTradingWallet: normalizedData.tradingwalletaddress,
+        originalStrategyWallet: createWalletResponse.data.strategywalletaddress,
+        normalizedStrategyWallet: normalizedData.strategywalletaddress
+      });
+      
+      return normalizedData;
     } else {
       logger.error(`Failed to create Hyperliquid wallet for user ${telegramId}`, {
         telegramId,
