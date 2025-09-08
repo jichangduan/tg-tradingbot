@@ -2,6 +2,7 @@ import {
   getUserWallet, 
   getUserHyperliquidBalance, 
   getUserContractBalance,
+  getUserActiveAssetData,
   createUserHyperliquidWallet,
   IUserWalletData,
   IUserBalanceData,
@@ -77,11 +78,36 @@ export class WalletService {
         }
       }
 
-      // 步骤2: 并行查询现货余额和合约余额
-      const [spotBalance, contractBalance] = await Promise.all([
+      // 步骤2: 并行查询现货余额、合约余额和可用资产数据
+      const [spotBalance, contractBalance, activeAssetData] = await Promise.all([
         getUserHyperliquidBalance(1, telegramId), // 1 = trading wallet
-        getUserContractBalance(1, telegramId)
+        getUserContractBalance(1, telegramId),
+        getUserActiveAssetData(1, telegramId).catch(err => {
+          logger.warn(`Failed to get active asset data for ${telegramId}`, { error: err.message });
+          return null;
+        })
       ]);
+
+      // 记录所有API的返回结果进行对比
+      logger.info(`All balance APIs comparison for ${telegramId}`, {
+        telegramId,
+        spotBalance: {
+          success: !!spotBalance,
+          data: spotBalance?.data,
+          coin: spotBalance?.data?.coin,
+          total: spotBalance?.data?.total
+        },
+        contractBalance: {
+          success: !!contractBalance,
+          data: contractBalance?.data,
+          accountValue: contractBalance?.data?.marginSummary?.accountValue
+        },
+        activeAssetData: {
+          success: !!activeAssetData,
+          data: activeAssetData?.data || 'failed to fetch'
+        },
+        requestId
+      });
 
       // 步骤3: 转换为标准格式
       const walletBalance = this.convertToFormattedBalance(

@@ -206,7 +206,9 @@ export async function getUserHyperliquidBalance(walletType: 1 | 2, telegramId?: 
   logger.info(`Getting user hyperliquid balance with authentication for ${telegramId}`, {
     telegramId,
     walletType,
-    hasToken: true
+    hasToken: true,
+    requestBody: requestBody,
+    apiEndpoint: "/api/hyperliquid/getUserBalance"
   });
   
   const response = await apiService.postWithAuth<{
@@ -355,6 +357,55 @@ export async function orderWithTpslApi(params?: Record<string, unknown>) {
 export async function getActiveAssetDataApi(params?: Record<string, unknown>) {
   const response = await apiService.post('/api/hyperliquid/getActiveAssetData',params);
   return response;
+}
+
+// 获取用户可用余额 (带认证)
+export async function getUserActiveAssetData(walletType: 1 | 2, telegramId?: string) {
+  if (!telegramId) {
+    throw new Error('telegramId is required for getUserActiveAssetData');
+  }
+
+  // 获取用户的JWT Token
+  const accessToken = await getUserAccessToken(telegramId);
+
+  const requestBody: any = {
+    type: walletType,
+    telegram_id: telegramId
+  };
+  
+  logger.info(`Getting user active asset data with authentication for ${telegramId}`, {
+    telegramId,
+    walletType,
+    hasToken: true,
+    requestBody: requestBody,
+    apiEndpoint: "/api/hyperliquid/getActiveAssetData"
+  });
+  
+  try {
+    const response = await apiService.postWithAuth<any>(
+      "/api/hyperliquid/getActiveAssetData", 
+      accessToken, 
+      requestBody
+    );
+
+    logger.info(`Active asset data API response for ${telegramId}`, {
+      telegramId,
+      walletType,
+      responseCode: response?.code || 'no code',
+      responseMessage: response?.message || 'no message',
+      hasData: !!response?.data,
+      fullResponse: JSON.stringify(response, null, 2)
+    });
+
+    return response;
+  } catch (error) {
+    logger.error(`Active asset data API failed for ${telegramId}`, {
+      telegramId,
+      walletType,
+      error: (error as Error).message
+    });
+    throw error;
+  }
 }
 
 
