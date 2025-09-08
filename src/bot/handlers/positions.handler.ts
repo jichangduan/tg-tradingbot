@@ -57,7 +57,19 @@ export class PositionsHandler {
    */
   public async handle(ctx: ExtendedContext, _args: string[]): Promise<void> {
     const userId = ctx.from?.id;
+    const username = ctx.from?.username || 'unknown';
+    const requestId = ctx.requestId || `pos_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    // 命令入口日志
+    logger.info(`Positions command started [${requestId}]`, {
+      userId,
+      username,
+      chatId: ctx.chat?.id,
+      requestId
+    });
+
     if (!userId) {
+      logger.error(`Positions command failed - no userId [${requestId}]`, { requestId });
       await ctx.reply('❌ 无法识别用户身份');
       return;
     }
@@ -70,8 +82,20 @@ export class PositionsHandler {
 
     try {
       // 尝试从缓存获取数据
+      logger.info(`Checking cache for positions [${requestId}]`, {
+        userId,
+        cacheKey: `${this.cacheKey}${userId}`,
+        requestId
+      });
+      
       const cachedData = await this.getCachedPositions(userId);
       if (cachedData) {
+        logger.info(`Using cached positions data [${requestId}]`, {
+          userId,
+          cachedDataLength: cachedData.length,
+          requestId
+        });
+        
         await ctx.telegram.editMessageText(
           ctx.chat!.id,
           loadingMessage.message_id,
@@ -80,10 +104,30 @@ export class PositionsHandler {
           { parse_mode: 'HTML' }
         );
         return;
+      } else {
+        logger.info(`No cached positions data found [${requestId}]`, {
+          userId,
+          requestId
+        });
       }
 
       // 从API获取数据，传递ctx用于fallback认证
-      const positionsData = await this.fetchPositionsFromAPI(userId, ctx);
+      logger.info(`Fetching positions from API [${requestId}]`, {
+        userId,
+        apiEndpoint: '/api/tgbot/trading/positions',
+        requestId
+      });
+      
+      const positionsData = await this.fetchPositionsFromAPI(userId, ctx, requestId);
+      
+      logger.info(`API call successful, formatting message [${requestId}]`, {
+        userId,
+        totalPositions: positionsData.data.totalPositions,
+        accountValue: positionsData.data.accountValue,
+        availableBalance: positionsData.data.availableBalance,
+        requestId
+      });
+      
       const formattedMessage = this.formatPositionsMessage(positionsData);
       
       // 缓存结果
@@ -123,7 +167,16 @@ export class PositionsHandler {
       }
 
     } catch (error) {
-      const errorMessage = this.handleError(error as Error);
+      logger.error(`Positions command failed [${requestId}]`, {
+        error: (error as Error).message,
+        errorStack: (error as Error).stack,
+        userId,
+        username,
+        errorType: (error as Error).constructor?.name,
+        requestId
+      });
+      
+      const errorMessage = this.handleError(error as Error, requestId);
       
       try {
         await ctx.telegram.editMessageText(
@@ -133,41 +186,97 @@ export class PositionsHandler {
           errorMessage,
           { parse_mode: 'HTML' }
         );
+        
+        logger.info(`Error message updated successfully [${requestId}]`, {
+          userId,
+          requestId
+        });
       } catch (editError) {
+        logger.warn(`Failed to edit message, sending new reply [${requestId}]`, {
+          userId,
+          editError: (editError as Error).message,
+          requestId
+        });
+        
         await ctx.reply(errorMessage, { parse_mode: 'HTML' });
       }
-
-      logger.error('Positions command failed', {
-        error: (error as Error).message,
-        userId,
-        requestId: ctx.requestId
-      });
     }
   }
 
   /**
    * 从API获取仓位数据
    */
-  private async fetchPositionsFromAPI(userId: number, ctx?: ExtendedContext): Promise<PositionsResponse> {
+  private async fetchPositionsFromAPI(userId: number, ctx?: ExtendedContext, requestId?: string): Promise<PositionsResponse> {
+    const reqId = requestId || `pos_api_${Date.now()}`;
+    
+    logger.info(`Starting fetchPositionsFromAPI [${reqId}]`, {
+      userId,
+      hasContext: !!ctx,
+      requestId: reqId
+    });
+    
     // 获取用户的access token，支持fallback重新认证
-    const userToken = await this.getUserAccessToken(userId, ctx);
+    logger.info(`Getting user access token [${reqId}]`, {
+      userId,
+      requestId: reqId
+    });
+    
+    const userToken = await this.getUserAccessToken(userId, ctx, reqId);
     
     if (!userToken) {
+      logger.error(`No access token available [${reqId}]`, {
+        userId,
+        requestId: reqId
+      });
       throw new Error('用户未登录，请先使用 /start 命令登录');
     }
+    
+    logger.info(`Access token obtained, making API call [${reqId}]`, {
+      userId,
+      tokenLength: userToken.length,
+      apiUrl: '/api/tgbot/trading/positions',
+      requestId: reqId
+    });
 
-    const response = await apiService.getWithAuth<PositionsResponse>(
-      '/api/tgbot/trading/positions',
-      userToken,
-      {},
-      { timeout: 10000 }
-    );
+    try {
+      const response = await apiService.getWithAuth<PositionsResponse>(
+        '/api/tgbot/trading/positions',
+        userToken,
+        {},
+        { timeout: 10000 }
+      );
+      
+      logger.info(`API response received [${reqId}]`, {
+        userId,
+        responseCode: response.code,
+        responseMessage: response.message,
+        hasData: !!response.data,
+        requestId: reqId
+      });
 
-    if (response.code !== 200) {
-      throw new Error(response.message || '获取仓位信息失败');
+      if (response.code !== 200) {
+        logger.error(`API returned non-200 code [${reqId}]`, {
+          userId,
+          responseCode: response.code,
+          responseMessage: response.message,
+          fullResponse: JSON.stringify(response),
+          requestId: reqId
+        });
+        throw new Error(response.message || '获取仓位信息失败');
+      }
+
+      return response;
+    } catch (apiError: any) {
+      logger.error(`API call failed [${reqId}]`, {
+        userId,
+        errorMessage: apiError.message,
+        errorStatus: apiError.response?.status,
+        errorStatusText: apiError.response?.statusText,
+        errorData: apiError.response?.data ? JSON.stringify(apiError.response.data) : 'no data',
+        requestId: reqId
+      });
+      throw apiError;
     }
-
-    return response;
   }
 
   /**
@@ -242,10 +351,18 @@ ${positionsText}
   /**
    * 错误处理
    */
-  private handleError(error: Error): string {
-    logger.error('Positions handler error:', { error: error.message });
+  private handleError(error: Error, requestId?: string): string {
+    const reqId = requestId || `error_${Date.now()}`;
+    
+    logger.error(`Handling positions error [${reqId}]`, { 
+      error: error.message,
+      errorType: error.constructor?.name,
+      errorStack: error.stack,
+      requestId: reqId
+    });
 
     if (error.message.includes('未登录')) {
+      logger.info(`Authentication error detected [${reqId}]`, { requestId: reqId });
       return `
 ❌ <b>用户未登录</b>
 
@@ -255,7 +372,8 @@ ${positionsText}
       `.trim();
     }
 
-    if (error.message.includes('网络')) {
+    if (error.message.includes('网络') || error.message.includes('ECONNREFUSED') || error.message.includes('ENOTFOUND')) {
+      logger.info(`Network error detected [${reqId}]`, { requestId: reqId });
       return `
 ❌ <b>网络连接失败</b>
 
@@ -266,7 +384,13 @@ ${positionsText}
     }
 
     // 判断是否为外部接口问题（API返回400/500等状态码）
-    if (error.message.includes('status code 400')) {
+    if (error.message.includes('status code 400') || (error as any).response?.status === 400) {
+      logger.info(`API 400 error detected [${reqId}]`, { 
+        errorStatus: (error as any).response?.status,
+        errorData: (error as any).response?.data,
+        requestId: reqId
+      });
+      
       return `
 ❌ <b>外部接口错误 (400)</b>
 
@@ -278,10 +402,19 @@ ${positionsText}
 • 使用其他命令如 /wallet 查看账户信息
 
 ⚠️ <i>这不是您的操作问题，而是系统接口需要修复。</i>
+
+<b>技术详情:</b> ${error.message}
       `.trim();
     }
 
-    if (error.message.includes('status code 500') || error.message.includes('status code 502') || error.message.includes('status code 503')) {
+    if (error.message.includes('status code 500') || error.message.includes('status code 502') || 
+        error.message.includes('status code 503') || 
+        (error as any).response?.status >= 500) {
+      logger.info(`Server error detected [${reqId}]`, { 
+        errorStatus: (error as any).response?.status,
+        requestId: reqId
+      });
+      
       return `
 ❌ <b>服务器错误</b>
 
@@ -296,12 +429,31 @@ ${positionsText}
       `.trim();
     }
 
+    // 超时错误
+    if (error.message.includes('timeout') || error.message.includes('ECONNABORTED')) {
+      logger.info(`Timeout error detected [${reqId}]`, { requestId: reqId });
+      return `
+❌ <b>请求超时</b>
+
+持仓查询超时，可能是网络或服务器响应较慢。
+
+💡 <b>建议操作:</b>
+• 稍后重试此命令
+• 检查网络连接状态
+
+<i>如果问题持续存在，请联系管理员。</i>
+      `.trim();
+    }
+
+    logger.info(`Generic error, returning default message [${reqId}]`, { requestId: reqId });
+    
     return `
 ❌ <b>查询失败</b>
 
 获取持仓信息时出现错误，请稍后重试。
 
 <b>错误详情:</b> ${error.message}
+<b>请求ID:</b> ${reqId}
 
 <i>如果问题持续存在，请联系管理员。</i>
     `.trim();
@@ -313,13 +465,36 @@ ${positionsText}
   private async getCachedPositions(userId: number): Promise<string | null> {
     try {
       const key = `${this.cacheKey}${userId}`;
+      
+      logger.debug('Getting cached positions', {
+        userId,
+        cacheKey: key
+      });
+      
       const result = await cacheService.get<string>(key);
+      
       if (result.success && result.data) {
+        logger.debug('Found cached positions data', {
+          userId,
+          cacheKey: key,
+          dataLength: result.data.length
+        });
         return result.data;
       }
+      
+      logger.debug('No cached positions data found', {
+        userId,
+        cacheKey: key,
+        cacheResult: result
+      });
+      
       return null;
     } catch (error) {
-      logger.warn('Failed to get cached positions', { error: (error as Error).message, userId });
+      logger.warn('Failed to get cached positions', { 
+        error: (error as Error).message, 
+        userId,
+        cacheKey: `${this.cacheKey}${userId}`
+      });
       return null;
     }
   }
@@ -330,9 +505,35 @@ ${positionsText}
   private async cachePositions(userId: number, data: string): Promise<void> {
     try {
       const key = `${this.cacheKey}${userId}`;
-      await cacheService.set(key, data, this.cacheTTL);
+      
+      logger.debug('Caching positions data', {
+        userId,
+        cacheKey: key,
+        dataLength: data.length,
+        cacheTTL: this.cacheTTL
+      });
+      
+      const result = await cacheService.set(key, data, this.cacheTTL);
+      
+      if (result.success) {
+        logger.debug('Positions data cached successfully', {
+          userId,
+          cacheKey: key,
+          cacheTTL: this.cacheTTL
+        });
+      } else {
+        logger.warn('Failed to cache positions data', {
+          userId,
+          cacheKey: key,
+          cacheError: result.error
+        });
+      }
     } catch (error) {
-      logger.warn('Failed to cache positions', { error: (error as Error).message, userId });
+      logger.warn('Failed to cache positions', { 
+        error: (error as Error).message, 
+        userId,
+        cacheKey: `${this.cacheKey}${userId}`
+      });
     }
   }
 
@@ -340,20 +541,44 @@ ${positionsText}
    * 获取用户的访问令牌
    * 支持从缓存获取，如果没有则尝试重新认证并缓存
    */
-  private async getUserAccessToken(userId: number, ctx?: ExtendedContext): Promise<string | null> {
+  private async getUserAccessToken(userId: number, ctx?: ExtendedContext, requestId?: string): Promise<string | null> {
+    const reqId = requestId || `token_${Date.now()}`;
+    
     try {
       // 方案1: 从缓存中获取用户token
       const tokenKey = `user:token:${userId}`;
+      
+      logger.info(`Checking token cache [${reqId}]`, {
+        userId,
+        tokenKey,
+        requestId: reqId
+      });
+      
       const result = await cacheService.get<string>(tokenKey);
       
       if (result.success && result.data) {
-        logger.debug('AccessToken found in cache', { userId, tokenKey });
+        logger.info(`AccessToken found in cache [${reqId}]`, { 
+          userId, 
+          tokenKey,
+          tokenLength: result.data.length,
+          requestId: reqId
+        });
         return result.data;
       }
 
+      logger.info(`AccessToken not in cache [${reqId}]`, {
+        userId,
+        cacheResult: result,
+        requestId: reqId
+      });
+
       // 方案2: 如果缓存中没有token，尝试通过用户信息重新获取
       if (ctx && ctx.from) {
-        logger.info('AccessToken not in cache, attempting to re-authenticate', { userId });
+        logger.info(`Attempting to re-authenticate user [${reqId}]`, { 
+          userId,
+          username: ctx.from.username,
+          requestId: reqId
+        });
         
         const userInfo = {
           username: ctx.from.username,
@@ -364,27 +589,48 @@ ${positionsText}
         try {
           const freshToken = await getUserAccessToken(userId.toString(), userInfo);
           
-          // 将新获取的token缓存起来
-          await this.cacheUserAccessToken(userId, freshToken);
+          logger.info(`Fresh token obtained [${reqId}]`, {
+            userId,
+            tokenLength: freshToken.length,
+            requestId: reqId
+          });
           
-          logger.info('AccessToken re-authenticated and cached successfully', { userId });
+          // 将新获取的token缓存起来
+          await this.cacheUserAccessToken(userId, freshToken, reqId);
+          
+          logger.info(`AccessToken re-authenticated and cached successfully [${reqId}]`, { 
+            userId,
+            requestId: reqId
+          });
           return freshToken;
         } catch (authError) {
-          logger.warn('Failed to re-authenticate user', {
+          logger.error(`Failed to re-authenticate user [${reqId}]`, {
             userId,
-            error: (authError as Error).message
+            error: (authError as Error).message,
+            requestId: reqId
           });
         }
+      } else {
+        logger.warn(`No context available for re-authentication [${reqId}]`, {
+          userId,
+          hasCtx: !!ctx,
+          hasFrom: !!(ctx?.from),
+          requestId: reqId
+        });
       }
 
       // 方案3: 如果所有方法都失败，返回null
-      logger.warn('No access token available for user', { userId });
+      logger.error(`No access token available for user [${reqId}]`, { 
+        userId,
+        requestId: reqId
+      });
       return null;
 
     } catch (error) {
-      logger.error('Failed to get user access token', { 
+      logger.error(`Failed to get user access token [${reqId}]`, { 
         error: (error as Error).message, 
-        userId 
+        userId,
+        requestId: reqId
       });
       return null;
     }
@@ -430,30 +676,43 @@ ${positionsText}
   /**
    * 缓存用户的accessToken
    */
-  private async cacheUserAccessToken(userId: number, accessToken: string): Promise<void> {
+  private async cacheUserAccessToken(userId: number, accessToken: string, requestId?: string): Promise<void> {
+    const reqId = requestId || `cache_token_${Date.now()}`;
+    
     try {
       const tokenKey = `user:token:${userId}`;
       const tokenTTL = 24 * 60 * 60; // 24小时过期
       
+      logger.info(`Caching access token [${reqId}]`, {
+        userId,
+        tokenKey,
+        tokenLength: accessToken.length,
+        expiresIn: tokenTTL,
+        requestId: reqId
+      });
+      
       const result = await cacheService.set(tokenKey, accessToken, tokenTTL);
       
       if (result.success) {
-        logger.debug('AccessToken cached in positions handler', {
+        logger.info(`AccessToken cached successfully [${reqId}]`, {
           userId,
           tokenKey,
-          expiresIn: tokenTTL
+          expiresIn: tokenTTL,
+          requestId: reqId
         });
       } else {
-        logger.warn('Failed to cache accessToken in positions handler', {
+        logger.error(`Failed to cache accessToken [${reqId}]`, {
           userId,
           tokenKey,
-          error: result.error
+          error: result.error,
+          requestId: reqId
         });
       }
     } catch (error) {
-      logger.error('Error caching accessToken in positions handler', {
+      logger.error(`Error caching accessToken [${reqId}]`, {
         userId,
-        error: (error as Error).message
+        error: (error as Error).message,
+        requestId: reqId
       });
     }
   }
