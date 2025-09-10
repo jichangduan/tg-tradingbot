@@ -199,6 +199,35 @@ export class PnlHandler {
       { timeout: 15000 } // 增加超时时间，因为数据计算较复杂
     );
 
+    // 🔧 详细记录API响应用于诊断
+    logger.info('PNL API Response - Full Debug', {
+      userId,
+      responseCode: response.code,
+      responseMessage: response.message,
+      dataStructure: {
+        hasTrades: response.data?.trades ? true : false,
+        tradesCount: response.data?.trades?.length || 0,
+        totalTrades: response.data?.totalTrades || 0,
+        hasStatistics: response.data?.statistics ? true : false,
+        hasSymbolBreakdown: response.data?.symbolBreakdown ? true : false,
+        hasDailyBreakdown: response.data?.dailyBreakdown ? true : false
+      },
+      // 记录前3笔交易的详细信息用于调试
+      sampleTrades: response.data?.trades?.slice(0, 3).map(trade => ({
+        tradeId: trade.tradeId,
+        symbol: trade.symbol,
+        side: trade.side,
+        quantity: trade.quantity,
+        quantityType: typeof trade.quantity,
+        price: trade.price,
+        priceType: typeof trade.price,
+        fee: trade.fee,
+        timestamp: trade.timestamp,
+        value: trade.value
+      })) || [],
+      fullResponse: JSON.stringify(response, null, 2)
+    });
+
     if (response.code !== 200) {
       throw new Error(response.message || '获取盈亏分析失败');
     }
@@ -214,6 +243,9 @@ export class PnlHandler {
    */
   private formatPnlMessage(data: PnlResponse): string {
     const { trades, totalTrades, statistics, symbolBreakdown, dailyBreakdown } = data.data;
+
+    // 🔧 检测数据异常情况
+    const dataQualityIssues = this.detectDataQualityIssues(data);
 
     // 如果没有交易记录
     if (totalTrades === 0) {
@@ -235,6 +267,35 @@ export class PnlHandler {
 • <code>/markets</code> - 查看市场行情
 
 <i>🕐 分析时间: ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}</i>
+      `.trim();
+    }
+
+    // 🔧 如果检测到严重数据质量问题，显示警告
+    if (dataQualityIssues.severity === 'high') {
+      return `
+📊 <b>盈亏分析报告</b>
+
+⚠️ <b>数据异常检测</b>
+
+检测到严重的数据质量问题：
+${dataQualityIssues.issues.map(issue => `• ${issue}`).join('\n')}
+
+📈 <b>基础统计:</b>
+• 总交易次数: ${totalTrades.toLocaleString()}
+• 数据异常率: ${dataQualityIssues.errorRate}
+
+💡 <b>建议操作:</b>
+• 这是后端API数据问题，不是您的操作错误
+• 请联系技术支持报告此问题
+• 可以尝试使用 <code>/positions</code> 查看当前持仓
+• 可以尝试使用 <code>/wallet</code> 查看账户余额
+
+🔧 <b>技术信息:</b>
+接口: <code>/api/tgbot/trading/pnl</code>
+状态: 返回数据但质量异常
+建议: 检查Hyperliquid数据映射逻辑
+
+<i>🕐 检测时间: ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}</i>
       `.trim();
     }
 
@@ -316,6 +377,26 @@ ${this.formatRecentTrades(trades.slice(0, 10))}
       return '暂无数据';
     }
 
+    // 🔧 详细记录原始交易数据用于调试
+    logger.info('PNL: Formatting trades - Debug Info', {
+      totalTrades: trades.length,
+      sampleTradesDetailed: trades.slice(0, 3).map(trade => ({
+        symbol: trade.symbol,
+        side: trade.side,
+        quantity: trade.quantity,
+        quantityValue: parseFloat(trade.quantity) || 0,
+        quantityType: typeof trade.quantity,
+        price: trade.price,
+        priceValue: parseFloat(trade.price) || 0,
+        priceType: typeof trade.price,
+        fee: trade.fee,
+        value: trade.value,
+        timestamp: trade.timestamp,
+        isQuantityZero: trade.quantity === '0' || trade.quantity === '0.00' || parseFloat(trade.quantity) === 0,
+        isPriceZero: trade.price === '0' || trade.price === '0.00' || parseFloat(trade.price) === 0
+      }))
+    });
+
     // 🔧 去重处理：根据组合键去除重复交易
     const uniqueTrades = this.deduplicateTrades(trades);
     
@@ -329,12 +410,29 @@ ${this.formatRecentTrades(trades.slice(0, 10))}
       });
     }
 
+    // 检查是否所有交易都是0值
+    const zeroValueTrades = uniqueTrades.filter(trade => 
+      (parseFloat(trade.quantity) || 0) === 0 || (parseFloat(trade.price) || 0) === 0
+    );
+
+    if (zeroValueTrades.length > uniqueTrades.length * 0.8) {
+      logger.error('PNL: Most trades have zero values - likely API data issue', {
+        totalTrades: uniqueTrades.length,
+        zeroValueTrades: zeroValueTrades.length,
+        percentage: ((zeroValueTrades.length / uniqueTrades.length) * 100).toFixed(1)
+      });
+    }
+
     // 限制显示最新10笔不重复的交易
     const displayTrades = uniqueTrades.slice(0, 10);
 
     let tradesText = displayTrades.map((trade, index) => {
       const sideIcon = trade.side === 'buy' ? '🟢' : '🔴';
       const sideText = trade.side === 'buy' ? '买' : '卖';
+      
+      // 🔧 改进数量和价格的显示逻辑
+      const quantity = this.formatTradeNumber(trade.quantity, 'quantity');
+      const price = this.formatTradeNumber(trade.price, 'price');
       
       // 🔧 改进时间显示，包含秒数避免相同时间
       const tradeTime = new Date(trade.timestamp * 1000).toLocaleString('zh-CN', { 
@@ -345,7 +443,18 @@ ${this.formatRecentTrades(trades.slice(0, 10))}
         minute: '2-digit'
       });
       
-      return `${sideIcon} <b>${trade.symbol}</b> ${sideText} ${this.formatNumber(trade.quantity)} @$${this.formatNumber(trade.price)} (${tradeTime})`;
+      // 🔧 如果数据异常，添加调试信息
+      const isQuantityZero = (parseFloat(trade.quantity) || 0) === 0;
+      const isPriceZero = (parseFloat(trade.price) || 0) === 0;
+      
+      let tradeText = `${sideIcon} <b>${trade.symbol}</b> ${sideText} ${quantity} @$${price} (${tradeTime})`;
+      
+      // 如果发现异常数据，添加原始值信息用于调试
+      if (isQuantityZero || isPriceZero) {
+        tradeText += ` <i>[原始: qty=${trade.quantity}, px=${trade.price}]</i>`;
+      }
+      
+      return tradeText;
     }).join('\n');
 
     // 🔧 如果检测到重复数据，添加说明
@@ -353,28 +462,146 @@ ${this.formatRecentTrades(trades.slice(0, 10))}
       tradesText += `\n\n⚠️ <i>已过滤${duplicateCount}条重复记录</i>`;
     }
 
+    // 🔧 如果检测到大量零值交易，添加警告
+    if (zeroValueTrades.length > uniqueTrades.length * 0.5) {
+      tradesText += `\n\n⚠️ <i>检测到${zeroValueTrades.length}/${uniqueTrades.length}笔交易数据异常（价格或数量为0）</i>`;
+      tradesText += `\n<i>这可能是后端API数据问题，建议联系技术支持</i>`;
+    }
+
     return tradesText;
   }
 
   /**
    * 去除重复的交易记录
+   * 改进算法避免过度过滤正常交易
    */
   private deduplicateTrades(trades: Trade[]): Trade[] {
     const seen = new Set<string>();
     const uniqueTrades: Trade[] = [];
+    const skippedTrades: any[] = [];
 
     for (const trade of trades) {
-      // 创建唯一标识符：如果有tradeId使用tradeId，否则使用组合键
-      const uniqueKey = trade.tradeId || 
-        `${trade.symbol}_${trade.side}_${trade.quantity}_${trade.price}_${trade.timestamp}`;
+      // 🔧 改进去重策略：优先使用 tradeId，如果没有则使用更严格的组合键
+      let uniqueKey: string;
+      
+      if (trade.tradeId && trade.tradeId !== '' && trade.tradeId !== 'undefined') {
+        // 如果有 tradeId，直接使用（最可靠）
+        uniqueKey = `id_${trade.tradeId}`;
+      } else {
+        // 如果没有 tradeId，使用组合键，但增加更多区分因素
+        // 包含时间戳精确到秒，以及交易值
+        uniqueKey = `combo_${trade.symbol}_${trade.side}_${trade.quantity}_${trade.price}_${trade.timestamp}_${trade.value || ''}`;
+      }
       
       if (!seen.has(uniqueKey)) {
         seen.add(uniqueKey);
         uniqueTrades.push(trade);
+      } else {
+        // 记录被跳过的交易用于调试
+        skippedTrades.push({
+          uniqueKey,
+          symbol: trade.symbol,
+          side: trade.side,
+          quantity: trade.quantity,
+          price: trade.price,
+          timestamp: trade.timestamp,
+          tradeId: trade.tradeId
+        });
+      }
+    }
+
+    // 🔧 详细记录去重结果
+    if (skippedTrades.length > 0) {
+      logger.info('PNL: Deduplication results', {
+        originalCount: trades.length,
+        uniqueCount: uniqueTrades.length,
+        skippedCount: skippedTrades.length,
+        skippedPercentage: ((skippedTrades.length / trades.length) * 100).toFixed(1),
+        // 记录前3个被跳过的交易
+        sampleSkipped: skippedTrades.slice(0, 3)
+      });
+
+      // 🔧 如果跳过的交易过多，可能是算法过于严格
+      if (skippedTrades.length > trades.length * 0.5) {
+        logger.warn('PNL: High deduplication rate - may be too aggressive', {
+          skippedPercentage: ((skippedTrades.length / trades.length) * 100).toFixed(1),
+          suggestion: 'Consider relaxing deduplication criteria'
+        });
       }
     }
 
     return uniqueTrades;
+  }
+
+  /**
+   * 检测数据质量问题
+   */
+  private detectDataQualityIssues(data: PnlResponse): {
+    severity: 'none' | 'low' | 'medium' | 'high';
+    issues: string[];
+    errorRate: string;
+  } {
+    const issues: string[] = [];
+    const trades = data.data.trades || [];
+    
+    if (trades.length === 0) {
+      return { severity: 'none', issues: [], errorRate: '0%' };
+    }
+
+    // 检查零值交易
+    const zeroQuantityTrades = trades.filter(t => 
+      !t.quantity || t.quantity === '0' || t.quantity === '0.00' || parseFloat(t.quantity) === 0
+    );
+    const zeroPriceTrades = trades.filter(t => 
+      !t.price || t.price === '0' || t.price === '0.00' || parseFloat(t.price) === 0
+    );
+
+    const zeroQuantityRate = (zeroQuantityTrades.length / trades.length) * 100;
+    const zeroPriceRate = (zeroPriceTrades.length / trades.length) * 100;
+
+    if (zeroQuantityRate > 50) {
+      issues.push(`${zeroQuantityRate.toFixed(1)}% 的交易数量为零`);
+    }
+    if (zeroPriceRate > 50) {
+      issues.push(`${zeroPriceRate.toFixed(1)}% 的交易价格为零`);
+    }
+
+    // 检查重复数据
+    const uniqueTradeIds = new Set(trades.map(t => t.tradeId).filter(Boolean));
+    const duplicateRate = ((trades.length - uniqueTradeIds.size) / trades.length) * 100;
+    
+    if (duplicateRate > 30) {
+      issues.push(`${duplicateRate.toFixed(1)}% 的交易记录重复`);
+    }
+
+    // 检查时间戳异常
+    const sameTimestamps = trades.filter((t, i, arr) => 
+      arr.some((other, j) => i !== j && other.timestamp === t.timestamp)
+    );
+    const sameTimestampRate = (sameTimestamps.length / trades.length) * 100;
+
+    if (sameTimestampRate > 40) {
+      issues.push(`${sameTimestampRate.toFixed(1)}% 的交易时间戳相同`);
+    }
+
+    // 计算总体错误率
+    const totalErrorRate = Math.max(zeroQuantityRate, zeroPriceRate, duplicateRate, sameTimestampRate);
+    
+    // 确定严重程度
+    let severity: 'none' | 'low' | 'medium' | 'high' = 'none';
+    if (totalErrorRate > 70) {
+      severity = 'high';
+    } else if (totalErrorRate > 40) {
+      severity = 'medium';
+    } else if (totalErrorRate > 20) {
+      severity = 'low';
+    }
+
+    return {
+      severity,
+      issues,
+      errorRate: `${totalErrorRate.toFixed(1)}%`
+    };
   }
 
   /**
@@ -484,6 +711,63 @@ ${this.formatRecentTrades(trades.slice(0, 10))}
       return num.toFixed(2);
     } else {
       return num.toFixed(4);
+    }
+  }
+
+  /**
+   * 专门用于交易数据的数字格式化工具
+   * 处理异常数据并提供调试信息
+   */
+  private formatTradeNumber(value: string | number, type: 'quantity' | 'price'): string {
+    // 🔧 记录原始值用于调试
+    const originalValue = value;
+    
+    if (value === null || value === undefined) {
+      logger.warn(`PNL: Trade ${type} is null/undefined`, { originalValue });
+      return `N/A`;
+    }
+
+    if (value === '' || value === '0' || value === '0.00' || value === '0.0000') {
+      logger.warn(`PNL: Trade ${type} is zero string`, { originalValue });
+      return `0.00`;
+    }
+
+    const num = typeof value === 'string' ? parseFloat(value) : value;
+    
+    if (isNaN(num) || num === 0) {
+      logger.warn(`PNL: Trade ${type} conversion failed or zero`, { 
+        originalValue, 
+        convertedValue: num,
+        type: typeof value 
+      });
+      return `0.00`;
+    }
+
+    // 根据类型调整格式化精度
+    if (type === 'quantity') {
+      // 数量：根据大小调整精度
+      if (num >= 1000000) {
+        return (num / 1000000).toFixed(2) + 'M';
+      } else if (num >= 1000) {
+        return (num / 1000).toFixed(2) + 'K';
+      } else if (num >= 1) {
+        return num.toFixed(4);
+      } else if (num >= 0.0001) {
+        return num.toFixed(6);
+      } else {
+        return num.toExponential(2);
+      }
+    } else {
+      // 价格：保持合理的小数位数
+      if (num >= 10000) {
+        return num.toFixed(2);
+      } else if (num >= 1) {
+        return num.toFixed(4);
+      } else if (num >= 0.0001) {
+        return num.toFixed(6);
+      } else {
+        return num.toExponential(2);
+      }
     }
   }
 

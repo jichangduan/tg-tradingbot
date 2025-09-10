@@ -596,6 +596,12 @@ export function registerCommands(bot: Telegraf<ExtendedContext>): void {
         return;
       }
 
+      // 处理群组使用说明回调
+      if (typeof callbackData === 'string' && callbackData === 'group_usage_guide') {
+        await startHandler.handleGroupUsageGuide(ctx);
+        return;
+      }
+
       // 其他未处理的回调
       await ctx.answerCbQuery('功能开发中...');
       

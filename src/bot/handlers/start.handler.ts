@@ -158,7 +158,7 @@ export class StartHandler {
    */
   private getWelcomeMessage(): string {
     return `
-🎉 <b>欢迎使用 AIW3 TGBot!</b>
+🎉 <b>欢迎使用 AIW3 交易机器人!</b>
 
 正在为您初始化账户，请稍候...
 
@@ -166,13 +166,17 @@ export class StartHandler {
 • 💰 实时价格查询
 • 📊 24小时涨跌数据  
 • 💹 交易量和市值
-• ⚡ 智能缓存优化
+• 📈 交易执行 (/long, /short)
+• 💼 钱包管理 (/wallet)
 • 🎁 邀请奖励系统
 
 <b>📝 常用命令:</b>
 <code>/price BTC</code> - 查询比特币价格
+<code>/long ETH 10</code> - 做多以太坊
 <code>/markets</code> - 查看市场行情
-<code>/help</code> - 查看帮助信息
+<code>/wallet</code> - 查看钱包信息
+
+<b>🤖 Bot标识:</b> @yuze_trading_bot
 
 <i>💡 正在为您创建专属钱包地址...</i>
     `.trim();
@@ -182,7 +186,7 @@ export class StartHandler {
    * 创建添加到群组的内联键盘
    */
   private createAddToGroupKeyboard(): InlineKeyboardMarkup {
-    const botUsername = config.telegram.botUsername || 'aiw3_bot';
+    const botUsername = config.telegram.botUsername || 'yuze_trading_bot';
     
     return {
       inline_keyboard: [
@@ -190,6 +194,12 @@ export class StartHandler {
           {
             text: '🤖 添加到群组',
             url: `tg://resolve?domain=${botUsername}&startgroup=welcome`
+          }
+        ],
+        [
+          {
+            text: '⚠️ 使用说明',
+            callback_data: 'group_usage_guide'
           }
         ]
       ]
@@ -336,28 +346,32 @@ export class StartHandler {
    */
   private getGroupWelcomeMessage(): string {
     return `
-👋 <b>AIW3 TGBot 已添加到群组！</b>
+👋 <b>AIW3 交易机器人已添加到群组！</b>
 
-🤖 我是您的专业加密货币助手，为群组成员提供：
+🤖 我是 @yuze_trading_bot，专业的加密货币交易助手
 
-<b>🚀 主要功能:</b>
+<b>🚀 核心功能:</b>
 • 💰 实时价格查询 - <code>/price BTC</code>
-• 📊 市场数据分析 - <code>/markets</code>
-• 📈 K线图表分析 - <code>/chart ETH</code>
-• 💹 交易提醒设置 - <code>/push</code>
+• 📈 交易执行 - <code>/long ETH 10</code> | <code>/short BTC 5</code>
+• 💼 钱包管理 - <code>/wallet</code> | <code>/positions</code>
+• 📊 市场数据 - <code>/markets</code>
+• 📈 图表分析 - <code>/chart BTC</code>
+• 💹 订单管理 - <code>/orders</code>
 
-<b>📝 常用命令:</b>
-<code>/price [代币]</code> - 查询任意代币价格
-<code>/chart [代币]</code> - K线图表分析
-<code>/markets</code> - 查看热门市场行情
-<code>/help</code> - 查看完整功能列表
+<b>⚠️ 重要说明:</b>
+• 这是 <b>AIW3 交易机器人</b>，不是管理工具
+• 支持真实交易功能，请谨慎使用
+• 所有交易需要钱包初始化和资金充值
 
-<b>💡 群组使用技巧:</b>
-• 所有成员都可以使用价格查询功能
-• 管理员可设置推送提醒（需要管理员权限）
-• 支持100+主流加密货币实时查询
+<b>📝 快速开始:</b>
+1. <code>/start</code> - 初始化您的交易账户
+2. <code>/price BTC</code> - 查询比特币价格  
+3. <code>/wallet</code> - 查看钱包状态
+4. <code>/help</code> - 获取完整命令列表
 
-<i>🎉 开始输入命令，享受专业的数字货币服务吧！</i>
+<b>🤖 Bot标识确认:</b> @yuze_trading_bot
+
+<i>🎉 开始您的加密货币交易之旅！</i>
     `.trim();
   }
 
@@ -461,6 +475,55 @@ export class StartHandler {
   }
 
   /**
+   * 处理群组使用说明回调
+   */
+  public async handleGroupUsageGuide(ctx: any): Promise<void> {
+    try {
+      const guideMessage = `
+📖 <b>群组添加使用说明</b>
+
+<b>⚠️ 重要提醒：</b>
+请确保您添加的是正确的交易机器人：
+
+<b>✅ 正确的Bot:</b>
+• 用户名: @yuze_trading_bot
+• 名称: Test_Trading_Bot  
+• 功能: 加密货币交易和价格查询
+
+<b>❌ 如果群组中出现设置界面的Bot，说明添加错误</b>
+
+<b>🔧 正确添加步骤:</b>
+1. 点击下方"🤖 添加到群组"按钮
+2. 选择目标群组
+3. 确认Bot用户名为 @yuze_trading_bot
+4. 添加成功后，bot会自动发送欢迎消息
+
+<b>🎯 验证方法:</b>
+添加后在群组中发送 <code>/price BTC</code>
+如果能正常查询价格，说明添加成功
+
+<b>🔄 如果添加错误：</b>
+1. 移除当前Bot
+2. 重新点击"添加到群组"按钮
+3. 确认Bot信息后再添加
+
+<b>📞 需要帮助？</b>
+请联系管理员或重新开始 /start
+      `.trim();
+
+      await ctx.answerCbQuery();
+      await ctx.reply(guideMessage, { parse_mode: 'HTML' });
+      
+    } catch (error) {
+      logger.error('Group usage guide failed', {
+        error: (error as Error).message,
+        userId: ctx.from?.id
+      });
+      await ctx.answerCbQuery('❌ 获取说明失败');
+    }
+  }
+
+  /**
    * 获取处理器统计信息
    */
   public getStats(): any {
@@ -474,6 +537,7 @@ export class StartHandler {
         'Automatic wallet creation',
         'Background processing',
         'AccessToken caching',
+        'Group usage guidance',
         'Comprehensive error handling'
       ]
     };
