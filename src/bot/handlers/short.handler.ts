@@ -441,6 +441,28 @@ export class ShortHandler {
       const apiResult = result as any; // 类型断言
       let successMessage = '';
       if (apiResult && apiResult.success !== false && !apiResult.error) {
+        // 打印显眼的交易成功日志
+        logger.info('🎯 [TRADING SUCCESS] Short position opened');
+        logger.info('==============================================');
+        logger.info('📊 Trading Details:', {
+          symbol: symbol.toUpperCase(),
+          leverage: leverage,
+          amount: `$${amount}`,
+          orderId: apiResult.data?.orderId || 'N/A',
+          side: 'SHORT'
+        });
+        
+        // 打印保证金信息（如果API返回了）
+        if (apiResult.data) {
+          logger.info('💰 Margin Information:', {
+            requiredMargin: apiResult.data.requiredMargin || 'N/A',
+            availableMargin: apiResult.data.availableMargin || 'N/A',
+            marginUsage: apiResult.data.marginUsage || 'N/A',
+            leverageConfirmed: apiResult.data.leverage || leverage
+          });
+        }
+        logger.info('==============================================');
+        
         // 只有确认成功才显示成功消息
         successMessage = `✅ <b>做空开仓成功</b>\n\n` +
           `代币: <code>${symbol.toUpperCase()}</code>\n` +
