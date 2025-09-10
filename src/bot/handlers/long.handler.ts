@@ -286,12 +286,10 @@ export class LongHandler {
       }
 
       // 关键交易请求日志
-      logger.info(`🚀 [LONG ORDER] ${symbol.toUpperCase()} ${leverageStr} $${amountStr}`, {
-        symbol: symbol.toUpperCase(),
-        leverage: leverageStr.replace('x', ''),
-        amount: amountStr,
-        requestId
-      });
+      logger.info(`🚀 [LONG ORDER] ${symbol.toUpperCase()} ${leverageStr} $${amountStr}`);
+      
+      // 简化接口数据日志
+      logger.debug(`📤 Request data: ${JSON.stringify(tradingData)}`);
 
       // 显示订单预览而不是直接执行交易
       const tokenData = await tokenService.getTokenPrice(symbol);
@@ -325,14 +323,12 @@ export class LongHandler {
 
     } catch (apiError: any) {
       // 关键交易失败日志
-      logger.error(`❌ [LONG FAILED] ${symbol.toUpperCase()} ${leverageStr} $${amountStr}`, {
-        symbol: symbol.toUpperCase(),
-        leverage: leverageStr.replace('x', ''),
-        amount: amountStr,
-        error: apiError.message,
-        statusCode: apiError.response?.status,
-        requestId
-      });
+      logger.error(`❌ [LONG FAILED] ${symbol.toUpperCase()} ${leverageStr} $${amountStr}: ${apiError.message}`);
+      
+      // 简化错误数据日志
+      if (apiError.response?.data) {
+        logger.debug(`📥 Error response: ${JSON.stringify(apiError.response.data)}`);
+      }
       
       // 使用统一错误处理系统
       await handleTradingError(
@@ -446,6 +442,9 @@ export class LongHandler {
         accessToken,
         tradingData
       );
+      
+      // 简化接口返回数据日志
+      logger.debug(`📥 Response data: ${JSON.stringify(result)}`);
 
       // 检查API响应以确定是否真正成功
       const apiResult = result as any; // 类型断言

@@ -37,38 +37,24 @@ export class WalletService {
       // 参数验证
       this.validateTelegramId(telegramId);
 
-      logger.info(`Hyperliquid wallet balance query started [${requestId}]`, {
-        telegramId,
-        requestId
-      });
+      logger.debug(`🔎 Starting wallet balance query for ${telegramId}`);
 
       // 步骤1: 获取Hyperliquid钱包地址，如果不存在则自动创建
       let walletData = await getUserWallet(telegramId);
       
-      logger.info(`User wallet query result [${requestId}]`, {
-        telegramId,
-        walletFound: !!walletData,
-        hasTradingWallet: !!(walletData?.tradingwalletaddress),
-        tradingWallet: walletData?.tradingwalletaddress,
-        requestId
-      });
+      if (!walletData?.tradingwalletaddress) {
+        logger.debug(`🔒 No wallet found, creating new one`);
+      }
       
       // 如果钱包不存在，尝试创建新钱包
       if (!walletData || !walletData.tradingwalletaddress) {
-        logger.info(`Hyperliquid wallet not found for user ${telegramId}, attempting to create new wallet`, {
-          telegramId,
-          requestId
-        });
+        logger.debug(`🔒 Creating Hyperliquid wallet for user ${telegramId}`);
         
         // 尝试创建钱包
         const createdWallet = await createUserHyperliquidWallet(telegramId);
         if (createdWallet && createdWallet.tradingwalletaddress) {
           walletData = createdWallet;
-          logger.info(`Successfully created Hyperliquid wallet for user ${telegramId}`, {
-            telegramId,
-            tradingWallet: createdWallet.tradingwalletaddress,
-            requestId
-          });
+          logger.debug(`✅ Created wallet: ${createdWallet.tradingwalletaddress}`);
         } else {
           throw this.createDetailedError(
             ApiErrorCode.TOKEN_NOT_FOUND,
@@ -84,22 +70,10 @@ export class WalletService {
         getUserContractBalance(1, telegramId)
       ]);
 
-      // 记录API返回结果用于调试
-      logger.info(`Hyperliquid balance APIs result for ${telegramId}`, {
-        telegramId,
-        spotBalance: {
-          success: !!spotBalance,
-          data: spotBalance?.data,
-          coin: spotBalance?.data?.coin,
-          total: spotBalance?.data?.total
-        },
-        contractBalance: {
-          success: !!contractBalance,
-          data: contractBalance?.data,
-          accountValue: contractBalance?.data?.marginSummary?.accountValue
-        },
-        requestId
-      });
+      // 简化API结果日志
+      const spotValue = spotBalance?.data?.total ? parseFloat(spotBalance.data.total) : 0;
+      const contractValue = parseFloat(contractBalance?.data?.marginSummary?.accountValue || '0');
+      logger.debug(`💰 API results: spot=$${spotValue.toFixed(2)}, contract=$${contractValue.toFixed(2)}`);
 
       // 步骤3: 转换为标准格式
       const walletBalance = this.convertToFormattedBalance(
@@ -110,33 +84,16 @@ export class WalletService {
       );
 
       const duration = Date.now() - startTime;
-      logger.info(`Hyperliquid wallet balance query successful [${requestId}] - ${duration}ms`, {
-        telegramId,
-        walletAddress: walletData.tradingwalletaddress,
-        spotBalance: spotBalance.data?.total,
-        contractValue: contractBalance.data?.marginSummary?.accountValue,
-        totalUsdValue: walletBalance.totalUsdValue,
-        duration,
-        requestId
-      });
-
-      // 记录性能指标
-      // 简化性能日志
-      logger.debug(`⚡ Balance query: ${duration}ms`);
+      // 简化成功日志
+      logger.debug(`⚡ Balance query successful: ${duration}ms - total: $${walletBalance.totalUsdValue.toFixed(2)}`);
 
       return walletBalance;
 
     } catch (error) {
       const duration = Date.now() - startTime;
-      const detailedError = this.handleServiceError(error, requestId);
+      const detailedError = this.handleServiceError(error, 'wallet_balance');
       
-      logger.error(`Hyperliquid wallet balance query failed [${requestId}] - ${duration}ms`, {
-        telegramId,
-        errorCode: detailedError.code,
-        errorMessage: detailedError.message,
-        duration,
-        requestId
-      });
+      logger.error(`❌ Wallet balance query failed - ${duration}ms: ${detailedError.message}`);
 
       throw detailedError;
     }
@@ -312,14 +269,7 @@ export class WalletService {
       return result;
       
     } catch (error) {
-      logger.error(`💥 Margin check error [${requestId}]`, {
-        telegramId,
-        requiredAmount,
-        leverage,
-        error: (error as Error).message,
-        errorStack: (error as Error).stack,
-        requestId
-      });
+      logger.error(`💥 Margin check error: ${(error as Error).message}`);
       
       return {
         sufficient: false,
