@@ -285,6 +285,14 @@ export class ShortHandler {
         // 如果余额检查失败，继续执行交易（让后端处理）
       }
 
+      // 关键交易请求日志
+      logger.info(`🚀 [SHORT ORDER] ${symbol.toUpperCase()} ${leverageStr} $${amountStr}`, {
+        symbol: symbol.toUpperCase(),
+        leverage: leverageStr.replace('x', ''),
+        amount: amountStr,
+        requestId
+      });
+
       // 显示订单预览而不是直接执行交易
       const tokenData = await tokenService.getTokenPrice(symbol);
       const orderSize = parseFloat(amountStr) / tokenData.price * parseFloat(leverageStr.replace('x', ''));
@@ -313,17 +321,19 @@ export class ShortHandler {
         }
       );
 
-      const duration = Date.now() - startTime;
-      logger.logPerformance('short_preview_success', duration, {
-        symbol,
-        leverage: leverageStr,
-        amount: amountStr,
-        userId,
-        username,
-        requestId
-      });
+      // 移除详细性能日志，减少噪音
 
     } catch (apiError: any) {
+      // 关键交易失败日志
+      logger.error(`❌ [SHORT FAILED] ${symbol.toUpperCase()} ${leverageStr} $${amountStr}`, {
+        symbol: symbol.toUpperCase(),
+        leverage: leverageStr.replace('x', ''),
+        amount: amountStr,
+        error: apiError.message,
+        statusCode: apiError.response?.status,
+        requestId
+      });
+      
       // 使用统一错误处理系统
       await handleTradingError(
         ctx, 

@@ -67,12 +67,7 @@ export class ApiService {
         config.metadata = { ...config.metadata, requestId, startTime: Date.now() };
         
         if (!config.skipLogging) {
-          logger.http(`API Request [${requestId}]: ${config.method?.toUpperCase()} ${config.url}`, {
-            method: config.method,
-            url: config.url,
-            params: config.params,
-            requestId
-          });
+          logger.debug(`🌐 ${config.method?.toUpperCase()} ${config.url}`);
         }
         
         return config;
@@ -90,12 +85,7 @@ export class ApiService {
         const requestId = response.config.metadata?.requestId;
         
         if (!response.config.skipLogging) {
-          logger.logApiCall(
-            response.config.method?.toUpperCase() || 'UNKNOWN',
-            response.config.url || '',
-            duration,
-            response.status
-          );
+          logger.debug(`✅ ${response.config.method?.toUpperCase()} ${response.config.url} - ${duration}ms`);
         }
         
         return response;
@@ -105,13 +95,7 @@ export class ApiService {
         const requestId = error.config?.metadata?.requestId;
         
         if (!error.config?.skipLogging) {
-          logger.logApiCall(
-            error.config?.method?.toUpperCase() || 'UNKNOWN',
-            error.config?.url || '',
-            duration,
-            error.response?.status,
-            error.message
-          );
+          logger.warn(`❌ ${error.config?.method?.toUpperCase()} ${error.config?.url} - ${duration}ms - ${error.response?.status || 'NETWORK'}: ${error.message}`);
         }
         
         return Promise.reject(this.handleApiError(error));
@@ -138,12 +122,7 @@ export class ApiService {
     } catch (error) {
       // 判断是否应该重试
       if (retries < this.maxRetries && this.shouldRetry(error as AxiosError)) {
-        logger.warn(`Retrying API request (${retries + 1}/${this.maxRetries})`, {
-          method: config.method,
-          url: config.url,
-          attempt: retries + 1,
-          error: (error as AxiosError).message
-        });
+        logger.warn(`🔄 Retry ${retries + 1}/${this.maxRetries}: ${config.method?.toUpperCase()} ${config.url} - ${(error as AxiosError).message}`);
         
         // 递增延迟重试
         await this.delay(this.retryDelay * (retries + 1));
@@ -317,10 +296,7 @@ export class ApiService {
    */
   public async healthCheck(): Promise<boolean> {
     const startTime = Date.now();
-    logger.debug('🔍 Starting API health check...', {
-      baseUrl: config.api.baseUrl,
-      timeout: 5000
-    });
+    logger.debug('🔍 Starting API health check...');
 
     try {
       // 尝试调用健康检查端点
@@ -330,27 +306,14 @@ export class ApiService {
       });
       
       const duration = Date.now() - startTime;
-      logger.info('✅ API health check passed', {
-        baseUrl: config.api.baseUrl,
-        duration,
-        durationText: `${duration}ms`,
-        response: typeof response === 'object' ? JSON.stringify(response).substring(0, 100) : response
-      });
+      logger.debug(`✅ API health check passed - ${duration}ms`);
       
       return true;
     } catch (error) {
       const duration = Date.now() - startTime;
       const err = error as ApiError;
       
-      logger.warn('⚠️ API health check failed', {
-        baseUrl: config.api.baseUrl,
-        duration,
-        durationText: `${duration}ms`,
-        error: err.message,
-        status: err.status,
-        code: err.code,
-        suggestion: this.getHealthCheckSuggestion(err)
-      });
+      logger.warn(`⚠️ API health check failed - ${duration}ms: ${err.message} (${err.status || 'NETWORK'})`);
       
       return false;
     }
