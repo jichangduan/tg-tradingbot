@@ -17,6 +17,7 @@ import { logger } from '../../utils/logger';
 import { ExtendedContext } from '../index';
 import { tradingStateService, TradingState } from '../../services/trading-state.service';
 import { tokenService } from '../../services/token.service';
+import { accountService } from '../../services/account.service';
 import { messageFormatter } from '../utils/message.formatter';
 
 /**
@@ -39,6 +40,8 @@ async function handleTradingInput(ctx: ExtendedContext, state: TradingState, inp
       // 验证代币符号
       try {
         const tokenData = await tokenService.getTokenPrice(symbol);
+        const accountBalance = await accountService.getAccountBalance(userId);
+        const availableMargin = accountBalance.withdrawableAmount || 0;
         
         // 更新状态到杠杆选择
         await tradingStateService.updateState(userId, {
@@ -50,7 +53,7 @@ async function handleTradingInput(ctx: ExtendedContext, state: TradingState, inp
           state.action,
           symbol,
           tokenData.price,
-          30.74 // 示例可用保证金
+          availableMargin
         );
         
         const keyboard = state.action === 'long' 

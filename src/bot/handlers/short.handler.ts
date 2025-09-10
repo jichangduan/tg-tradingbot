@@ -89,7 +89,8 @@ export class ShortHandler {
       try {
         // 获取当前价格和可用保证金
         const tokenData = await tokenService.getTokenPrice(symbol);
-        const availableMargin = 30.74; // 示例值，实际应从accountService获取
+        const accountBalance = await accountService.getAccountBalance(userId!.toString());
+        const availableMargin = accountBalance.withdrawableAmount || 0;
         
         const message = messageFormatter.formatTradingLeveragePrompt(
           action, 
@@ -176,9 +177,9 @@ export class ShortHandler {
       // 准备交易数据
       const tradingData = {
         symbol: symbol.toUpperCase(),
-        leverage: leverageStr,
+        leverage: leverageStr.replace('x', ''),
         amount: amountStr,
-        telegram_id: userId!.toString()
+        orderType: "market"
       };
 
       // 检查余额是否足够
@@ -391,11 +392,15 @@ export class ShortHandler {
     await ctx.answerCbQuery(`✅ 已选择 ${leverage} 杠杆`);
 
     // 显示金额输入提示
+    // 获取可用保证金
+    const accountBalance = await accountService.getAccountBalance(userId);
+    const availableMargin = accountBalance.withdrawableAmount || 0;
+    
     const message = messageFormatter.formatTradingAmountPrompt(
       'short',
       state.symbol,
       leverage,
-      30.74 // 示例可用保证金
+      availableMargin
     );
 
     await ctx.editMessageText(message, { parse_mode: 'HTML' });
@@ -421,9 +426,9 @@ export class ShortHandler {
       // 调用交易API
       const tradingData = {
         symbol: symbol.toUpperCase(),
-        leverage: leverage,
+        leverage: leverage.replace('x', ''),
         amount: amount,
-        telegram_id: userId!.toString()
+        orderType: "market"
       };
 
       const result = await apiService.postWithAuth(
