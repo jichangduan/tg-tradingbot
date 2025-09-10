@@ -838,9 +838,17 @@ BTC, ETH, SOL, USDT, USDC, BNB, ADA, DOT, LINK, MATIC, AVAX, UNI
     message += `• 实时统计，及时到账\n`;
     message += `• 积分可用于兑换奖励\n`;
     
-    // 邀请链接提示
-    message += `\n\n🔗 <b>分享邀请:</b>\n`;
-    message += `点击菜单中的"邀请链接"获取专属邀请链接`;
+    // 邀请链接
+    message += `\n\n🔗 <b>您的专属邀请链接:</b>\n`;
+    if (stats.invitationLink) {
+      message += `<code>${stats.invitationLink}</code>\n\n`;
+      message += `💡 <b>如何使用:</b>\n`;
+      message += `• 复制上方链接分享给朋友\n`;
+      message += `• 朋友点击链接开始使用Bot\n`;
+      message += `• 朋友交易时您将获得积分奖励`;
+    } else {
+      message += `<i>暂无可用的邀请链接</i>`;
+    }
     
     // 更新时间
     message += `\n\n🕐 <b>更新时间:</b> ${this.formatTimestamp(stats.lastUpdated)}`;

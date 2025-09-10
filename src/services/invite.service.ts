@@ -161,6 +161,8 @@ export class InviteService {
       totalTradingVolume: data.totalTradingVolume || 0,
       currentPoints,
       inviteRecords: data.inviteRecord || [],
+      invitationLink: data.invitationLink,
+      referralCode: data.referralCode,
       pagination: {
         page: data.page || page,
         totalPages: data.totalPages || 1,
@@ -320,7 +322,9 @@ export class InviteService {
         pageSize: raw.data.pageSize ? (typeof raw.data.pageSize === 'string' ? Number(raw.data.pageSize) : raw.data.pageSize) : 10,
         totalPages: raw.data.totalPages ? (typeof raw.data.totalPages === 'string' ? Number(raw.data.totalPages) : raw.data.totalPages) : 1,
         totalRecords: typeof raw.data.totalRecords === 'string' ? Number(raw.data.totalRecords) : raw.data.totalRecords,
-        totalTradingVolume: typeof raw.data.totalTradingVolume === 'string' ? Number(raw.data.totalTradingVolume) : raw.data.totalTradingVolume
+        totalTradingVolume: typeof raw.data.totalTradingVolume === 'string' ? Number(raw.data.totalTradingVolume) : raw.data.totalTradingVolume,
+        invitationLink: raw.data.invitationLink || '',
+        referralCode: raw.data.referralCode || ''
       }
     };
 
