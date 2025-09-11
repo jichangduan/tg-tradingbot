@@ -506,7 +506,13 @@ export class LongHandler {
         symbol: symbol.toUpperCase(),
         leverage,
         amount,
-        requestData: tradingData,
+        requestData: {
+          symbol: symbol.toUpperCase(),
+          leverage: parseInt(leverage.replace('x', '')),
+          amount: parseFloat(amount),
+          orderType: "market",
+          telegram_id: userId?.toString()
+        },
         errorStatus: error.response?.status,
         errorData: error.response?.data,
         errorMessage: error.message,
