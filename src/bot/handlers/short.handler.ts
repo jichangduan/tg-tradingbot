@@ -440,14 +440,24 @@ export class ShortHandler {
         telegram_id: userId?.toString()               // 可能需要的字段
       };
 
-      // 详细记录API请求信息用于调试
-      logger.info('📤 Short Trading API Request - Complete Details:', {
+      // 🚀 显眼的API参数日志
+      logger.info('🚀🚀🚀 SHORT TRADING API CALL - DETAILED PARAMETERS 🚀🚀🚀');
+      logger.info('═══════════════════════════════════════════════════════');
+      logger.info('📋 Trading Request Details:', {
         endpoint: '/api/tgbot/trading/short',
         userId,
-        requestData: tradingData,
-        hasAccessToken: !!accessToken,
-        tokenLength: accessToken?.length || 0
+        symbol: symbol.toUpperCase(),
+        leverage: `${leverage} (${leverageStr})`,
+        amount: `$${amount} (${amountStr})`,
+        orderType: 'market'
       });
+      logger.info('📦 Complete Request Payload:', tradingData);
+      logger.info('🔐 Authentication Status:', {
+        hasAccessToken: !!accessToken,
+        tokenLength: accessToken?.length || 0,
+        tokenPreview: accessToken ? `${accessToken.substring(0, 10)}...` : 'none'
+      });
+      logger.info('═══════════════════════════════════════════════════════');
 
       const result = await apiService.postWithAuth(
         '/api/tgbot/trading/short',
