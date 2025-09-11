@@ -177,9 +177,10 @@ export class LongHandler {
       // 准备交易数据
       const tradingData = {
         symbol: symbol.toUpperCase(),
-        leverage: leverageStr.replace('x', ''),
-        amount: amountStr,
-        orderType: "market"
+        leverage: parseInt(leverageStr.replace('x', '')), // 转换为数字
+        amount: parseFloat(amountStr),                    // 转换为数字
+        orderType: "market",
+        telegram_id: userId?.toString()                   // 可能需要的字段
       };
 
       // 检查余额是否足够
@@ -433,10 +434,20 @@ export class LongHandler {
       // 调用交易API
       const tradingData = {
         symbol: symbol.toUpperCase(),
-        leverage: leverage.replace('x', ''),
-        amount: amount,
-        orderType: "market"
+        leverage: parseInt(leverage.replace('x', '')), // 转换为数字
+        amount: parseFloat(amount),                    // 转换为数字
+        orderType: "market",
+        telegram_id: userId?.toString()               // 可能需要的字段
       };
+
+      // 详细记录API请求信息用于调试
+      logger.info('📤 Long Trading API Request - Complete Details:', {
+        endpoint: '/api/tgbot/trading/long',
+        userId,
+        requestData: tradingData,
+        hasAccessToken: !!accessToken,
+        tokenLength: accessToken?.length || 0
+      });
 
       const result = await apiService.postWithAuth(
         '/api/tgbot/trading/long',
@@ -489,6 +500,20 @@ export class LongHandler {
       await ctx.editMessageText(successMessage, { parse_mode: 'HTML' });
 
     } catch (error: any) {
+      // 详细记录API错误信息用于调试
+      logger.error('🚨 Long Trading API Error - Complete Details:', {
+        userId,
+        symbol: symbol.toUpperCase(),
+        leverage,
+        amount,
+        requestData: tradingData,
+        errorStatus: error.response?.status,
+        errorData: error.response?.data,
+        errorMessage: error.message,
+        errorHeaders: error.response?.headers,
+        fullError: error.toString()
+      });
+      
       await ctx.answerCbQuery('❌ 交易执行失败');
       
       // 解析API错误，提供更友好的错误信息
