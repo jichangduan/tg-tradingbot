@@ -34,7 +34,7 @@ export const config = {
 
   // API配置
   api: {
-    baseUrl: process.env.API_BASE_URL || 'https://api.aiw3.com',
+    baseUrl: process.env.API_BASE_URL || 'https://api-test1.aiw3.ai',
     apiKey: process.env.API_KEY,
     timeout: parseInt(process.env.API_TIMEOUT || '10000'),
     retryAttempts: parseInt(process.env.API_RETRY_ATTEMPTS || '3'),

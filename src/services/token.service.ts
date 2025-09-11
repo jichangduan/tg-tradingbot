@@ -79,45 +79,87 @@ export class TokenService {
   }
 
   /**
-   * 从API获取代币价格数据
+   * 从API获取代币价格数据 (支持多数据源)
    */
   private async fetchTokenPriceFromApi(symbol: string): Promise<TokenData> {
     logger.debug(`Fetching token price from API for ${symbol}`);
     
+    // 尝试AIW3 BirdEye API
     try {
-      // 调用trending API获取token列表
       const response = await apiService.get<any>(
         `/api/birdeye/token_trending`
       );
 
-      // 检查API响应格式
-      if (!response || !response.data || !Array.isArray(response.data)) {
-        throw new Error(`Invalid API response format: ${JSON.stringify(response).substring(0, 200)}`);
+      if (response && response.data && Array.isArray(response.data)) {
+        const matchedToken = this.findMatchingToken(response.data, symbol);
+        if (matchedToken) {
+          const processedData = this.processRawApiData(matchedToken, symbol);
+          logger.debug(`AIW3 API data processed successfully for ${symbol}`, {
+            price: processedData.price,
+            source: 'aiw3_birdeye'
+          });
+          return processedData;
+        }
       }
-
-      // 从trending列表中查找匹配的token
-      const matchedToken = this.findMatchingToken(response.data, symbol);
-      
-      if (!matchedToken) {
-        throw new Error(`Token ${symbol} not found in trending list`);
-      }
-
-      const processedData = this.processRawApiData(matchedToken, symbol);
-      
-      logger.debug(`API data processed successfully for ${symbol}`, {
-        price: processedData.price,
-        change24h: processedData.change24h
-      });
-
-      return processedData;
-
     } catch (error) {
-      // 如果是API错误，重新抛出以保持错误类型
-      if (error instanceof Error) {
-        throw error;
-      }
-      throw new Error(`Failed to fetch token data for ${symbol}: ${error}`);
+      logger.warn(`AIW3 BirdEye API failed for ${symbol}, trying fallbacks`, {
+        error: (error as Error).message
+      });
     }
+
+    // Fallback 1: 尝试Hyperliquid价格API
+    try {
+      logger.debug(`Trying Hyperliquid API fallback for ${symbol}`);
+      const hyperliquidData = await this.fetchFromHyperliquid(symbol);
+      if (hyperliquidData) {
+        logger.info(`✅ Fallback success: Hyperliquid API for ${symbol}`, {
+          price: hyperliquidData.price,
+          source: 'hyperliquid'
+        });
+        return hyperliquidData;
+      }
+    } catch (error) {
+      logger.warn(`Hyperliquid API fallback failed for ${symbol}`, {
+        error: (error as Error).message
+      });
+    }
+
+    // Fallback 2: 尝试Binance公共API
+    try {
+      logger.debug(`Trying Binance API fallback for ${symbol}`);
+      const binanceData = await this.fetchFromBinance(symbol);
+      if (binanceData) {
+        logger.info(`✅ Fallback success: Binance API for ${symbol}`, {
+          price: binanceData.price,
+          source: 'binance'
+        });
+        return binanceData;
+      }
+    } catch (error) {
+      logger.warn(`Binance API fallback failed for ${symbol}`, {
+        error: (error as Error).message
+      });
+    }
+
+    // Fallback 3: 尝试CoinGecko API
+    try {
+      logger.debug(`Trying CoinGecko API fallback for ${symbol}`);
+      const geckoData = await this.fetchFromCoinGecko(symbol);
+      if (geckoData) {
+        logger.info(`✅ Fallback success: CoinGecko API for ${symbol}`, {
+          price: geckoData.price,
+          source: 'coingecko'
+        });
+        return geckoData;
+      }
+    } catch (error) {
+      logger.warn(`CoinGecko API fallback failed for ${symbol}`, {
+        error: (error as Error).message
+      });
+    }
+
+    // 所有数据源都失败
+    throw new Error(`All price data sources failed for ${symbol}. Please try again later.`);
   }
 
   /**
@@ -423,6 +465,126 @@ export class TokenService {
         timestamp: new Date()
       }
     };
+  }
+
+  /**
+   * Hyperliquid价格API fallback
+   */
+  private async fetchFromHyperliquid(symbol: string): Promise<TokenData | null> {
+    try {
+      const response = await apiService.get<any>(`/api/hyperliquid/getAllMids`);
+      
+      if (response && response.data && Array.isArray(response.data)) {
+        const tokenData = response.data.find((item: any) => 
+          item.coin && item.coin.toUpperCase() === symbol.toUpperCase()
+        );
+        
+        if (tokenData && tokenData.px) {
+          return {
+            symbol: symbol.toUpperCase(),
+            name: symbol,
+            price: parseFloat(tokenData.px),
+            change24h: 0, // Hyperliquid可能不提供24h变化
+            volume24h: 0,
+            marketCap: 0,
+            high24h: 0,
+            low24h: 0,
+            supply: { circulating: 0, total: 0, max: 0 },
+            updatedAt: new Date(),
+            source: 'hyperliquid_api'
+          };
+        }
+      }
+    } catch (error) {
+      logger.debug(`Hyperliquid API error for ${symbol}: ${(error as Error).message}`);
+    }
+    return null;
+  }
+
+  /**
+   * Binance公共API fallback
+   */
+  private async fetchFromBinance(symbol: string): Promise<TokenData | null> {
+    try {
+      const axios = require('axios');
+      const binanceSymbol = `${symbol.toUpperCase()}USDT`;
+      
+      const [priceResponse, statsResponse] = await Promise.all([
+        axios.get(`https://api.binance.com/api/v3/ticker/price?symbol=${binanceSymbol}`, { timeout: 5000 }),
+        axios.get(`https://api.binance.com/api/v3/ticker/24hr?symbol=${binanceSymbol}`, { timeout: 5000 })
+      ]);
+      
+      if (priceResponse.data && priceResponse.data.price) {
+        const price = parseFloat(priceResponse.data.price);
+        const stats = statsResponse.data || {};
+        
+        return {
+          symbol: symbol.toUpperCase(),
+          name: symbol,
+          price: price,
+          change24h: parseFloat(stats.priceChangePercent || '0'),
+          volume24h: parseFloat(stats.volume || '0'),
+          marketCap: 0,
+          high24h: parseFloat(stats.highPrice || '0'),
+          low24h: parseFloat(stats.lowPrice || '0'),
+          supply: { circulating: 0, total: 0, max: 0 },
+          updatedAt: new Date(),
+          source: 'binance_api'
+        };
+      }
+    } catch (error) {
+      logger.debug(`Binance API error for ${symbol}: ${(error as Error).message}`);
+    }
+    return null;
+  }
+
+  /**
+   * CoinGecko API fallback
+   */
+  private async fetchFromCoinGecko(symbol: string): Promise<TokenData | null> {
+    try {
+      const axios = require('axios');
+      
+      // CoinGecko ID映射
+      const coinGeckoIds: { [key: string]: string } = {
+        'BTC': 'bitcoin',
+        'ETH': 'ethereum', 
+        'SOL': 'solana',
+        'USDC': 'usd-coin',
+        'USDT': 'tether'
+      };
+      
+      const coinId = coinGeckoIds[symbol.toUpperCase()];
+      if (!coinId) {
+        logger.debug(`No CoinGecko mapping for ${symbol}`);
+        return null;
+      }
+      
+      const response = await axios.get(
+        `https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=usd&include_24hr_change=true&include_24hr_vol=true&include_market_cap=true`,
+        { timeout: 5000 }
+      );
+      
+      if (response.data && response.data[coinId]) {
+        const data = response.data[coinId];
+        return {
+          symbol: symbol.toUpperCase(),
+          name: symbol,
+          price: data.usd || 0,
+          change24h: data.usd_24h_change || 0,
+          volume24h: data.usd_24h_vol || 0,
+          marketCap: data.usd_market_cap || 0,
+          high24h: 0,
+          low24h: 0,
+          supply: { circulating: 0, total: 0, max: 0 },
+          updatedAt: new Date(),
+          source: 'coingecko_api'
+        };
+      }
+    } catch (error) {
+      logger.debug(`CoinGecko API error for ${symbol}: ${(error as Error).message}`);
+    }
+    return null;
   }
 
   /**

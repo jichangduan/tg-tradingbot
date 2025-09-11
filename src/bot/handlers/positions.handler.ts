@@ -9,7 +9,7 @@ import { getUserAccessToken } from '../../utils/auth';
 import { chartImageService, PositionsChartData, PositionInfo } from '../../services/chart-image.service';
 
 /**
- * 仓位信息接口
+ * Position information interface
  */
 interface Position {
   symbol: string;
@@ -23,7 +23,7 @@ interface Position {
 }
 
 /**
- * 仓位查询响应接口
+ * Positions query response interface
  */
 interface PositionsResponse {
   code: number;
@@ -38,8 +38,8 @@ interface PositionsResponse {
 }
 
 /**
- * 仓位查询命令处理器
- * 处理用户的 /positions 命令，查询并显示当前所有开放仓位
+ * Positions query command handler
+ * Handles user's /positions command, queries and displays all current open positions
  */
 export class PositionsHandler {
   // private formatter: MessageFormatter; // 未使用，已注释
@@ -70,14 +70,14 @@ export class PositionsHandler {
 
     if (!userId) {
       logger.error(`Positions command failed - no userId [${requestId}]`, { requestId });
-      await ctx.reply('❌ 无法识别用户身份');
+      await ctx.reply('❌ Unable to identify user');
       return;
     }
 
-    // 发送加载消息
+    // Send loading message
     const loadingMessage = await ctx.reply(
-      '🔍 正在查询您的持仓信息...\n' +
-      '⏳ 请稍候，正在获取最新数据'
+      '🔍 Querying your position information...\n' +
+      '⏳ Please wait, fetching latest data'
     );
 
     try {
@@ -149,7 +149,7 @@ export class PositionsHandler {
         
         // 发送图表图片
         await ctx.replyWithPhoto({ source: chartImage.imageBuffer }, {
-          caption: '📊 持仓总览图表',
+          caption: '📊 Positions Overview Chart',
           parse_mode: 'HTML'
         });
         
@@ -228,7 +228,7 @@ export class PositionsHandler {
         userId,
         requestId: reqId
       });
-      throw new Error('用户未登录，请先使用 /start 命令登录');
+      throw new Error('User not logged in, please use /start command to login first');
     }
     
     logger.info(`Access token obtained, making API call [${reqId}]`, {
@@ -284,7 +284,7 @@ export class PositionsHandler {
           fullResponse: JSON.stringify(response),
           requestId: reqId
         });
-        throw new Error(response.message || '获取仓位信息失败');
+        throw new Error(response.message || 'Failed to get position information');
       }
 
       // 🔍 详细诊断：对比多个API数据源找出真正问题
@@ -427,46 +427,46 @@ export class PositionsHandler {
   }
 
   /**
-   * 格式化仓位信息消息
+   * Format positions information message
    */
   private formatPositionsMessage(data: PositionsResponse): string {
     const { positions, totalPositions, totalPnl, accountValue, availableBalance } = data.data;
 
     if (totalPositions === 0) {
       return `
-📊 <b>持仓概览</b>
+📊 <b>Positions Overview</b>
 
-💰 <b>账户信息:</b>
-• 账户价值: $${accountValue}
-• 可用余额: $${availableBalance}
-• 持仓数量: 0
+💰 <b>Account Information:</b>
+• Account Value: $${accountValue}
+• Available Balance: $${availableBalance}
+• Position Count: 0
 
-📈 <b>当前持仓:</b>
-暂无持仓
+📈 <b>Current Positions:</b>
+No positions
 
-💡 <i>您可以使用以下命令开仓:</i>
-• <code>/long BTC 10x 100</code> - 做多BTC
-• <code>/short ETH 5x 50</code> - 做空ETH
-• <code>/markets</code> - 查看市场行情
+💡 <i>You can open positions with these commands:</i>
+• <code>/long BTC 10x 100</code> - Long BTC
+• <code>/short ETH 5x 50</code> - Short ETH
+• <code>/markets</code> - View market data
 
-<i>🕐 查询时间: ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}</i>
+<i>🕐 Query time: ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Shanghai' })}</i>
       `.trim();
     }
 
     let positionsText = '';
     positions.forEach((position, index) => {
       const sideIcon = position.side === 'long' ? '📈' : '📉';
-      const sideText = position.side === 'long' ? '做多' : '做空';
+      const sideText = position.side === 'long' ? 'Long' : 'Short';
       const pnlColor = parseFloat(position.pnl) >= 0 ? '🟢' : '🔴';
       const pnlPrefix = parseFloat(position.pnl) >= 0 ? '+' : '';
       
       positionsText += `
 ${sideIcon} <b>${position.symbol} ${sideText}</b>
-• 仓位大小: ${Math.abs(parseFloat(position.size)).toFixed(4)} ${position.symbol}
-• 开仓价格: $${parseFloat(position.entryPrice).toFixed(4)}
-• 标记价格: $${parseFloat(position.markPrice).toFixed(4)}
-• 未实现盈亏: ${pnlColor} ${pnlPrefix}$${position.pnl} (${pnlPrefix}${position.pnlPercentage}%)
-• 占用保证金: $${position.marginUsed}
+• Position Size: ${Math.abs(parseFloat(position.size)).toFixed(4)} ${position.symbol}
+• Entry Price: $${parseFloat(position.entryPrice).toFixed(4)}
+• Mark Price: $${parseFloat(position.markPrice).toFixed(4)}
+• Unrealized PNL: ${pnlColor} ${pnlPrefix}$${position.pnl} (${pnlPrefix}${position.pnlPercentage}%)
+• Margin Used: $${position.marginUsed}
 ${index < positions.length - 1 ? '\n━━━━━━━━━━━━━━━━━━━━\n' : ''}
       `.trim();
     });
@@ -475,28 +475,28 @@ ${index < positions.length - 1 ? '\n━━━━━━━━━━━━━━�
     const totalPnlPrefix = parseFloat(totalPnl) >= 0 ? '+' : '';
 
     return `
-📊 <b>持仓概览</b>
+📊 <b>Positions Overview</b>
 
-💰 <b>账户信息:</b>
-• 账户价值: $${accountValue}
-• 可用余额: $${availableBalance}
-• 总体盈亏: ${totalPnlColor} ${totalPnlPrefix}$${totalPnl}
-• 持仓数量: ${totalPositions}
+💰 <b>Account Information:</b>
+• Account Value: $${accountValue}
+• Available Balance: $${availableBalance}
+• Total PNL: ${totalPnlColor} ${totalPnlPrefix}$${totalPnl}
+• Position Count: ${totalPositions}
 
-📈 <b>当前持仓:</b>
+📈 <b>Current Positions:</b>
 ${positionsText}
 
-💡 <i>管理持仓:</i>
-• <code>/close 代币</code> - 平仓指定代币
-• <code>/price 代币</code> - 查询实时价格
-• <code>/chart 代币</code> - 查看K线图
+💡 <i>Manage Positions:</i>
+• <code>/close symbol</code> - Close specified position
+• <code>/price symbol</code> - Check real-time price
+• <code>/chart symbol</code> - View candlestick chart
 
-<i>🕐 查询时间: ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}</i>
+<i>🕐 Query time: ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Shanghai' })}</i>
     `.trim();
   }
 
   /**
-   * 错误处理
+   * Error handling
    */
   private handleError(error: Error, requestId?: string): string {
     const reqId = requestId || `error_${Date.now()}`;
@@ -508,25 +508,25 @@ ${positionsText}
       requestId: reqId
     });
 
-    if (error.message.includes('未登录')) {
+    if (error.message.includes('not logged in') || error.message.includes('未登录')) {
       logger.info(`Authentication error detected [${reqId}]`, { requestId: reqId });
       return `
-❌ <b>用户未登录</b>
+❌ <b>User Not Logged In</b>
 
-请先使用 /start 命令登录系统后再查询持仓信息。
+Please use /start command to login first before querying position information.
 
-<i>如果您已经登录但仍出现此错误，请联系管理员。</i>
+<i>If you are already logged in but still see this error, please contact administrator.</i>
       `.trim();
     }
 
     if (error.message.includes('网络') || error.message.includes('ECONNREFUSED') || error.message.includes('ENOTFOUND')) {
       logger.info(`Network error detected [${reqId}]`, { requestId: reqId });
       return `
-❌ <b>网络连接失败</b>
+❌ <b>Network Connection Failed</b>
 
-请检查网络连接后重试，或稍后再试。
+Please check your network connection and retry, or try again later.
 
-<i>如果问题持续存在，请联系管理员。</i>
+<i>If the problem persists, please contact administrator.</i>
       `.trim();
     }
 
@@ -539,18 +539,18 @@ ${positionsText}
       });
       
       return `
-❌ <b>外部接口错误 (400)</b>
+❌ <b>External Interface Error (400)</b>
 
-持仓查询接口暂时不可用，这是后端API接口问题。
+Positions query interface temporarily unavailable, this is a backend API issue.
 
-💡 <b>建议操作:</b>
-• 稍后重试此命令
-• 联系管理员报告接口故障
-• 使用其他命令如 /wallet 查看账户信息
+💡 <b>Suggested Actions:</b>
+• Retry this command later
+• Contact administrator to report interface failure
+• Use other commands like /wallet to check account information
 
-⚠️ <i>这不是您的操作问题，而是系统接口需要修复。</i>
+⚠️ <i>This is not your operation error, but a system interface that needs repair.</i>
 
-<b>技术详情:</b> ${error.message}
+<b>Technical Details:</b> ${error.message}
       `.trim();
     }
 
@@ -563,32 +563,32 @@ ${positionsText}
       });
       
       return `
-❌ <b>服务器错误</b>
+❌ <b>Server Error</b>
 
-后端服务暂时不可用，请稍后重试。
+Backend service temporarily unavailable, please retry later.
 
-💡 <b>建议操作:</b>
-• 等待5-10分钟后重试
-• 检查其他命令是否正常工作
-• 联系管理员确认服务状态
+💡 <b>Suggested Actions:</b>
+• Wait 5-10 minutes and retry
+• Check if other commands work normally
+• Contact administrator to confirm service status
 
-⚠️ <i>这是临时性服务问题，通常会自动恢复。</i>
+⚠️ <i>This is a temporary service issue that usually recovers automatically.</i>
       `.trim();
     }
 
-    // 超时错误
+    // Timeout error
     if (error.message.includes('timeout') || error.message.includes('ECONNABORTED')) {
       logger.info(`Timeout error detected [${reqId}]`, { requestId: reqId });
       return `
-❌ <b>请求超时</b>
+❌ <b>Request Timeout</b>
 
-持仓查询超时，可能是网络或服务器响应较慢。
+Positions query timed out, possibly due to slow network or server response.
 
-💡 <b>建议操作:</b>
-• 稍后重试此命令
-• 检查网络连接状态
+💡 <b>Suggested Actions:</b>
+• Retry this command later
+• Check network connection status
 
-<i>如果问题持续存在，请联系管理员。</i>
+<i>If the problem persists, please contact administrator.</i>
       `.trim();
     }
 
