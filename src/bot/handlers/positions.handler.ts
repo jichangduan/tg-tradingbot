@@ -595,14 +595,14 @@ Positions query timed out, possibly due to slow network or server response.
     logger.info(`Generic error, returning default message [${reqId}]`, { requestId: reqId });
     
     return `
-❌ <b>查询失败</b>
+❌ <b>Query Failed</b>
 
-获取持仓信息时出现错误，请稍后重试。
+An error occurred while fetching position information, please try again later.
 
-<b>错误详情:</b> ${error.message}
-<b>请求ID:</b> ${reqId}
+<b>Error Details:</b> ${error.message}
+<b>Request ID:</b> ${reqId}
 
-<i>如果问题持续存在，请联系管理员。</i>
+<i>If the problem persists, please contact administrator.</i>
     `.trim();
   }
 

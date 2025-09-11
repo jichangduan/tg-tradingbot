@@ -92,14 +92,14 @@ export class PnlHandler {
   public async handle(ctx: ExtendedContext, args: string[]): Promise<void> {
     const userId = ctx.from?.id;
     if (!userId) {
-      await ctx.reply('❌ 无法识别用户身份');
+      await ctx.reply('❌ Unable to identify user');
       return;
     }
 
     // 发送加载消息
     const loadingMessage = await ctx.reply(
-      '📊 正在生成您的盈亏分析报告...\n' +
-      '⏳ 请稍候，正在计算历史数据'
+      '📊 Generating your PNL analysis report...\n' +
+      '⏳ Please wait, calculating historical data'
     );
 
     try {
@@ -140,7 +140,7 @@ export class PnlHandler {
           
           // 发送图表图片
           await ctx.replyWithPhoto({ source: chartImage.imageBuffer }, {
-            caption: '📈 PNL趋势图表',
+            caption: '📈 PNL Trend Chart',
             parse_mode: 'HTML'
           });
           
@@ -189,7 +189,7 @@ export class PnlHandler {
     const userToken = await this.getUserAccessToken(userId, ctx);
     
     if (!userToken) {
-      throw new Error('用户未登录，请先使用 /start 命令登录');
+      throw new Error('User not logged in, please use /start command to login first');
     }
 
     const response = await apiService.getWithAuth<PnlResponse>(
@@ -229,7 +229,7 @@ export class PnlHandler {
     });
 
     if (response.code !== 200) {
-      throw new Error(response.message || '获取盈亏分析失败');
+      throw new Error(response.message || 'Failed to get PNL analysis');
     }
 
     // 🔧 数据质量验证和清理
@@ -247,86 +247,86 @@ export class PnlHandler {
     // 🔧 检测数据异常情况
     const dataQualityIssues = this.detectDataQualityIssues(data);
 
-    // 如果没有交易记录
+    // If no trading records
     if (totalTrades === 0) {
       return `
-📊 <b>盈亏分析报告</b>
+📊 <b>PNL Analysis Report</b>
 
-📈 <b>交易统计:</b>
-• 总交易次数: 0
-• 成交量: $0.00
-• 手续费: $0.00
-• 交易天数: 0
+📈 <b>Trading Statistics:</b>
+• Total Trades: 0
+• Volume: $0.00
+• Fees: $0.00
+• Trading Days: 0
 
-📝 <b>交易记录:</b>
-暂无交易记录
+📝 <b>Trading Records:</b>
+No trading records
 
-💡 <i>开始交易获取盈亏数据:</i>
-• <code>/long BTC 10x 100</code> - 做多BTC
-• <code>/short ETH 5x 50</code> - 做空ETH
-• <code>/markets</code> - 查看市场行情
+💡 <i>Start trading to get PNL data:</i>
+• <code>/long BTC 10x 100</code> - Long BTC
+• <code>/short ETH 5x 50</code> - Short ETH
+• <code>/markets</code> - View market data
 
-<i>🕐 分析时间: ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}</i>
+<i>🕐 Analysis time: ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Shanghai' })}</i>
       `.trim();
     }
 
-    // 🔧 如果检测到严重数据质量问题，显示警告
+    // 🔧 If severe data quality issues detected, show warning
     if (dataQualityIssues.severity === 'high') {
       return `
-📊 <b>盈亏分析报告</b>
+📊 <b>PNL Analysis Report</b>
 
-⚠️ <b>数据异常检测</b>
+⚠️ <b>Data Anomaly Detection</b>
 
-检测到严重的数据质量问题：
+Severe data quality issues detected:
 ${dataQualityIssues.issues.map(issue => `• ${issue}`).join('\n')}
 
-📈 <b>基础统计:</b>
-• 总交易次数: ${totalTrades.toLocaleString()}
-• 数据异常率: ${dataQualityIssues.errorRate}
+📈 <b>Basic Statistics:</b>
+• Total Trades: ${totalTrades.toLocaleString()}
+• Data Error Rate: ${dataQualityIssues.errorRate}
 
-💡 <b>建议操作:</b>
-• 这是后端API数据问题，不是您的操作错误
-• 请联系技术支持报告此问题
-• 可以尝试使用 <code>/positions</code> 查看当前持仓
-• 可以尝试使用 <code>/wallet</code> 查看账户余额
+💡 <b>Suggested Actions:</b>
+• This is a backend API data issue, not your operation error
+• Please contact technical support to report this issue
+• You can try using <code>/positions</code> to view current positions
+• You can try using <code>/wallet</code> to check account balance
 
-🔧 <b>技术信息:</b>
-接口: <code>/api/tgbot/trading/pnl</code>
-状态: 返回数据但质量异常
-建议: 检查Hyperliquid数据映射逻辑
+🔧 <b>Technical Information:</b>
+API: <code>/api/tgbot/trading/pnl</code>
+Status: Data returned but quality abnormal
+Suggestion: Check Hyperliquid data mapping logic
 
-<i>🕐 检测时间: ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}</i>
+<i>🕐 Detection time: ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Shanghai' })}</i>
       `.trim();
     }
 
-    // 生成完整的盈亏分析报告
+    // Generate complete PNL analysis report
     let analysisMessage = `
-📊 <b>盈亏分析报告</b>
+📊 <b>PNL Analysis Report</b>
 
-📈 <b>交易统计:</b>
-• 总交易次数: ${totalTrades.toLocaleString()}
-• 总成交量: $${this.formatNumber(statistics.totalVolume)}
-• 总手续费: $${this.formatNumber(statistics.totalFees)}
-• 买入交易: ${statistics.buyTrades} (${((statistics.buyTrades / totalTrades) * 100).toFixed(1)}%)
-• 卖出交易: ${statistics.sellTrades} (${((statistics.sellTrades / totalTrades) * 100).toFixed(1)}%)
-• 平均交易规模: $${this.formatNumber(statistics.averageTradeSize)}
-• 交易天数: ${statistics.tradingDays}天
+📈 <b>Trading Statistics:</b>
+• Total Trades: ${totalTrades.toLocaleString()}
+• Total Volume: $${this.formatNumber(statistics.totalVolume)}
+• Total Fees: $${this.formatNumber(statistics.totalFees)}
+• Buy Trades: ${statistics.buyTrades} (${((statistics.buyTrades / totalTrades) * 100).toFixed(1)}%)
+• Sell Trades: ${statistics.sellTrades} (${((statistics.sellTrades / totalTrades) * 100).toFixed(1)}%)
+• Average Trade Size: $${this.formatNumber(statistics.averageTradeSize)}
+• Trading Days: ${statistics.tradingDays} days
 
-📊 <b>主要交易对分析:</b>
+📊 <b>Main Trading Pairs Analysis:</b>
 ${this.formatSymbolBreakdown(symbolBreakdown)}
 
-📅 <b>近期交易活动:</b>
+📅 <b>Recent Trading Activity:</b>
 ${this.formatDailyBreakdown(dailyBreakdown)}
 
-📝 <b>最近交易记录 (最新${Math.min(trades.length, 10)}笔):</b>
+📝 <b>Recent Trading Records (Latest ${Math.min(trades.length, 10)}):</b>
 ${this.formatRecentTrades(trades.slice(0, 10))}
 
-💡 <i>交易建议:</i>
-• <code>/positions</code> - 查看当前持仓
-• <code>/orders</code> - 查看挂单情况
-• <code>/markets</code> - 分析市场行情
+💡 <i>Trading Suggestions:</i>
+• <code>/positions</code> - View current positions
+• <code>/orders</code> - View open orders
+• <code>/markets</code> - Analyze market data
 
-<i>🕐 分析时间: ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}</i>
+<i>🕐 Analysis time: ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Shanghai' })}</i>
     `.trim();
 
     return analysisMessage;
@@ -337,15 +337,15 @@ ${this.formatRecentTrades(trades.slice(0, 10))}
    */
   private formatSymbolBreakdown(breakdown: SymbolBreakdown[]): string {
     if (breakdown.length === 0) {
-      return '暂无数据';
+      return 'No data available';
     }
 
-    // 取前5个最活跃的交易对
+    // Take top 5 most active trading pairs
     const topSymbols = breakdown.slice(0, 5);
     
     return topSymbols.map((item, index) => {
       const buyPercentage = item.trades > 0 ? ((item.buyTrades / item.trades) * 100).toFixed(1) : '0.0';
-      return `${index + 1}. <b>${item.symbol}</b>: ${item.trades}笔, $${this.formatNumber(item.volume)} (买入${buyPercentage}%)`;
+      return `${index + 1}. <b>${item.symbol}</b>: ${item.trades} trades, $${this.formatNumber(item.volume)} (${buyPercentage}% buy)`;
     }).join('\n');
   }
 
@@ -354,18 +354,18 @@ ${this.formatRecentTrades(trades.slice(0, 10))}
    */
   private formatDailyBreakdown(breakdown: DailyBreakdown[]): string {
     if (breakdown.length === 0) {
-      return '暂无数据';
+      return 'No data available';
     }
 
-    // 取最近7天的数据
+    // Take last 7 days data
     const recentDays = breakdown.slice(-7).reverse();
     
     return recentDays.map((item, index) => {
-      const date = new Date(item.date).toLocaleDateString('zh-CN', { 
+      const date = new Date(item.date).toLocaleDateString('en-US', { 
         month: '2-digit', 
         day: '2-digit' 
       });
-      return `${date}: ${item.trades}笔交易, $${this.formatNumber(item.volume)}`;
+      return `${date}: ${item.trades} trades, $${this.formatNumber(item.volume)}`;
     }).join('\n');
   }
 
@@ -374,7 +374,7 @@ ${this.formatRecentTrades(trades.slice(0, 10))}
    */
   private formatRecentTrades(trades: Trade[]): string {
     if (trades.length === 0) {
-      return '暂无数据';
+      return 'No data available';
     }
 
     // 🔧 详细记录原始交易数据用于调试
@@ -428,14 +428,14 @@ ${this.formatRecentTrades(trades.slice(0, 10))}
 
     let tradesText = displayTrades.map((trade, index) => {
       const sideIcon = trade.side === 'buy' ? '🟢' : '🔴';
-      const sideText = trade.side === 'buy' ? '买' : '卖';
+      const sideText = trade.side === 'buy' ? 'Buy' : 'Sell';
       
       // 🔧 改进数量和价格的显示逻辑
       const quantity = this.formatTradeNumber(trade.quantity, 'quantity');
       const price = this.formatTradeNumber(trade.price, 'price');
       
       // 🔧 改进时间显示，包含秒数避免相同时间
-      const tradeTime = new Date(trade.timestamp * 1000).toLocaleString('zh-CN', { 
+      const tradeTime = new Date(trade.timestamp * 1000).toLocaleString('en-US', { 
         timeZone: 'Asia/Shanghai',
         month: '2-digit',
         day: '2-digit',
@@ -451,7 +451,7 @@ ${this.formatRecentTrades(trades.slice(0, 10))}
       
       // 如果发现异常数据，添加原始值信息用于调试
       if (isQuantityZero || isPriceZero) {
-        tradeText += ` <i>[原始: qty=${trade.quantity}, px=${trade.price}]</i>`;
+        tradeText += ` <i>[Raw: qty=${trade.quantity}, px=${trade.price}]</i>`;
       }
       
       return tradeText;
@@ -459,13 +459,13 @@ ${this.formatRecentTrades(trades.slice(0, 10))}
 
     // 🔧 如果检测到重复数据，添加说明
     if (duplicateCount > 0) {
-      tradesText += `\n\n⚠️ <i>已过滤${duplicateCount}条重复记录</i>`;
+      tradesText += `\n\n⚠️ <i>Filtered ${duplicateCount} duplicate records</i>`;
     }
 
     // 🔧 如果检测到大量零值交易，添加警告
     if (zeroValueTrades.length > uniqueTrades.length * 0.5) {
-      tradesText += `\n\n⚠️ <i>检测到${zeroValueTrades.length}/${uniqueTrades.length}笔交易数据异常（价格或数量为0）</i>`;
-      tradesText += `\n<i>这可能是后端API数据问题，建议联系技术支持</i>`;
+      tradesText += `\n\n⚠️ <i>Detected ${zeroValueTrades.length}/${uniqueTrades.length} abnormal trade data (price or quantity is 0)</i>`;
+      tradesText += `\n<i>This may be a backend API data issue, please contact technical support</i>`;
     }
 
     return tradesText;
@@ -560,10 +560,10 @@ ${this.formatRecentTrades(trades.slice(0, 10))}
     const zeroPriceRate = (zeroPriceTrades.length / trades.length) * 100;
 
     if (zeroQuantityRate > 50) {
-      issues.push(`${zeroQuantityRate.toFixed(1)}% 的交易数量为零`);
+      issues.push(`${zeroQuantityRate.toFixed(1)}% of trades have zero quantity`);
     }
     if (zeroPriceRate > 50) {
-      issues.push(`${zeroPriceRate.toFixed(1)}% 的交易价格为零`);
+      issues.push(`${zeroPriceRate.toFixed(1)}% of trades have zero price`);
     }
 
     // 检查重复数据
@@ -571,7 +571,7 @@ ${this.formatRecentTrades(trades.slice(0, 10))}
     const duplicateRate = ((trades.length - uniqueTradeIds.size) / trades.length) * 100;
     
     if (duplicateRate > 30) {
-      issues.push(`${duplicateRate.toFixed(1)}% 的交易记录重复`);
+      issues.push(`${duplicateRate.toFixed(1)}% of trade records are duplicated`);
     }
 
     // 检查时间戳异常
@@ -581,7 +581,7 @@ ${this.formatRecentTrades(trades.slice(0, 10))}
     const sameTimestampRate = (sameTimestamps.length / trades.length) * 100;
 
     if (sameTimestampRate > 40) {
-      issues.push(`${sameTimestampRate.toFixed(1)}% 的交易时间戳相同`);
+      issues.push(`${sameTimestampRate.toFixed(1)}% of trades have identical timestamps`);
     }
 
     // 计算总体错误率
@@ -779,63 +779,63 @@ ${this.formatRecentTrades(trades.slice(0, 10))}
 
     if (error.message.includes('未登录')) {
       return `
-❌ <b>用户未登录</b>
+❌ <b>User Not Logged In</b>
 
-请先使用 /start 命令登录系统后再查询盈亏分析。
+Please use /start command to login first before querying PNL analysis.
 
-<i>如果您已经登录但仍出现此错误，请联系管理员。</i>
+<i>If you are already logged in but still see this error, please contact administrator.</i>
       `.trim();
     }
 
     if (error.message.includes('网络')) {
       return `
-❌ <b>网络连接失败</b>
+❌ <b>Network Connection Failed</b>
 
-请检查网络连接后重试，或稍后再试。
+Please check your network connection and retry, or try again later.
 
-<i>如果问题持续存在，请联系管理员。</i>
+<i>If the problem persists, please contact administrator.</i>
       `.trim();
     }
 
     // 🔧 判断是否为外部接口问题（API返回400/500等状态码）
     if (error.message.includes('status code 400')) {
       return `
-❌ <b>外部接口错误 (400)</b>
+❌ <b>External Interface Error (400)</b>
 
-盈亏分析接口暂时不可用，这是后端API接口问题。
+PNL analysis interface is temporarily unavailable, this is a backend API issue.
 
-💡 <b>建议操作:</b>
-• 稍后重试此命令
-• 联系管理员报告接口故障
-• 使用其他命令如 /positions 查看持仓
+💡 <b>Suggested Actions:</b>
+• Retry this command later
+• Contact administrator to report interface failure
+• Use other commands like /positions to view positions
 
-⚠️ <i>这不是您的操作问题，而是系统接口需要修复。</i>
+⚠️ <i>This is not your operation error, but a system interface that needs repair.</i>
       `.trim();
     }
 
     if (error.message.includes('status code 500') || error.message.includes('status code 502') || error.message.includes('status code 503')) {
       return `
-❌ <b>服务器错误</b>
+❌ <b>Server Error</b>
 
-后端服务暂时不可用，请稍后重试。
+Backend service is temporarily unavailable, please retry later.
 
-💡 <b>建议操作:</b>
-• 等待5-10分钟后重试
-• 检查其他命令是否正常工作
-• 联系管理员确认服务状态
+💡 <b>Suggested Actions:</b>
+• Wait 5-10 minutes and retry
+• Check if other commands work normally
+• Contact administrator to confirm service status
 
-⚠️ <i>这是临时性服务问题，通常会自动恢复。</i>
+⚠️ <i>This is a temporary service issue that usually recovers automatically.</i>
       `.trim();
     }
 
     return `
-❌ <b>分析失败</b>
+❌ <b>Analysis Failed</b>
 
-生成盈亏分析报告时出现错误，请稍后重试。
+An error occurred while generating PNL analysis report, please try again later.
 
-<b>错误详情:</b> ${error.message}
+<b>Error Details:</b> ${error.message}
 
-<i>如果问题持续存在，请联系管理员。</i>
+<i>If the problem persists, please contact administrator.</i>
     `.trim();
   }
 
