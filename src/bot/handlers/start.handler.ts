@@ -192,13 +192,13 @@ Initializing your account, please wait...
       inline_keyboard: [
         [
           {
-            text: '🤖 添加到群组',
+            text: '🤖 Add to Group',
             url: `tg://resolve?domain=${botUsername}&startgroup=welcome`
           }
         ],
         [
           {
-            text: '⚠️ 使用说明',
+            text: '⚠️ Usage Guide',
             callback_data: 'group_usage_guide'
           }
         ]

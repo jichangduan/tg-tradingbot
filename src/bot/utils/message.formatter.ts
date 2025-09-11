@@ -930,39 +930,39 @@ BTC, ETH, SOL, USDT, USDC, BNB, ADA, DOT, LINK, MATIC, AVAX, UNI
     const changeText = this.formatPercentage(priceChangePercent24h, true);
     
     // 构建主要信息
-    let message = `📊 <b>${symbol}/USDT K线数据</b> (${timeFrame.toUpperCase()}) ${trendEmoji}\n\n`;
+    let message = `📊 <b>${symbol}/USDT Candlestick Data</b> (${timeFrame.toUpperCase()}) ${trendEmoji}\n\n`;
     
-    message += `🕐 <b>最新价格:</b> ${this.formatPrice(latestPrice, this.defaultOptions)}\n`;
-    message += `📊 <b>24h涨跌:</b> ${changeText}\n`;
-    message += `📈 <b>24h最高:</b> ${this.formatPrice(high24h, this.defaultOptions)}\n`;
-    message += `📉 <b>24h最低:</b> ${this.formatPrice(low24h, this.defaultOptions)}\n`;
-    message += `💰 <b>24h成交量:</b> ${this.formatLargeNumber(volume24h)}\n\n`;
+    message += `🕐 <b>Latest Price:</b> ${this.formatPrice(latestPrice, this.defaultOptions)}\n`;
+    message += `📊 <b>24h Change:</b> ${changeText}\n`;
+    message += `📈 <b>24h High:</b> ${this.formatPrice(high24h, this.defaultOptions)}\n`;
+    message += `📉 <b>24h Low:</b> ${this.formatPrice(low24h, this.defaultOptions)}\n`;
+    message += `💰 <b>24h Volume:</b> ${this.formatLargeNumber(volume24h)}\n\n`;
     
     // 简单的ASCII趋势图
     const asciiChart = this.generateSimpleAsciiChart(candles.slice(-10)); // 最近10个数据点
-    message += `<b>近期趋势:</b>\n<pre>${asciiChart}</pre>\n\n`;
+    message += `<b>Recent Trend:</b>\n<pre>${asciiChart}</pre>\n\n`;
     
     // K线统计信息
-    message += `📋 <b>数据统计:</b>\n`;
-    message += `• K线数量: ${candles.length} 根\n`;
-    message += `• 时间范围: ${this.formatTimeFrame(timeFrame)}\n`;
-    message += `• 价格区间: ${this.formatPrice(low24h, this.defaultOptions)} - ${this.formatPrice(high24h, this.defaultOptions)}\n\n`;
+    message += `📋 <b>Data Statistics:</b>\n`;
+    message += `• Candle Count: ${candles.length}\n`;
+    message += `• Timeframe: ${this.formatTimeFrame(timeFrame)}\n`;
+    message += `• Price Range: ${this.formatPrice(low24h, this.defaultOptions)} - ${this.formatPrice(high24h, this.defaultOptions)}\n\n`;
     
     // 时间框架选择按钮提示
-    message += `⏰ <b>切换时间周期:</b>\n`;
-    message += `<code>/chart ${symbol} 1m</code> - 1分钟\n`;
-    message += `<code>/chart ${symbol} 5m</code> - 5分钟\n`;
-    message += `<code>/chart ${symbol} 1h</code> - 1小时\n`;
-    message += `<code>/chart ${symbol} 1d</code> - 1天\n`;
+    message += `⏰ <b>Switch Timeframe:</b>\n`;
+    message += `<code>/chart ${symbol} 1m</code> - 1 minute\n`;
+    message += `<code>/chart ${symbol} 5m</code> - 5 minutes\n`;
+    message += `<code>/chart ${symbol} 1h</code> - 1 hour\n`;
+    message += `<code>/chart ${symbol} 1d</code> - 1 day\n`;
     
     // 添加数据来源信息
-    message += `\n<i>🕐 更新时间: ${this.formatTimestamp(candleData.updatedAt)}</i>\n`;
+    message += `\n<i>🕐 Updated: ${this.formatTimestamp(candleData.updatedAt)}</i>\n`;
     
     if (isCached) {
-      message += `<i>⚡ 缓存数据 (更新间隔: 5分钟)</i>\n`;
+      message += `<i>⚡ Cached data (refresh interval: 5 minutes)</i>\n`;
     }
     
-    message += `<i>📡 数据来源: Hyperliquid</i>`;
+    message += `<i>📡 Data source: Hyperliquid</i>`;
     
     return message;
   }
@@ -972,31 +972,31 @@ BTC, ETH, SOL, USDT, USDC, BNB, ADA, DOT, LINK, MATIC, AVAX, UNI
    */
   public formatChartHelpMessage(): string {
     return `
-📊 <b>K线图表使用方法</b>
+📊 <b>Candlestick Chart Usage</b>
 
-<code>/chart BTC</code> - 查询BTC 1小时K线
-<code>/chart ETH 1d</code> - 查询ETH 日线
-<code>/chart SOL 5m</code> - 查询SOL 5分钟线
+<code>/chart BTC</code> - Query BTC 1-hour chart
+<code>/chart ETH 1d</code> - Query ETH daily chart
+<code>/chart SOL 5m</code> - Query SOL 5-minute chart
 
-<b>支持的时间周期:</b>
-• 1m - 1分钟
-• 5m - 5分钟  
-• 15m - 15分钟
-• 1h - 1小时 (默认)
-• 4h - 4小时
-• 1d - 1天
+<b>Supported Timeframes:</b>
+• 1m - 1 minute
+• 5m - 5 minutes  
+• 15m - 15 minutes
+• 1h - 1 hour (default)
+• 4h - 4 hours
+• 1d - 1 day
 
-<b>支持的交易对:</b>
-BTC, ETH, SOL, ETC, LINK, AVAX, UNI等主流币种
+<b>Supported Trading Pairs:</b>
+BTC, ETH, SOL, ETC, LINK, AVAX, UNI and other major cryptocurrencies
 
-<b>功能特点:</b>
-• 🕯️ 实时K线数据
-• 📈 ASCII趋势图展示
-• 📊 24小时统计信息
-• ⚡ 5分钟智能缓存
-• 🎯 毫秒级响应
+<b>Features:</b>
+• 🕯️ Real-time candlestick data
+• 📈 ASCII trend visualization
+• 📊 24-hour statistics
+• ⚡ 5-minute smart caching
+• 🎯 Millisecond response time
 
-<i>💡 提示: 交易对符号不区分大小写</i>
+<i>💡 Tip: Trading pair symbols are case-insensitive</i>
     `.trim();
   }
 
@@ -1004,7 +1004,7 @@ BTC, ETH, SOL, ETC, LINK, AVAX, UNI等主流币种
    * 格式化K线"正在查询"消息
    */
   public formatChartLoadingMessage(symbol: string, timeFrame: TimeFrame): string {
-    return `🔍 正在查询 ${symbol.toUpperCase()} ${timeFrame.toUpperCase()} K线数据...`;
+    return `🔍 Querying ${symbol.toUpperCase()} ${timeFrame.toUpperCase()} candlestick data...`;
   }
 
   /**
@@ -1012,7 +1012,7 @@ BTC, ETH, SOL, ETC, LINK, AVAX, UNI等主流币种
    */
   private generateSimpleAsciiChart(candles: CandleData[]): string {
     if (candles.length === 0) {
-      return '暂无数据';
+      return 'No data available';
     }
 
     // 获取价格范围
@@ -1021,7 +1021,7 @@ BTC, ETH, SOL, ETC, LINK, AVAX, UNI等主流币种
     const maxPrice = Math.max(...prices);
     
     if (minPrice === maxPrice) {
-      return '━━━━━━━━━━ (价格平稳)';
+      return '━━━━━━━━━━ (Price stable)';
     }
 
     // 将价格映射到5个高度级别
@@ -1053,21 +1053,21 @@ BTC, ETH, SOL, ETC, LINK, AVAX, UNI等主流币种
     // 构建简洁的图表说明
     let caption = `📊 <b>${symbol}/USDT</b> (${timeFrame.toUpperCase()}) ${trendEmoji}\n\n`;
     
-    caption += `💰 <b>最新:</b> ${this.formatPrice(latestPrice, this.defaultOptions)}\n`;
+    caption += `💰 <b>Latest:</b> ${this.formatPrice(latestPrice, this.defaultOptions)}\n`;
     caption += `📊 <b>24h:</b> ${changeText}\n`;
-    caption += `📈 <b>最高:</b> ${this.formatPrice(high24h, this.defaultOptions)} `;
-    caption += `📉 <b>最低:</b> ${this.formatPrice(low24h, this.defaultOptions)}\n`;
-    caption += `💹 <b>成交量:</b> ${this.formatLargeNumber(volume24h)}\n\n`;
+    caption += `📈 <b>High:</b> ${this.formatPrice(high24h, this.defaultOptions)} `;
+    caption += `📉 <b>Low:</b> ${this.formatPrice(low24h, this.defaultOptions)}\n`;
+    caption += `💹 <b>Volume:</b> ${this.formatLargeNumber(volume24h)}\n\n`;
     
     // 快速切换时间周期提示
-    caption += `⚡ 切换周期: <code>/chart ${symbol} 1m|5m|1h|1d</code>\n`;
+    caption += `⚡ Switch timeframe: <code>/chart ${symbol} 1m|5m|1h|1d</code>\n`;
     
     // 数据来源
-    caption += `\n<i>📡 TradingView专业图表 • `;
+    caption += `\n<i>📡 TradingView Professional Chart • `;
     if (isCached) {
-      caption += `⚡ 缓存数据</i>`;
+      caption += `⚡ Cached data</i>`;
     } else {
-      caption += `🔄 实时数据</i>`;
+      caption += `🔄 Real-time data</i>`;
     }
     
     return caption;
@@ -1078,12 +1078,12 @@ BTC, ETH, SOL, ETC, LINK, AVAX, UNI等主流币种
    */
   private formatTimeFrame(timeFrame: TimeFrame): string {
     const timeFrameMap: { [key in TimeFrame]: string } = {
-      '1m': '1分钟',
-      '5m': '5分钟',
-      '15m': '15分钟',
-      '1h': '1小时',
-      '4h': '4小时',
-      '1d': '1天'
+      '1m': '1 minute',
+      '5m': '5 minutes',
+      '15m': '15 minutes',
+      '1h': '1 hour',
+      '4h': '4 hours',
+      '1d': '1 day'
     };
     
     return timeFrameMap[timeFrame] || timeFrame;

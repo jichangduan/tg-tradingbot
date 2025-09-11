@@ -1042,12 +1042,12 @@ export class ChartImageService {
           millisecond: 'HH:mm:ss',
           second: 'HH:mm:ss',
           minute: 'HH:mm',
-          hour: 'DD日',              // 1d图显示: 16日, 17日, 18日
-          day: 'DD日',               // 日线图显示日期格式: 16日, 17日
-          week: 'DD日',
-          month: 'DD日',
-          quarter: 'DD日',
-          year: 'DD日'               // 1d图统一显示日期格式
+          hour: 'Do',                // 1d图显示: 1st, 2nd, 3rd, 15th, 30th
+          day: 'Do',                 // 日线图显示英文序数格式
+          week: 'Do',
+          month: 'Do',
+          quarter: 'Do',
+          year: 'Do'                 // 1d图统一显示英文序数格式
         };
       
       default:
@@ -1076,7 +1076,7 @@ export class ChartImageService {
       case '1m': return 10;   // 1分钟图: 10个时间刻度, 每2根K线显示一个时间
       case '5m': return 10;   // 5分钟图: 10个时间刻度, 每2根K线显示一个时间
       case '1h': return 10;   // 1小时图: 10个时间刻度, 每2根K线显示一个时间
-      case '1d': return 20;   // 日线图: 20个时间刻度, 每根K线显示一个日期
+      case '1d': return 5;    // 日线图: 5个时间刻度, 每4根K线显示一个日期
       default: return 10;     // 默认10个刻度
     }
   }
