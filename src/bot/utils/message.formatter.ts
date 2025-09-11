@@ -1157,14 +1157,16 @@ BTC, ETH, SOL, ETC, LINK, AVAX, UNI等主流币种
   ): string {
     const actionText = action === 'long' ? 'LONG' : 'SHORT';
     const actionEmoji = action === 'long' ? '📈' : '📉';
+    const leverageNum = parseFloat(leverage.replace('x', ''));
+    const positionValue = parseFloat(amount) * leverageNum;
     
-    let message = `💰 <b>订单预览</b>\n\n`;
-    message += `市场: <b>${actionText} ${symbol}</b> ${actionEmoji}\n`;
-    message += `杠杆: <b>${leverage}</b>\n`;
-    message += `订单大小: <b>${orderSize.toFixed(2)} ${symbol} / ${this.formatPrice(parseFloat(amount), this.defaultOptions)}</b>\n`;
-    message += `当前价格: <b>${this.formatPrice(currentPrice, this.defaultOptions)}</b>\n`;
-    message += `强制平仓价格: <b>${this.formatPrice(liquidationPrice, this.defaultOptions)}</b>\n\n`;
-    message += `点击下方按钮确认您的交易`;
+    let message = `💰 <b>Order Preview</b>\n\n`;
+    message += `Market: <b>${actionText} ${symbol}</b> ${actionEmoji}\n`;
+    message += `Leverage: <b>${leverage}</b>\n`;
+    message += `Order Size: <b>${orderSize.toFixed(6)} ${symbol} / $${this.formatCurrency(parseFloat(amount))}</b>\n`;
+    message += `Current Price: <b>$${this.formatCurrency(currentPrice)}</b>\n`;
+    message += `Forced Liquidation Price: <b>$${this.formatCurrency(liquidationPrice)}</b>\n\n`;
+    message += `Click the button below to confirm your trade`;
     
     return message;
   }

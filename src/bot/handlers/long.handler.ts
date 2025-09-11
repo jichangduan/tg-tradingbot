@@ -293,7 +293,8 @@ export class LongHandler {
 
       // 显示订单预览而不是直接执行交易
       const tokenData = await tokenService.getTokenPrice(symbol);
-      const orderSize = parseFloat(amountStr) / tokenData.price * parseFloat(leverageStr.replace('x', ''));
+      // 修复：用户实际购买的代币数量（不考虑杠杆）
+      const orderSize = parseFloat(amountStr) / tokenData.price;
       const liquidationPrice = this.calculateLiquidationPrice(tokenData.price, parseFloat(leverageStr.replace('x', '')), 'long');
       
       const previewMessage = messageFormatter.formatTradingOrderPreview(
