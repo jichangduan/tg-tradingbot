@@ -464,6 +464,15 @@ export class LongHandler {
         tokenLength: accessToken?.length || 0,
         tokenPreview: accessToken ? `${accessToken.substring(0, 10)}...` : 'none'
       });
+      
+      // 验证关键参数
+      logger.info('🔍 Parameter Validation:', {
+        hasSize: tradingData.hasOwnProperty('size'),
+        sizeValue: tradingData.size,
+        sizeType: typeof tradingData.size,
+        hasAmount: tradingData.hasOwnProperty('amount'),
+        hasTelegramId: tradingData.hasOwnProperty('telegram_id')
+      });
       logger.info('═══════════════════════════════════════════════════════');
 
       const result = await apiService.postWithAuth(
@@ -523,13 +532,7 @@ export class LongHandler {
         symbol: symbol.toUpperCase(),
         leverage,
         amount,
-        requestData: {
-          symbol: symbol.toUpperCase(),
-          leverage: parseInt(leverage.replace('x', '')),
-          amount: parseFloat(amount),
-          orderType: "market",
-          telegram_id: userId?.toString()
-        },
+        actualRequestData: tradingData, // 显示实际发送的数据
         errorStatus: error.response?.status,
         errorData: error.response?.data,
         errorMessage: error.message,
@@ -547,7 +550,22 @@ export class LongHandler {
         const responseData = error.response?.data;
         const errorMsg = responseData?.message || error.message || '';
         
-        if (errorMsg.includes('余额不足') || errorMsg.includes('insufficient') || errorMsg.toLowerCase().includes('balance')) {
+        // 新的错误码处理
+        if (errorMsg.includes('Builder fee has not been approved')) {
+          errorMessage = '🔧 <b>需要批准费用</b>\n\n' +
+            `首次交易需要批准builder费用\n\n` +
+            `💡 <b>解决方案:</b>\n` +
+            `• 这是一次性设置，请确认批准\n` +
+            `• 批准后可正常进行所有交易\n` +
+            `• 如果问题持续，请联系客服`;
+        } else if (errorMsg.includes('size must be a positive number')) {
+          errorMessage = '📊 <b>交易数量参数错误</b>\n\n' +
+            `计算的代币数量无效\n\n` +
+            `💡 <b>可能原因:</b>\n` +
+            `• 价格数据获取失败\n` +
+            `• 交易金额过小\n` +
+            `• 请稍后重试或增加交易金额`;
+        } else if (errorMsg.includes('余额不足') || errorMsg.includes('insufficient') || errorMsg.toLowerCase().includes('balance')) {
           errorMessage = '💰 <b>账户余额不足</b>\n\n' +
             `无法完成$${amount}的做多交易\n\n` +
             `💡 <b>解决方案:</b>\n` +
@@ -566,8 +584,19 @@ export class LongHandler {
             `<i>请检查交易参数或稍后重试</i>`;
         }
       } else if (error.response?.status === 401) {
-        errorMessage += `认证失败，请重新登录\n\n` +
-          `<i>使用 /start 重新开始</i>`;
+        const responseData = error.response?.data;
+        const errorMsg = responseData?.message || error.message || '';
+        
+        if (errorMsg.includes('Invalid access token')) {
+          errorMessage = '🔑 <b>访问令牌无效</b>\n\n' +
+            `您的登录状态已过期\n\n` +
+            `💡 <b>解决方案:</b>\n` +
+            `• 使用 /start 重新初始化\n` +
+            `• 这将自动刷新您的访问权限`;
+        } else {
+          errorMessage += `认证失败，请重新登录\n\n` +
+            `<i>使用 /start 重新开始</i>`;
+        }
       } else if (error.response?.status >= 500) {
         errorMessage += `服务器暂时不可用\n\n` +
           `<i>请稍后重试</i>`;
