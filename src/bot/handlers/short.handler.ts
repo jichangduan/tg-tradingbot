@@ -447,8 +447,8 @@ export class ShortHandler {
         endpoint: '/api/tgbot/trading/short',
         userId,
         symbol: symbol.toUpperCase(),
-        leverage: `${leverage} (${leverageStr})`,
-        amount: `$${amount} (${amountStr})`,
+        leverage: `${leverage.replace('x', '')} (${leverage})`,
+        amount: `$${amount} (${amount})`,
         orderType: 'market'
       });
       logger.info('📦 Complete Request Payload:', tradingData);

@@ -447,8 +447,8 @@ export class LongHandler {
         endpoint: '/api/tgbot/trading/long',
         userId,
         symbol: symbol.toUpperCase(),
-        leverage: `${leverage} (${leverageStr})`,
-        amount: `$${amount} (${amountStr})`,
+        leverage: `${leverage.replace('x', '')} (${leverage})`,
+        amount: `$${amount} (${amount})`,
         orderType: 'market'
       });
       logger.info('📦 Complete Request Payload:', tradingData);
