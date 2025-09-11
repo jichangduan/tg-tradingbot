@@ -532,7 +532,12 @@ export class LongHandler {
         symbol: symbol.toUpperCase(),
         leverage,
         amount,
-        actualRequestData: tradingData, // 显示实际发送的数据
+        requestParameters: {
+          symbol: symbol.toUpperCase(),
+          leverage: parseInt(leverage.replace('x', '')),
+          size: 'calculated_from_amount_and_price',
+          orderType: 'market'
+        },
         errorStatus: error.response?.status,
         errorData: error.response?.data,
         errorMessage: error.message,
@@ -550,59 +555,59 @@ export class LongHandler {
         const responseData = error.response?.data;
         const errorMsg = responseData?.message || error.message || '';
         
-        // 新的错误码处理
+        // Handle new API error codes
         if (errorMsg.includes('Builder fee has not been approved')) {
-          errorMessage = '🔧 <b>需要批准费用</b>\n\n' +
-            `首次交易需要批准builder费用\n\n` +
-            `💡 <b>解决方案:</b>\n` +
-            `• 这是一次性设置，请确认批准\n` +
-            `• 批准后可正常进行所有交易\n` +
-            `• 如果问题持续，请联系客服`;
+          errorMessage = '🔧 <b>Builder Fee Approval Required</b>\n\n' +
+            `First-time trading requires builder fee approval\n\n` +
+            `💡 <b>Solution:</b>\n` +
+            `• This is a one-time setup, please confirm approval\n` +
+            `• After approval, all trading will work normally\n` +
+            `• If the issue persists, please contact support`;
         } else if (errorMsg.includes('size must be a positive number')) {
-          errorMessage = '📊 <b>交易数量参数错误</b>\n\n' +
-            `计算的代币数量无效\n\n` +
-            `💡 <b>可能原因:</b>\n` +
-            `• 价格数据获取失败\n` +
-            `• 交易金额过小\n` +
-            `• 请稍后重试或增加交易金额`;
+          errorMessage = '📊 <b>Trading Size Parameter Error</b>\n\n' +
+            `Calculated token amount is invalid\n\n` +
+            `💡 <b>Possible causes:</b>\n` +
+            `• Price data retrieval failed\n` +
+            `• Trading amount too small\n` +
+            `• Please try again later or increase trading amount`;
         } else if (errorMsg.includes('余额不足') || errorMsg.includes('insufficient') || errorMsg.toLowerCase().includes('balance')) {
-          errorMessage = '💰 <b>账户余额不足</b>\n\n' +
-            `无法完成$${amount}的做多交易\n\n` +
-            `💡 <b>解决方案:</b>\n` +
-            `• 使用 /wallet 查看当前余额\n` +
-            `• 向钱包充值更多USDC\n` +
-            `• 减少交易金额\n\n` +
-            `<i>💸 提醒: Hyperliquid最小交易金额为$10</i>`;
+          errorMessage = '💰 <b>Insufficient Account Balance</b>\n\n' +
+            `Cannot complete $${amount} long trade\n\n` +
+            `💡 <b>Solutions:</b>\n` +
+            `• Use /wallet to check current balance\n` +
+            `• Deposit more USDC to wallet\n` +
+            `• Reduce trading amount\n\n` +
+            `<i>💸 Note: Hyperliquid minimum trade amount is $10</i>`;
         } else if (errorMsg.includes('minimum') || errorMsg.includes('最小') || parseFloat(amount) < 10) {
-          errorMessage = '💰 <b>交易金额不符合要求</b>\n\n' +
-            `Hyperliquid最小交易金额为 <b>$10</b>\n` +
-            `您的金额: <code>$${amount}</code>\n\n` +
-            `💡 <b>请调整为至少$10:</b>\n` +
+          errorMessage = '💰 <b>Trading Amount Requirements Not Met</b>\n\n' +
+            `Hyperliquid minimum trade amount is <b>$10</b>\n` +
+            `Your amount: <code>$${amount}</code>\n\n` +
+            `💡 <b>Please adjust to at least $10:</b>\n` +
             `<code>/long ${symbol.toUpperCase()} ${leverage} 10</code>`;
         } else {
-          errorMessage += `参数错误: ${errorMsg}\n\n` +
-            `<i>请检查交易参数或稍后重试</i>`;
+          errorMessage += `Parameter error: ${errorMsg}\n\n` +
+            `<i>Please check trading parameters or try again later</i>`;
         }
       } else if (error.response?.status === 401) {
         const responseData = error.response?.data;
         const errorMsg = responseData?.message || error.message || '';
         
         if (errorMsg.includes('Invalid access token')) {
-          errorMessage = '🔑 <b>访问令牌无效</b>\n\n' +
-            `您的登录状态已过期\n\n` +
-            `💡 <b>解决方案:</b>\n` +
-            `• 使用 /start 重新初始化\n` +
-            `• 这将自动刷新您的访问权限`;
+          errorMessage = '🔑 <b>Invalid Access Token</b>\n\n' +
+            `Your login session has expired\n\n` +
+            `💡 <b>Solution:</b>\n` +
+            `• Use /start to reinitialize\n` +
+            `• This will automatically refresh your access permissions`;
         } else {
-          errorMessage += `认证失败，请重新登录\n\n` +
-            `<i>使用 /start 重新开始</i>`;
+          errorMessage += `Authentication failed, please log in again\n\n` +
+            `<i>Use /start to restart</i>`;
         }
       } else if (error.response?.status >= 500) {
-        errorMessage += `服务器暂时不可用\n\n` +
-          `<i>请稍后重试</i>`;
+        errorMessage += `Server temporarily unavailable\n\n` +
+          `<i>Please try again later</i>`;
       } else {
         errorMessage += `${error.message}\n\n` +
-          `<i>请稍后重试或联系客服</i>`;
+          `<i>Please try again later or contact support</i>`;
       }
       
       await ctx.editMessageText(errorMessage, { parse_mode: 'HTML' });
