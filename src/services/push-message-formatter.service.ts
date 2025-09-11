@@ -77,9 +77,21 @@ export class PushMessageFormatterService {
                    `<code>┌──────────────────────────────────────┐</code>\n` +
                    `<code>│ </code>${this.escapeHtml(news.title)}<code> │</code>\n`;
 
-      // 如果有内容，添加内容行
+      // 如果有内容，清理HTML并添加内容行
       if (news.content && news.content.trim()) {
-        message += `<code>│ </code>${this.escapeHtml(news.content)}<code> │</code>\n`;
+        const cleanContent = this.cleanHtmlContent(news.content);
+        if (cleanContent) {
+          // 将清理后的内容按行分割，每行都添加框框格式
+          const contentLines = cleanContent.split('\n');
+          for (const line of contentLines) {
+            if (line.trim()) {
+              message += `<code>│ </code>${this.escapeHtml(line)}<code> │</code>\n`;
+            } else {
+              // 空行也保持框框格式
+              message += `<code>│ </code><code> │</code>\n`;
+            }
+          }
+        }
       }
 
       message += `<code>│ ⏰ ${formattedTimestamp} │</code>\n` +
@@ -323,6 +335,43 @@ export class PushMessageFormatterService {
       });
       return timestamp;
     }
+  }
+
+  /**
+   * 清理HTML标签并格式化内容为纯文本
+   * @param htmlContent 包含HTML标签的内容
+   * @returns 清理后的纯文本内容
+   */
+  private cleanHtmlContent(htmlContent: string): string {
+    if (!htmlContent || typeof htmlContent !== 'string') {
+      return '';
+    }
+
+    let cleanText = htmlContent
+      // 处理段落标签：<p> -> 换行, </p> -> 换行
+      .replace(/<p>/gi, '\n')
+      .replace(/<\/p>/gi, '\n')
+      // 处理换行标签：<br> -> 换行
+      .replace(/<br\s*\/?>/gi, '\n')
+      // 移除所有其他HTML标签
+      .replace(/<[^>]*>/g, '')
+      // 清理HTML实体
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      // 清理多余的空行：连续超过2个换行合并为2个
+      .replace(/\n{3,}/g, '\n\n')
+      // 清理每行首尾空白
+      .split('\n')
+      .map(line => line.trim())
+      .join('\n')
+      // 清理开头和结尾的换行
+      .trim();
+
+    return cleanText;
   }
 
   /**
