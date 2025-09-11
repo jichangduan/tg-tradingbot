@@ -11,12 +11,12 @@ import { tradingStateService, TradingState } from '../../services/trading-state.
 import { messageFormatter } from '../utils/message.formatter';
 
 /**
- * Short命令处理器
- * 支持两种模式：引导模式和快捷模式
+ * Short command handler
+ * Supports two modes: guided mode and quick mode
  */
 export class ShortHandler {
   /**
-   * 处理 /short 命令 - 支持两种模式
+   * Handle /short command - supports two modes
    */
   public async handle(ctx: ExtendedContext, args: string[]): Promise<void> {
     const startTime = Date.now();
@@ -27,32 +27,32 @@ export class ShortHandler {
     try {
       logger.logCommand('short', userId!, username, args);
 
-      // 检查用户是否有活跃的交易状态
+      // Check if user has active trading state
       const activeState = await tradingStateService.getState(userId!.toString());
       if (activeState) {
         await ctx.reply(
-          '⚠️ <b>您已有进行中的交易流程</b>\n\n' +
-          '请完成当前交易或发送 /cancel 取消当前流程',
+          '⚠️ <b>You have an active trading session</b>\n\n' +
+          'Please complete current trade or send /cancel to cancel current session',
           { parse_mode: 'HTML' }
         );
         return;
       }
 
-      // 根据参数数量决定处理模式
+      // Determine handling mode based on parameter count
       if (args.length === 0) {
-        // 引导模式：无参数，开始分步引导
+        // Guided mode: no parameters, start step-by-step guidance
         await this.handleGuidedMode(ctx, 'short');
         return;
       } else if (args.length === 1) {
-        // 引导模式：只提供了代币，跳到杠杆选择
+        // Guided mode: only token provided, jump to leverage selection
         await this.handleGuidedMode(ctx, 'short', args[0]);
         return;
       } else if (args.length === 3) {
-        // 快捷模式：完整参数，直接处理
+        // Quick mode: complete parameters, handle directly
         await this.handleQuickMode(ctx, args);
         return;
       } else {
-        // 参数数量不正确
+        // Incorrect parameter count
         await ctx.reply(
           messageFormatter.formatTradingCommandErrorMessage('short'),
           { parse_mode: 'HTML' }
@@ -61,18 +61,18 @@ export class ShortHandler {
       }
 
     } catch (error) {
-      // 使用统一错误处理处理系统异常
+      // Use unified error handling for system exceptions
       await handleTradingError(ctx, error, 'short', args[0], args[2]);
     }
   }
 
   /**
-   * 处理引导模式
+   * Handle guided mode
    */
   private async handleGuidedMode(ctx: ExtendedContext, action: 'short', symbol?: string): Promise<void> {
     const userId = ctx.from?.id?.toString();
     if (!userId) {
-      await ctx.reply('❌ 无法获取用户信息，请重试');
+      await ctx.reply('❌ Unable to get user information, please retry');
       return;
     }
     
@@ -108,7 +108,7 @@ export class ShortHandler {
       } catch (error) {
         await tradingStateService.clearState(userId);
         await ctx.reply(
-          `❌ 无法获取 ${symbol.toUpperCase()} 的价格信息，请稍后重试`,
+          `❌ Unable to get ${symbol.toUpperCase()} price information, please retry later`,
           { parse_mode: 'HTML' }
         );
       }
@@ -116,7 +116,7 @@ export class ShortHandler {
   }
 
   /**
-   * 处理快捷模式
+   * Handle quick mode
    */
   private async handleQuickMode(ctx: ExtendedContext, args: string[]): Promise<void> {
     const startTime = Date.now();
@@ -147,13 +147,13 @@ export class ShortHandler {
       return;
     }
 
-    // 验证Hyperliquid最小交易金额 ($10)
+    // Validate Hyperliquid minimum trading amount ($10)
     if (amount < 10) {
       await ctx.reply(
-        `💰 <b>交易金额不足</b>\n\n` +
-        `Hyperliquid最小交易金额为 <b>$10</b>\n` +
-        `您的金额: <code>$${amount}</code>\n\n` +
-        `💡 <b>请调整为至少$10:</b>\n` +
+        `💰 <b>Insufficient Trading Amount</b>\n\n` +
+        `Hyperliquid minimum trading amount is <b>$10</b>\n` +
+        `Your amount: <code>$${amount}</code>\n\n` +
+        `💡 <b>Please adjust to at least $10:</b>\n` +
         `<code>/short ${symbol.toUpperCase()} ${leverageStr} 10</code>`,
         { parse_mode: 'HTML' }
       );

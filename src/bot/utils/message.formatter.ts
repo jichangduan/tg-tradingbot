@@ -417,9 +417,9 @@ BTC, ETH, SOL, USDT, USDC, BNB, ADA, DOT, LINK, MATIC, AVAX, UNI
         break;
         
       case 'SERVER_ERROR':
-        message += `🛠️ 服务器内部错误\n\n`;
-        message += `我们的技术团队正在处理此问题。\n\n`;
-        message += `💡 <b>建议:</b> 请稍后重试或联系客服`;
+        message += `🛠️ Internal server error\n\n`;
+        message += `Our technical team is handling this issue.\n\n`;
+        message += `💡 <b>Suggestion:</b> Please retry later or contact support`;
         break;
         
       case 'RATE_LIMIT_EXCEEDED':
@@ -461,18 +461,18 @@ BTC, ETH, SOL, USDT, USDC, BNB, ADA, DOT, LINK, MATIC, AVAX, UNI
     message += `• 🎯 Exclusive user badge\n`;
     message += `• 🚀 Priority feature access\n\n`;
     
-    message += `<b>🏦 您的账户信息:</b>\n`;
-    message += `👤 <b>用户ID:</b> <code>${userData.userId}</code>\n`;
-    message += `💎 <b>钱包地址:</b> <code>${this.truncateAddress(userData.walletAddress)}</code>\n`;
-    message += `⚡ <b>当前能量:</b> ${userData.energy} ⚡\n`;
-    message += `🔗 <b>您的邀请码:</b> <code>${userData.referralCode}</code>\n\n`;
+    message += `<b>🏦 Your Account Info:</b>\n`;
+    message += `👤 <b>User ID:</b> <code>${userData.userId}</code>\n`;
+    message += `💎 <b>Wallet Address:</b> <code>${this.truncateAddress(userData.walletAddress)}</code>\n`;
+    message += `⚡ <b>Current Energy:</b> ${userData.energy} ⚡\n`;
+    message += `🔗 <b>Your Referral Code:</b> <code>${userData.referralCode}</code>\n\n`;
     
-    message += `<b>💡 立即开始:</b>\n`;
-    message += `• <code>/price BTC</code> - 查询币价\n`;
-    message += `• <code>/markets</code> - 市场概况\n`;
-    message += `• 分享您的邀请码 <code>${userData.referralCode}</code> 赚取奖励\n\n`;
+    message += `<b>💡 Quick Start:</b>\n`;
+    message += `• <code>/price BTC</code> - Check Bitcoin price\n`;
+    message += `• <code>/markets</code> - Market overview\n`;
+    message += `• Share your referral code <code>${userData.referralCode}</code> to earn rewards\n\n`;
     
-    message += `<i>🎊 感谢您选择 AIW3，祝您交易愉快！</i>`;
+    message += `<i>🎊 Thank you for choosing AIW3, happy trading!</i>`;
     
     return message;
   }
@@ -482,12 +482,12 @@ BTC, ETH, SOL, USDT, USDC, BNB, ADA, DOT, LINK, MATIC, AVAX, UNI
    * Modified to show full address for testing
    */
   private truncateAddress(address: string): string {
-    // 显示完整钱包地址
+    // Display full wallet address
     return address;
   }
 
   /**
-   * 格式化能量值显示
+   * Format energy value display
    */
   public formatEnergyDisplay(energy: number): string {
     if (energy >= 1000) {
@@ -497,28 +497,28 @@ BTC, ETH, SOL, USDT, USDC, BNB, ADA, DOT, LINK, MATIC, AVAX, UNI
   }
 
   /**
-   * 格式化用户统计信息（预留）
+   * Format user statistics information (reserved)
    */
   public formatUserStatsMessage(userStats: any): string {
-    // 预留给未来的用户统计功能
-    return `📊 <b>用户统计</b>\n\n功能开发中...`;
+    // Reserved for future user statistics feature
+    return `📊 <b>User Statistics</b>\n\nFeature in development...`;
   }
 
   /**
-   * 格式化钱包余额消息 (支持新版链上钱包和旧版交易所账户)
+   * Format wallet balance message (supports new on-chain wallet and legacy exchange account)
    */
   public formatWalletBalanceMessage(balance: FormattedWalletBalance | FormattedAccountBalance, warnings?: string[]): string {
-    // 检查是否为新版链上钱包格式
+    // Check if it's new on-chain wallet format
     if ('address' in balance && 'network' in balance) {
       return this.formatOnChainWalletMessage(balance as FormattedWalletBalance, warnings);
     } else {
-      // 旧版交易所账户格式 (向后兼容)
+      // Legacy exchange account format (backward compatibility)
       return this.formatExchangeAccountMessage(balance as FormattedAccountBalance, warnings);
     }
   }
 
   /**
-   * 格式化链上钱包余额消息
+   * Format on-chain wallet balance message
    */
   private formatOnChainWalletMessage(balance: FormattedWalletBalance, warnings?: string[]): string {
     // Determine wallet name based on network type
@@ -594,29 +594,29 @@ BTC, ETH, SOL, USDT, USDC, BNB, ADA, DOT, LINK, MATIC, AVAX, UNI
   }
 
   /**
-   * 格式化交易所账户余额消息 (旧版兼容)
+   * Format exchange account balance message (legacy compatibility)
    */
   private formatExchangeAccountMessage(balance: FormattedAccountBalance, warnings?: string[]): string {
-    let message = `💰 <b>钱包余额</b>\n\n`;
+    let message = `💰 <b>Wallet Balance</b>\n\n`;
     
-    // 主要余额信息
-    message += `📈 <b>总资产:</b> $${this.formatCurrency(balance.totalEquity)} ${balance.currency}\n`;
-    message += `💳 <b>可用余额:</b> $${this.formatCurrency(balance.availableEquity)} ${balance.currency}\n`;
+    // Main balance information
+    message += `📈 <b>Total Assets:</b> $${this.formatCurrency(balance.totalEquity)} ${balance.currency}\n`;
+    message += `💳 <b>Available Balance:</b> $${this.formatCurrency(balance.availableEquity)} ${balance.currency}\n`;
     
     if (balance.orderFrozen > 0) {
-      message += `🔒 <b>冻结资金:</b> $${this.formatCurrency(balance.orderFrozen)} ${balance.currency}\n`;
+      message += `🔒 <b>Frozen Funds:</b> $${this.formatCurrency(balance.orderFrozen)} ${balance.currency}\n`;
     }
     
     if (balance.adjustedEquity !== balance.totalEquity && balance.adjustedEquity > 0) {
-      message += `📊 <b>调整权益:</b> $${this.formatCurrency(balance.adjustedEquity)} ${balance.currency}\n`;
+      message += `📊 <b>Adjusted Equity:</b> $${this.formatCurrency(balance.adjustedEquity)} ${balance.currency}\n`;
     }
 
-    // 资金使用率
+    // Fund utilization rate
     const utilizationEmoji = this.getUtilizationEmoji(balance.utilizationRate);
-    message += `\n💡 <b>资金使用率:</b> ${utilizationEmoji} ${balance.utilizationRate}%\n`;
+    message += `\n💡 <b>Fund Utilization:</b> ${utilizationEmoji} ${balance.utilizationRate}%\n`;
     
-    // 最后更新时间
-    message += `🕐 <b>更新时间:</b> ${this.formatTimestamp(balance.lastUpdated)}\n`;
+    // Last update time
+    message += `🕐 <b>Updated:</b> ${this.formatTimestamp(balance.lastUpdated)}\n`;
 
     // 警告信息
     if (warnings && warnings.length > 0) {
@@ -646,19 +646,19 @@ BTC, ETH, SOL, USDT, USDC, BNB, ADA, DOT, LINK, MATIC, AVAX, UNI
   }
 
   /**
-   * 格式化货币数值
+   * Format currency values
    */
   private formatCurrency(amount: number): string {
     if (amount === 0) {
       return '0.00';
     }
     
-    // 大于1000的显示紧凑格式
+    // Display compact format for amounts > 1000
     if (amount >= 1000) {
       return this.formatLargeNumber(amount);
     }
     
-    // 小于1000的显示完整数值
+    // Display full values for amounts < 1000
     return amount.toLocaleString('en-US', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
@@ -666,29 +666,29 @@ BTC, ETH, SOL, USDT, USDC, BNB, ADA, DOT, LINK, MATIC, AVAX, UNI
   }
 
   /**
-   * 根据资金使用率获取相应的emoji
+   * Get corresponding emoji based on fund utilization rate
    */
   private getUtilizationEmoji(utilizationRate: number): string {
     if (utilizationRate >= 80) {
-      return '🔴'; // 高风险
+      return '🔴'; // High risk
     } else if (utilizationRate >= 60) {
-      return '🟡'; // 中风险
+      return '🟡'; // Medium risk
     } else if (utilizationRate >= 30) {
-      return '🟢'; // 正常
+      return '🟢'; // Normal
     } else {
-      return '⚪'; // 低使用率
+      return '⚪'; // Low utilization
     }
   }
 
   /**
-   * 格式化钱包余额加载消息
+   * Format wallet balance loading message
    */
   public formatWalletLoadingMessage(): string {
     return `🔍 <b>Querying wallet balance...</b>\n\n💡 <i>Fetching your account information</i>`;
   }
 
   /**
-   * 格式化钱包余额错误消息
+   * Format wallet balance error message
    */
   public formatWalletErrorMessage(error: DetailedError): string {
     let message = `❌ <b>Wallet Balance Query Failed</b>\n\n`;
@@ -863,9 +863,9 @@ BTC, ETH, SOL, USDT, USDC, BNB, ADA, DOT, LINK, MATIC, AVAX, UNI
         break;
         
       case 'SERVER_ERROR':
-        message += `🛠️ 服务器内部错误\n\n`;
-        message += `我们的技术团队正在处理此问题。\n\n`;
-        message += `💡 <b>建议:</b> 请稍后重试或联系客服`;
+        message += `🛠️ Internal server error\n\n`;
+        message += `Our technical team is handling this issue.\n\n`;
+        message += `💡 <b>Suggestion:</b> Please retry later or contact support`;
         break;
         
       case 'RATE_LIMIT_EXCEEDED':
@@ -1090,55 +1090,55 @@ BTC, ETH, SOL, ETC, LINK, AVAX, UNI等主流币种
   }
 
   /**
-   * 格式化交易引导消息 - 选择代币
+   * Format trading guidance message - Select token
    */
   public formatTradingSymbolPrompt(action: 'long' | 'short'): string {
-    const actionText = action === 'long' ? '做多' : '做空';
+    const actionText = action === 'long' ? 'Long' : 'Short';
     const actionEmoji = action === 'long' ? '📈' : '📉';
     
-    let message = `${actionEmoji} <b>开始${actionText}交易</b>\n\n`;
-    message += `请回复您想要${actionText}的代币符号\n\n`;
-    message += `💡 <b>例如:</b> HYPE, BTC, ETH, SOL\n\n`;
-    message += `<b>支持的代币:</b>\n`;
-    message += `• 主流币: BTC, ETH, SOL, BNB\n`;
-    message += `• 热门币: HYPE, PEPE, DOGE\n`;
+    let message = `${actionEmoji} <b>Start ${actionText} Trading</b>\n\n`;
+    message += `Please reply with the token symbol you want to ${actionText.toLowerCase()}\n\n`;
+    message += `💡 <b>Examples:</b> HYPE, BTC, ETH, SOL\n\n`;
+    message += `<b>Supported Tokens:</b>\n`;
+    message += `• Major: BTC, ETH, SOL, BNB\n`;
+    message += `• Popular: HYPE, PEPE, DOGE\n`;
     message += `• DeFi: UNI, LINK, AAVE\n\n`;
-    message += `<i>💬 直接回复代币符号即可，不区分大小写</i>`;
+    message += `<i>💬 Simply reply with token symbol, case insensitive</i>`;
     
     return message;
   }
 
   /**
-   * 格式化交易引导消息 - 选择杠杆
+   * Format trading guidance message - Select leverage
    */
   public formatTradingLeveragePrompt(action: 'long' | 'short', symbol: string, currentPrice: number, availableMargin: number): string {
-    const actionText = action === 'long' ? '做多' : '做空';
+    const actionText = action === 'long' ? 'Long' : 'Short';
     const actionEmoji = action === 'long' ? '📈' : '📉';
     
     let message = `${actionEmoji} <b>${actionText} ${symbol}</b>\n`;
-    message += `当前价格: <b>${this.formatPrice(currentPrice, this.defaultOptions)}</b>\n\n`;
+    message += `Current Price: <b>${this.formatPrice(currentPrice, this.defaultOptions)}</b>\n\n`;
     
-    message += `<b>选择您的杠杆倍数:</b>\n`;
-    message += `可用保证金: <b>${this.formatPrice(availableMargin, this.defaultOptions)}</b>\n`;
-    message += `最大杠杆: <b>3x</b>\n\n`;
+    message += `<b>Select Your Leverage:</b>\n`;
+    message += `Available Margin: <b>${this.formatPrice(availableMargin, this.defaultOptions)}</b>\n`;
+    message += `Max Leverage: <b>3x</b>\n\n`;
     
     return message;
   }
 
   /**
-   * 格式化交易引导消息 - 输入金额
+   * Format trading guidance message - Enter amount
    */
   public formatTradingAmountPrompt(action: 'long' | 'short', symbol: string, leverage: string, availableMargin: number): string {
-    const actionText = action === 'long' ? '做多' : '做空';
+    const actionText = action === 'long' ? 'Long' : 'Short';
     const actionEmoji = action === 'long' ? '📈' : '📉';
     
     let message = `${actionEmoji} <b>${actionText} ${symbol}</b>\n`;
-    message += `杠杆倍数: <b>${leverage}</b>\n\n`;
+    message += `Leverage: <b>${leverage}</b>\n\n`;
     
-    message += `<b>选择仓位大小</b>\n\n`;
-    message += `可用保证金: <b>${this.formatPrice(availableMargin, this.defaultOptions)}</b>\n\n`;
-    message += `请回复您要用于${actionText} ${symbol} 的保证金金额($)\n\n`;
-    message += `<i>💡 直接回复数字即可，例如: 30</i>`;
+    message += `<b>Select Position Size</b>\n\n`;
+    message += `Available Margin: <b>${this.formatPrice(availableMargin, this.defaultOptions)}</b>\n\n`;
+    message += `Please reply with the margin amount ($) for ${actionText.toLowerCase()} ${symbol}\n\n`;
+    message += `<i>💡 Simply reply with number, e.g.: 30</i>`;
     
     return message;
   }
@@ -1172,52 +1172,52 @@ BTC, ETH, SOL, ETC, LINK, AVAX, UNI等主流币种
   }
 
   /**
-   * 格式化余额不足的交易错误消息
+   * Format trading insufficient funds error message
    */
   public formatTradingInsufficientFundsMessage(): string {
-    let message = `💰 <b>账户余额不足</b>\n\n`;
-    message += `您的账户暂时无法进行交易。您可能需要先向账户充值。\n\n`;
-    message += `💡 <b>解决方案:</b>\n`;
-    message += `• 使用 /wallet 查看当前余额\n`;
-    message += `• 向钱包充值更多资金\n`;
-    message += `• 减少交易金额`;
+    let message = `💰 <b>Insufficient Account Balance</b>\n\n`;
+    message += `Your account cannot currently trade. You may need to deposit funds first.\n\n`;
+    message += `💡 <b>Solutions:</b>\n`;
+    message += `• Use /wallet to check current balance\n`;
+    message += `• Deposit more funds to wallet\n`;
+    message += `• Reduce trading amount`;
     
     return message;
   }
 
   /**
-   * 格式化交易命令格式错误消息
+   * Format trading command format error message
    */
   public formatTradingCommandErrorMessage(action: 'long' | 'short'): string {
-    const actionText = action === 'long' ? '做多' : '做空';
+    const actionText = action === 'long' ? 'Long' : 'Short';
     const actionLower = action.toLowerCase();
     
-    let message = `❌ <b>命令格式错误</b>\n\n`;
-    message += `<b>正确格式:</b>\n`;
-    message += `<code>/${actionLower} &lt;代币&gt; &lt;杠杆&gt; &lt;金额&gt;</code>\n\n`;
-    message += `<b>示例:</b>\n`;
-    message += `<code>/${actionLower} BTC 10x 100</code> - ${actionText}BTC，10倍杠杆，$100\n`;
-    message += `<code>/${actionLower} ETH 5x 50</code> - ${actionText}ETH，5倍杠杆，$50\n\n`;
-    message += `<b>⚠️ 重要提醒:</b>\n`;
-    message += `• 最小交易金额: $10\n`;
-    message += `• 支持杠杆: 1x-20x\n`;
-    message += `• 支持代币: BTC, ETH, SOL 等主流币\n\n`;
-    message += `💡 首次交易建议先用小金额测试`;
+    let message = `❌ <b>Command Format Error</b>\n\n`;
+    message += `<b>Correct Format:</b>\n`;
+    message += `<code>/${actionLower} &lt;token&gt; &lt;leverage&gt; &lt;amount&gt;</code>\n\n`;
+    message += `<b>Examples:</b>\n`;
+    message += `<code>/${actionLower} BTC 10x 100</code> - ${actionText} BTC, 10x leverage, $100\n`;
+    message += `<code>/${actionLower} ETH 5x 50</code> - ${actionText} ETH, 5x leverage, $50\n\n`;
+    message += `<b>⚠️ Important Notes:</b>\n`;
+    message += `• Minimum trade amount: $10\n`;
+    message += `• Supported leverage: 1x-20x\n`;
+    message += `• Supported tokens: BTC, ETH, SOL and other major coins\n\n`;
+    message += `💡 First-time traders should test with small amounts`;
     
     return message;
   }
 
   /**
-   * 格式化交易处理中消息
+   * Format trading processing message
    */
   public formatTradingProcessingMessage(action: 'long' | 'short', symbol: string, leverage: string, amount: string): string {
-    const actionText = action === 'long' ? '做多' : '做空';
+    const actionText = action === 'long' ? 'Long' : 'Short';
     const actionEmoji = action === 'long' ? '📈' : '📉';
     
-    let message = `🔄 <b>正在处理${actionText}交易...</b>\n\n`;
-    message += `${actionEmoji} 代币: <code>${symbol.toUpperCase()}</code>\n`;
-    message += `📊 杠杆: <code>${leverage}</code>\n`;
-    message += `💰 金额: <code>${amount}</code>`;
+    let message = `🔄 <b>Processing ${actionText} Trade...</b>\n\n`;
+    message += `${actionEmoji} Token: <code>${symbol.toUpperCase()}</code>\n`;
+    message += `📊 Leverage: <code>${leverage}</code>\n`;
+    message += `💰 Amount: <code>${amount}</code>`;
     
     return message;
   }

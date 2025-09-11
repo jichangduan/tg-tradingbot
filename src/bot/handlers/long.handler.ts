@@ -11,12 +11,12 @@ import { tradingStateService, TradingState } from '../../services/trading-state.
 import { messageFormatter } from '../utils/message.formatter';
 
 /**
- * Long命令处理器
- * 支持两种模式：引导模式和快捷模式
+ * Long command handler
+ * Supports two modes: guided mode and quick mode
  */
 export class LongHandler {
   /**
-   * 处理 /long 命令 - 支持两种模式
+   * Handle /long command - supports two modes
    */
   public async handle(ctx: ExtendedContext, args: string[]): Promise<void> {
     const startTime = Date.now();
@@ -27,32 +27,32 @@ export class LongHandler {
     try {
       logger.logCommand('long', userId!, username, args);
 
-      // 检查用户是否有活跃的交易状态
+      // Check if user has active trading state
       const activeState = await tradingStateService.getState(userId!.toString());
       if (activeState) {
         await ctx.reply(
-          '⚠️ <b>您已有进行中的交易流程</b>\n\n' +
-          '请完成当前交易或发送 /cancel 取消当前流程',
+          '⚠️ <b>You have an active trading session</b>\n\n' +
+          'Please complete current trade or send /cancel to cancel current session',
           { parse_mode: 'HTML' }
         );
         return;
       }
 
-      // 根据参数数量决定处理模式
+      // Determine handling mode based on parameter count
       if (args.length === 0) {
-        // 引导模式：无参数，开始分步引导
+        // Guided mode: no parameters, start step-by-step guidance
         await this.handleGuidedMode(ctx, 'long');
         return;
       } else if (args.length === 1) {
-        // 引导模式：只提供了代币，跳到杠杆选择
+        // Guided mode: only token provided, jump to leverage selection
         await this.handleGuidedMode(ctx, 'long', args[0]);
         return;
       } else if (args.length === 3) {
-        // 快捷模式：完整参数，直接处理
+        // Quick mode: complete parameters, handle directly
         await this.handleQuickMode(ctx, args);
         return;
       } else {
-        // 参数数量不正确
+        // Incorrect parameter count
         await ctx.reply(
           messageFormatter.formatTradingCommandErrorMessage('long'),
           { parse_mode: 'HTML' }
@@ -61,33 +61,33 @@ export class LongHandler {
       }
 
     } catch (error) {
-      // 使用统一错误处理处理系统异常
+      // Use unified error handling for system exceptions
       await handleTradingError(ctx, error, 'long', args[0], args[2]);
     }
   }
 
   /**
-   * 处理引导模式
+   * Handle guided mode
    */
   private async handleGuidedMode(ctx: ExtendedContext, action: 'long', symbol?: string): Promise<void> {
     const userId = ctx.from?.id?.toString();
     if (!userId) {
-      await ctx.reply('❌ 无法获取用户信息，请重试');
+      await ctx.reply('❌ Unable to get user information, please retry');
       return;
     }
     
     if (!symbol) {
-      // 第一步：选择代币
+      // Step 1: Select token
       const state = await tradingStateService.createState(userId, action);
       const message = messageFormatter.formatTradingSymbolPrompt(action);
       
       await ctx.reply(message, { parse_mode: 'HTML' });
     } else {
-      // 跳到第二步：选择杠杆 (已有代币)
+      // Jump to step 2: Select leverage (already have token)
       const state = await tradingStateService.createState(userId, action, symbol.toUpperCase());
       
       try {
-        // 获取当前价格和可用保证金
+        // Get current price and available margin
         const tokenData = await tokenService.getTokenPrice(symbol);
         const accountBalance = await accountService.getAccountBalance(userId!.toString());
         const availableMargin = accountBalance.withdrawableAmount || 0;
@@ -108,7 +108,7 @@ export class LongHandler {
       } catch (error) {
         await tradingStateService.clearState(userId);
         await ctx.reply(
-          `❌ 无法获取 ${symbol.toUpperCase()} 的价格信息，请稍后重试`,
+          `❌ Unable to get ${symbol.toUpperCase()} price information, please retry later`,
           { parse_mode: 'HTML' }
         );
       }
@@ -116,7 +116,7 @@ export class LongHandler {
   }
 
   /**
-   * 处理快捷模式
+   * Handle quick mode
    */
   private async handleQuickMode(ctx: ExtendedContext, args: string[]): Promise<void> {
     const startTime = Date.now();
@@ -126,7 +126,7 @@ export class LongHandler {
 
     const [symbol, leverageStr, amountStr] = args;
 
-    // 基础验证
+    // Basic validation
     if (!symbol || !leverageStr || !amountStr) {
       await ctx.reply(
         messageFormatter.formatTradingCommandErrorMessage('long'),
@@ -135,78 +135,78 @@ export class LongHandler {
       return;
     }
 
-    // 验证交易金额格式
+    // Validate trading amount format
     const amount = parseFloat(amountStr);
     if (isNaN(amount) || amount <= 0) {
       await ctx.reply(
-        `❌ <b>交易金额错误</b>\n\n` +
-        `请输入有效的数字金额\n\n` +
-        `示例: <code>/long BTC 10x 100</code>`,
+        `❌ <b>Trading Amount Error</b>\n\n` +
+        `Please enter a valid numeric amount\n\n` +
+        `Example: <code>/long BTC 10x 100</code>`,
         { parse_mode: 'HTML' }
       );
       return;
     }
 
-    // 验证Hyperliquid最小交易金额 ($10)
+    // Validate Hyperliquid minimum trading amount ($10)
     if (amount < 10) {
       await ctx.reply(
-        `💰 <b>交易金额不足</b>\n\n` +
-        `Hyperliquid最小交易金额为 <b>$10</b>\n` +
-        `您的金额: <code>$${amount}</code>\n\n` +
-        `💡 <b>请调整为至少$10:</b>\n` +
+        `💰 <b>Insufficient Trading Amount</b>\n\n` +
+        `Hyperliquid minimum trading amount is <b>$10</b>\n` +
+        `Your amount: <code>$${amount}</code>\n\n` +
+        `💡 <b>Please adjust to at least $10:</b>\n` +
         `<code>/long ${symbol.toUpperCase()} ${leverageStr} 10</code>`,
         { parse_mode: 'HTML' }
       );
       return;
     }
 
-    // 发送处理中消息
+    // Send processing message
     const loadingMessage = await ctx.reply(
       messageFormatter.formatTradingProcessingMessage('long', symbol, leverageStr, amountStr),
       { parse_mode: 'HTML' }
     );
 
     try {
-      // 获取用户访问令牌
+      // Get user access token
       const accessToken = await getUserAccessToken(userId!.toString(), {
         username,
         first_name: ctx.from?.first_name,
         last_name: ctx.from?.last_name
       });
 
-      // 获取代币价格用于计算size
+      // Get token price for size calculation
       const tokenData = await tokenService.getTokenPrice(symbol);
       const size = parseFloat(amountStr) / tokenData.price;
       
-      // 准备交易数据
+      // Prepare trading data
       const tradingData = {
         symbol: symbol.toUpperCase(),
-        leverage: parseInt(leverageStr.replace('x', '')), // 转换为数字
-        size: size,                                       // 计算的代币数量
+        leverage: parseInt(leverageStr.replace('x', '')), // Convert to number
+        size: size,                                       // Calculated token quantity
         orderType: "market"
       };
 
-      // 检查余额是否足够
+      // Check if balance is sufficient
       const requiredAmount = parseFloat(amountStr);
       if (isNaN(requiredAmount) || requiredAmount <= 0) {
         await ctx.telegram.editMessageText(
           ctx.chat?.id,
           loadingMessage.message_id,
           undefined,
-          '❌ <b>交易参数错误</b>\n\n' +
-          '请输入有效的数量\n\n' +
-          '示例: <code>/long BTC 10x 200</code>',
+          '❌ <b>Trading Parameter Error</b>\n\n' +
+          'Please enter a valid quantity\n\n' +
+          'Example: <code>/long BTC 10x 200</code>',
           { parse_mode: 'HTML' }
         );
         return;
       }
 
-      // 检查账户余额 - 考虑杠杆倍数
+      // Check account balance - consider leverage multiplier
       try {
         const leverageNum = parseFloat(leverageStr.replace('x', ''));
         
         if (leverageNum > 1) {
-          // 杠杆交易：检查合约账户可用保证金
+          // Leverage trading: check contract account available margin
           const marginCheck = await accountService.checkAvailableMargin(
             userId!.toString(),
             requiredAmount,
@@ -219,18 +219,18 @@ export class LongHandler {
             
             switch (marginCheck.reason) {
               case 'margin_occupied':
-                errorMessage = `💰 <b>可用保证金不足</b>\n\n` +
-                  `合约账户总价值: <code>$${contractAccountValue.toFixed(2)}</code>\n` +
-                  `可用保证金: <code>$${marginCheck.availableMargin.toFixed(2)}</code>\n` +
-                  `所需保证金: <code>$${marginCheck.requiredMargin.toFixed(2)}</code>\n\n` +
-                  `💡 <b>原因分析:</b>\n` +
-                  `• 您的资金被现有持仓占用作保证金\n` +
-                  `• 杠杆交易需要足够的可用保证金\n\n` +
-                  `🔧 <b>解决方案:</b>\n` +
-                  `• 平仓部分持仓释放保证金\n` +
-                  `• 降低交易金额: <code>/long ${symbol.toUpperCase()} ${leverageStr} ${Math.floor(marginCheck.availableMargin * leverageNum)}</code>\n` +
-                  `• 减少杠杆倍数\n` +
-                  `• 充值更多USDC到合约账户`;
+                errorMessage = `💰 <b>Insufficient Available Margin</b>\n\n` +
+                  `Contract Account Total Value: <code>$${contractAccountValue.toFixed(2)}</code>\n` +
+                  `Available Margin: <code>$${marginCheck.availableMargin.toFixed(2)}</code>\n` +
+                  `Required Margin: <code>$${marginCheck.requiredMargin.toFixed(2)}</code>\n\n` +
+                  `💡 <b>Cause Analysis:</b>\n` +
+                  `• Your funds are occupied by existing positions as margin\n` +
+                  `• Leverage trading requires sufficient available margin\n\n` +
+                  `🔧 <b>Solutions:</b>\n` +
+                  `• Close some positions to release margin\n` +
+                  `• Reduce trading amount: <code>/long ${symbol.toUpperCase()} ${leverageStr} ${Math.floor(marginCheck.availableMargin * leverageNum)}</code>\n` +
+                  `• Reduce leverage multiplier\n` +
+                  `• Deposit more USDC to contract account`;
                 break;
               case 'no_funds':
                 errorMessage = `💰 <b>合约账户无资金</b>\n\n` +
