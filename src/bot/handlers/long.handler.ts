@@ -174,13 +174,16 @@ export class LongHandler {
         last_name: ctx.from?.last_name
       });
 
+      // 获取代币价格用于计算size
+      const tokenData = await tokenService.getTokenPrice(symbol);
+      const size = parseFloat(amountStr) / tokenData.price;
+      
       // 准备交易数据
       const tradingData = {
         symbol: symbol.toUpperCase(),
         leverage: parseInt(leverageStr.replace('x', '')), // 转换为数字
-        amount: parseFloat(amountStr),                    // 转换为数字
-        orderType: "market",
-        telegram_id: userId?.toString()                   // 可能需要的字段
+        size: size,                                       // 计算的代币数量
+        orderType: "market"
       };
 
       // 检查余额是否足够
@@ -431,13 +434,16 @@ export class LongHandler {
         last_name: ctx.from?.last_name
       });
 
+      // 获取代币价格用于计算size
+      const tokenData = await tokenService.getTokenPrice(symbol);
+      const size = parseFloat(amount) / tokenData.price;
+      
       // 调用交易API
       const tradingData = {
         symbol: symbol.toUpperCase(),
         leverage: parseInt(leverage.replace('x', '')), // 转换为数字
-        amount: parseFloat(amount),                    // 转换为数字
-        orderType: "market",
-        telegram_id: userId?.toString()               // 可能需要的字段
+        size: size,                                    // 计算的代币数量
+        orderType: "market"
       };
 
       // 🚀 显眼的API参数日志
@@ -448,7 +454,9 @@ export class LongHandler {
         userId,
         symbol: symbol.toUpperCase(),
         leverage: `${leverage.replace('x', '')} (${leverage})`,
-        amount: `$${amount} (${amount})`,
+        userInputAmount: `$${amount}`,
+        tokenPrice: `$${tokenData.price.toFixed(2)}`,
+        calculatedSize: `${size.toFixed(8)} ${symbol.toUpperCase()}`,
         orderType: 'market'
       });
       logger.info('📦 Complete Request Payload:', tradingData);
