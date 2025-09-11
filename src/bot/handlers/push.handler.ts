@@ -11,14 +11,14 @@ import { longHandler } from './long.handler';
 import { shortHandler } from './short.handler';
 
 /**
- * Push命令处理器
- * 处理 /push 命令，管理用户的推送设置（快讯、鲸鱼动向、资金流向）
+ * Push command handler
+ * Handles /push command, manages user's push settings (flash news, whale movements, fund flows)
  */
 export class PushHandler {
   /**
-   * 处理 /push 命令
-   * @param ctx Telegram上下文
-   * @param args 命令参数数组
+   * Handle /push command
+   * @param ctx Telegram context
+   * @param args Command parameter array
    */
   public async handle(ctx: ExtendedContext, args: string[]): Promise<void> {
     const startTime = Date.now();
@@ -29,7 +29,7 @@ export class PushHandler {
     try {
       logger.logCommand('push', userId!, username, args);
 
-      // 显示推送设置界面
+      // Show push settings interface
       await this.showPushSettings(ctx);
 
       const duration = Date.now() - startTime;
@@ -54,14 +54,14 @@ export class PushHandler {
   }
 
   /**
-   * 显示推送设置界面
+   * Show push settings interface
    */
   private async showPushSettings(ctx: ExtendedContext): Promise<void> {
     const userId = ctx.from?.id?.toString();
     if (!userId) return;
 
     try {
-      // 获取用户当前的推送设置和推送数据
+      // Get user's current push settings and push data
       const { settings, pushData } = await this.getUserPushSettings(userId);
 
       const message = this.formatPushSettingsMessage(settings, pushData);
@@ -80,7 +80,7 @@ export class PushHandler {
         error: (error as Error).message
       });
 
-      // 显示默认的错误状态
+      // Show default error status
       const defaultSettings: PushSettings = {
         flash_enabled: false,
         whale_enabled: false,
@@ -91,7 +91,7 @@ export class PushHandler {
       const keyboard = this.createPushSettingsKeyboard(defaultSettings);
 
       await ctx.reply(
-        `📢 <b>主动推送</b>\n\n❌ 暂时无法获取您的推送设置，显示默认状态\n\n${message}`,
+        `📢 <b>Active Push Notifications</b>\n\n❌ Unable to get your push settings temporarily, showing default status\n\n${message}`,
         {
           parse_mode: 'HTML',
           reply_markup: {
@@ -103,21 +103,21 @@ export class PushHandler {
   }
 
   /**
-   * 获取用户推送设置
+   * Get user push settings
    */
   private async getUserPushSettings(userId: string): Promise<{
     settings: PushSettings;
     pushData?: PushData;
   }> {
     try {
-      // 首先尝试从缓存获取访问令牌
+      // First try to get access token from cache
       let accessToken = await getUserToken(userId);
       
-      // 如果没有缓存的token，自动初始化用户
+      // If no cached token, automatically initialize user
       if (!accessToken) {
         logger.info('No cached token found, initializing user', { telegramId: userId });
         
-        // 从上下文获取用户信息
+        // Get user info from context
         const userInfo = {
           username: undefined, // 在这里我们无法直接获取，但API会处理
           first_name: undefined,
@@ -128,7 +128,7 @@ export class PushHandler {
         logger.info('User initialized and token obtained', { telegramId: userId });
       }
 
-      // 调用推送服务获取设置和数据
+      // Call push service to get settings and data
       const response = await pushService.getUserPushSettings(userId, accessToken);
       
       return {
@@ -142,80 +142,80 @@ export class PushHandler {
         error: (error as Error).message
       });
       
-      // 如果是API错误，重新抛出以便上层处理
+      // If API error, rethrow for upper layer handling
       if (error instanceof ApiError) {
         throw error;
       }
       
-      // 其他错误也重新抛出
-      throw new Error('获取推送设置失败: ' + (error as Error).message);
+      // Rethrow other errors as well
+      throw new Error('Failed to get push settings: ' + (error as Error).message);
     }
   }
 
   /**
-   * 格式化推送设置消息
+   * Format push settings message
    */
   private formatPushSettingsMessage(settings: PushSettings, pushData?: PushData): string {
-    const flashStatus = settings.flash_enabled ? '✅ 开启' : '❌ 关闭';
-    const whaleStatus = settings.whale_enabled ? '✅ 开启' : '❌ 关闭';
-    const fundStatus = settings.fund_enabled ? '✅ 开启' : '❌ 关闭';
+    const flashStatus = settings.flash_enabled ? '✅ On' : '❌ Off';
+    const whaleStatus = settings.whale_enabled ? '✅ On' : '❌ Off';
+    const fundStatus = settings.fund_enabled ? '✅ On' : '❌ Off';
 
-    let message = `📢 <b>主动推送设置</b>\n\n` +
-                  `🚨 快讯推送: ${flashStatus}\n` +
-                  `🐋 鲸鱼动向: ${whaleStatus}\n` +
-                  `💰 资金流向: ${fundStatus}\n\n`;
+    let message = `📢 <b>Active Push Settings</b>\n\n` +
+                  `🚨 Flash News: ${flashStatus}\n` +
+                  `🐋 Whale Movements: ${whaleStatus}\n` +
+                  `💰 Fund Flows: ${fundStatus}\n\n`;
 
-    // 显示推送内容状态
+    // Show push content status
     if (pushData && this.hasValidPushContent(pushData)) {
-      message += `<b>📈 最新推送内容</b>\n\n`;
+      message += `<b>📈 Latest Push Content</b>\n\n`;
 
-      // 显示快讯
+      // Show flash news
       if (pushData.flash_news && pushData.flash_news.length > 0) {
         const latestFlash = pushData.flash_news[0];
-        message += `🚨 <b>快讯</b>\n${latestFlash.title}\n⏰ ${this.formatTimestamp(latestFlash.timestamp)}\n\n`;
+        message += `🚨 <b>Flash News</b>\n${latestFlash.title}\n⏰ ${this.formatTimestamp(latestFlash.timestamp)}\n\n`;
       }
 
-      // 显示鲸鱼动向
+      // Show whale movements
       if (pushData.whale_actions && pushData.whale_actions.length > 0) {
         const latestWhale = pushData.whale_actions[0];
-        message += `🐋 <b>鲸鱼动向</b>\n地址: ${latestWhale.address}\n操作: ${latestWhale.action} ${latestWhale.amount}\n⏰ ${this.formatTimestamp(latestWhale.timestamp)}\n\n`;
+        message += `🐋 <b>Whale Movements</b>\nAddress: ${latestWhale.address}\nAction: ${latestWhale.action} ${latestWhale.amount}\n⏰ ${this.formatTimestamp(latestWhale.timestamp)}\n\n`;
       }
 
-      // 显示资金流向
+      // Show fund flows
       if (pushData.fund_flows && pushData.fund_flows.length > 0) {
         const latestFund = pushData.fund_flows[0];
-        message += `💰 <b>资金流向</b>\n从: ${latestFund.from} → 到: ${latestFund.to}\n金额: ${latestFund.amount}\n⏰ ${this.formatTimestamp(latestFund.timestamp)}\n\n`;
+        message += `💰 <b>Fund Flows</b>\nFrom: ${latestFund.from} → To: ${latestFund.to}\nAmount: ${latestFund.amount}\n⏰ ${this.formatTimestamp(latestFund.timestamp)}\n\n`;
       }
     } else {
-      message += `<b>📋 推送状态</b>\n\n`;
-      message += `📭 <i>暂无最新推送内容</i>\n\n`;
+      message += `<b>📋 Push Status</b>\n\n`;
+      message += `📭 <i>No latest push content available</i>\n\n`;
     }
 
-    message += `点击下方按钮管理推送设置:`;
+    message += `Click the buttons below to manage push settings:`;
     
     return message;
   }
 
   /**
-   * 创建推送设置键盘
+   * Create push settings keyboard
    */
   private createPushSettingsKeyboard(settings: PushSettings): any[][] {
     return [
       [
         {
-          text: settings.flash_enabled ? '🚨 快讯 [关闭]' : '🚨 快讯 [开启]',
+          text: settings.flash_enabled ? '🚨 Flash News [Turn Off]' : '🚨 Flash News [Turn On]',
           callback_data: `push_toggle_flash_${!settings.flash_enabled}`
         }
       ],
       [
         {
-          text: settings.whale_enabled ? '🐋 鲸鱼动向 [关闭]' : '🐋 鲸鱼动向 [开启]',
+          text: settings.whale_enabled ? '🐋 Whale Movements [Turn Off]' : '🐋 Whale Movements [Turn On]',
           callback_data: `push_toggle_whale_${!settings.whale_enabled}`
         }
       ],
       [
         {
-          text: settings.fund_enabled ? '💰 资金流向 [关闭]' : '💰 资金流向 [开启]',
+          text: settings.fund_enabled ? '💰 Fund Flows [Turn Off]' : '💰 Fund Flows [Turn On]',
           callback_data: `push_toggle_fund_${!settings.fund_enabled}`
         }
       ]
@@ -223,7 +223,7 @@ export class PushHandler {
   }
 
   /**
-   * 处理按钮回调
+   * Handle button callbacks
    */
   public async handleCallback(ctx: ExtendedContext, callbackData: string): Promise<void> {
     const startTime = Date.now();
@@ -239,32 +239,32 @@ export class PushHandler {
       });
 
       if (!userIdString) {
-        await ctx.answerCbQuery('用户信息无效');
+        await ctx.answerCbQuery('Invalid user information');
         return;
       }
 
-      // 解析回调数据
-      const callbackParts = callbackData.split('_').slice(1); // 移除 'push' 前缀
+      // Parse callback data
+      const callbackParts = callbackData.split('_').slice(1); // Remove 'push' prefix
       const action = callbackParts[0];
 
-      // 处理推送交易按钮
+      // Handle push trading buttons
       if (action === 'trade') {
         await this.handleTradingCallback(ctx, callbackParts);
         return;
       }
 
-      // 处理推送设置按钮
+      // Handle push settings buttons
       if (action === 'toggle') {
         const [, type, value] = callbackParts;
         const enabled = value === 'true';
         
-        // 更新用户设置
+        // Update user settings
         await this.updateUserPushSetting(userIdString, type, enabled);
 
-        // 获取更新后的设置
+        // Get updated settings
         const { settings: updatedSettings, pushData } = await this.getUserPushSettings(userIdString);
 
-        // 更新消息
+        // Update message
         const message = this.formatPushSettingsMessage(updatedSettings, pushData);
         const keyboard = this.createPushSettingsKeyboard(updatedSettings);
 
@@ -275,10 +275,10 @@ export class PushHandler {
           }
         });
 
-        // 反馈用户
+        // Give user feedback
         const typeName = this.getTypeName(type);
-        const statusText = enabled ? '开启' : '关闭';
-        await ctx.answerCbQuery(`✅ ${typeName}推送已${statusText}`);
+        const statusText = enabled ? 'enabled' : 'disabled';
+        await ctx.answerCbQuery(`✅ ${typeName} push notifications ${statusText}`);
 
         const duration = Date.now() - startTime;
         logger.info(`Push callback completed [${requestId}] - ${duration}ms`, {
@@ -291,8 +291,8 @@ export class PushHandler {
         return;
       }
 
-      // 未识别的操作
-      await ctx.answerCbQuery('无效的操作');
+      // Unrecognized operation
+      await ctx.answerCbQuery('Invalid operation');
 
     } catch (error) {
       const duration = Date.now() - startTime;
@@ -303,12 +303,12 @@ export class PushHandler {
         requestId
       });
 
-      await ctx.answerCbQuery('操作失败，请稍后重试');
+      await ctx.answerCbQuery('Operation failed, please retry later');
     }
   }
 
   /**
-   * 处理交易按钮回调
+   * Handle trading button callbacks
    */
   private async handleTradingCallback(ctx: ExtendedContext, callbackParts: string[]): Promise<void> {
     const requestId = ctx.requestId || 'unknown';
@@ -319,7 +319,7 @@ export class PushHandler {
       const [, direction, symbol] = callbackParts;
       
       if (!symbol || (direction !== 'long' && direction !== 'short')) {
-        await ctx.answerCbQuery('交易参数无效');
+        await ctx.answerCbQuery('Invalid trading parameters');
         return;
       }
 
@@ -330,16 +330,14 @@ export class PushHandler {
         requestId
       });
 
-      // 构造交易参数，使用配置中的默认交易金额
-      const tradingArgs = [symbol, config.trading.defaultAmount];
-
-      // 调用相应的交易处理器
+      // Call corresponding trading handler with guided mode (same as chart handler)
+      // Using only symbol parameter triggers guided trading flow
       if (direction === 'long') {
-        await longHandler.handle(ctx, tradingArgs);
-        await ctx.answerCbQuery(`✅ 正在执行 ${symbol} 做多交易`);
+        await longHandler.handle(ctx, [symbol]);
+        await ctx.answerCbQuery(`✅ Opening ${symbol} long trading interface...`);
       } else {
-        await shortHandler.handle(ctx, tradingArgs);
-        await ctx.answerCbQuery(`✅ 正在执行 ${symbol} 做空交易`);
+        await shortHandler.handle(ctx, [symbol]);
+        await ctx.answerCbQuery(`✅ Opening ${symbol} short trading interface...`);
       }
 
       logger.info(`Trading callback completed [${requestId}]`, {
@@ -357,19 +355,19 @@ export class PushHandler {
         requestId
       });
 
-      await ctx.answerCbQuery('交易执行失败，请稍后重试');
+      await ctx.answerCbQuery('Trade execution failed, please retry later');
     }
   }
 
   /**
-   * 更新用户推送设置
+   * Update user push settings
    */
   private async updateUserPushSetting(userId: string, type: string, enabled: boolean): Promise<void> {
     try {
-      // 首先尝试从缓存获取访问令牌
+      // First try to get access token from cache
       let accessToken = await getUserToken(userId);
       
-      // 如果没有缓存的token，自动初始化用户
+      // If no cached token, automatically initialize user
       if (!accessToken) {
         logger.info('No cached token found, initializing user for update', { telegramId: userId });
         
@@ -383,7 +381,7 @@ export class PushHandler {
         logger.info('User initialized and token obtained for update', { telegramId: userId });
       }
 
-      // 构造更新请求
+      // Construct update request
       const updateRequest: { [key: string]: boolean } = {};
       switch (type) {
         case 'flash':
@@ -396,13 +394,13 @@ export class PushHandler {
           updateRequest.fund_enabled = enabled;
           break;
         default:
-          throw new Error(`无效的推送类型: ${type}`);
+          throw new Error(`Invalid push type: ${type}`);
       }
 
-      // 调用推送服务更新设置
+      // Call push service to update settings
       const response = await pushService.updateUserPushSettings(userId, accessToken, updateRequest);
 
-      // 更新推送调度器的内存跟踪
+      // Update push scheduler's memory tracking
       if (response.data?.user_settings) {
         pushScheduler.addUserToPushTracking(userId, response.data.user_settings);
       }
@@ -421,25 +419,25 @@ export class PushHandler {
         error: (error as Error).message
       });
       
-      // 重新抛出错误以便上层处理
+      // Rethrow error for upper layer handling
       throw error;
     }
   }
 
   /**
-   * 获取类型名称
+   * Get type name
    */
   private getTypeName(type: string): string {
     switch (type) {
-      case 'flash': return '快讯';
-      case 'whale': return '鲸鱼动向';
-      case 'fund': return '资金流向';
-      default: return '未知';
+      case 'flash': return 'Flash News';
+      case 'whale': return 'Whale Movements';
+      case 'fund': return 'Fund Flows';
+      default: return 'Unknown';
     }
   }
 
   /**
-   * 检查是否有有效的推送内容
+   * Check if there is valid push content
    */
   private hasValidPushContent(pushData: PushData): boolean {
     if (!pushData) return false;
@@ -452,7 +450,7 @@ export class PushHandler {
   }
 
   /**
-   * 格式化时间戳
+   * Format timestamp
    */
   private formatTimestamp(timestamp: string): string {
     try {
@@ -464,15 +462,15 @@ export class PushHandler {
       const diffDays = Math.floor(diffHours / 24);
 
       if (diffMinutes < 1) {
-        return '刚刚';
+        return 'Just now';
       } else if (diffMinutes < 60) {
-        return `${diffMinutes}分钟前`;
+        return `${diffMinutes} minutes ago`;
       } else if (diffHours < 24) {
-        return `${diffHours}小时前`;
+        return `${diffHours} hours ago`;
       } else if (diffDays < 7) {
-        return `${diffDays}天前`;
+        return `${diffDays} days ago`;
       } else {
-        return date.toLocaleDateString('zh-CN', {
+        return date.toLocaleDateString('en-US', {
           month: 'short',
           day: 'numeric',
           hour: '2-digit',
@@ -486,11 +484,11 @@ export class PushHandler {
   }
 
   /**
-   * 错误处理
+   * Error handling
    */
   private async handleError(ctx: ExtendedContext, error: Error): Promise<void> {
-    const errorMessage = '❌ 推送设置操作失败，请稍后重试\n\n' +
-                        '如果问题持续存在，请联系技术支持';
+    const errorMessage = '❌ Push settings operation failed, please retry later\n\n' +
+                        'If the problem persists, please contact technical support';
 
     try {
       await ctx.reply(errorMessage, { parse_mode: 'HTML' });

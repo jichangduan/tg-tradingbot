@@ -347,19 +347,19 @@ export class LongHandler {
   }
 
   /**
-   * 处理交易回调查询（确认/取消按钮）
+   * Handle trading callback queries (confirm/cancel buttons)
    */
   public async handleCallback(ctx: ExtendedContext, callbackData: string): Promise<void> {
     try {
       if (callbackData.startsWith('long_confirm_')) {
-        // 确认执行交易
+        // Confirm execution of trade
         const [, , symbol, leverage, amount] = callbackData.split('_');
         await this.executeTrading(ctx, 'long', symbol, leverage, amount);
       } else if (callbackData.startsWith('long_cancel_')) {
-        // 取消交易
-        await ctx.answerCbQuery('❌ 交易已取消');
+        // Cancel trade
+        await ctx.answerCbQuery('❌ Trade cancelled');
         await ctx.editMessageText(
-          '❌ <b>交易已取消</b>\n\n您可以随时重新开始交易',
+          '❌ <b>Trade Cancelled</b>\n\nYou can restart trading anytime',
           { parse_mode: 'HTML' }
         );
       } else if (callbackData.startsWith('long_leverage_')) {
@@ -596,14 +596,14 @@ export class LongHandler {
   }
 
   /**
-   * 创建确认键盘
+   * Create confirmation keyboard
    */
   public createConfirmationKeyboard(symbol: string, leverage: string, amount: string): InlineKeyboardMarkup {
     return {
       inline_keyboard: [
         [
-          { text: '❌ 取消', callback_data: `long_cancel_${symbol}_${leverage}_${amount}` },
-          { text: '✅ 确认', callback_data: `long_confirm_${symbol}_${leverage}_${amount}` }
+          { text: '❌ Cancel', callback_data: `long_cancel_${symbol}_${leverage}_${amount}` },
+          { text: '✅ Confirm', callback_data: `long_confirm_${symbol}_${leverage}_${amount}` }
         ]
       ]
     };

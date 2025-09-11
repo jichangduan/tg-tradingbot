@@ -9,8 +9,8 @@ import { DetailedError, TimeFrame } from '../../types/api.types';
 import { ExtendedContext } from '../index';
 
 /**
- * Chart命令处理器
- * 处理 /chart <symbol> [timeframe] 命令的完整流程
+ * Chart command handler
+ * Handles the complete flow of /chart <symbol> [timeframe] command
  */
 export class ChartHandler {
   /**
@@ -35,9 +35,9 @@ export class ChartHandler {
 
       if (args.length > 2) {
         await ctx.reply(
-          '⚠️ 参数过多\n\n' +
-          '正确格式: <code>/chart BTC</code> 或 <code>/chart BTC 1h</code>\n\n' +
-          '支持的时间框架: 1m, 5m, 15m, 1h, 4h, 1d',
+          '⚠️ Too many parameters\n\n' +
+          'Correct format: <code>/chart BTC</code> or <code>/chart BTC 1h</code>\n\n' +
+          'Supported timeframes: 1m, 5m, 15m, 1h, 4h, 1d',
           { parse_mode: 'HTML' }
         );
         return;
@@ -58,9 +58,9 @@ export class ChartHandler {
         const inputTimeFrame = args[1].toLowerCase();
         if (!chartService.isValidTimeFrame(inputTimeFrame)) {
           await ctx.reply(
-            `⚠️ <b>不支持的时间框架: ${args[1]}</b>\n\n` +
-            '支持的时间框架: 1m, 5m, 15m, 1h, 4h, 1d\n\n' +
-            '示例: <code>/chart BTC 1h</code>',
+            `⚠️ <b>Unsupported timeframe: ${args[1]}</b>\n\n` +
+            'Supported timeframes: 1m, 5m, 15m, 1h, 4h, 1d\n\n' +
+            'Example: <code>/chart BTC 1h</code>',
             { parse_mode: 'HTML' }
           );
           return;
@@ -68,7 +68,7 @@ export class ChartHandler {
         timeFrame = inputTimeFrame as TimeFrame;
       }
 
-      // 4. 发送"查询中..."消息
+      // 4. Send "Loading..." message
       const loadingMessage = await ctx.reply(
         messageFormatter.formatChartLoadingMessage(symbol, timeFrame),
         { parse_mode: 'HTML' }
@@ -152,11 +152,11 @@ export class ChartHandler {
           requestId
         });
 
-        // 如果发送消息失败，尝试发送简单的错误提示
+        // If message sending fails, try to send simple error message
         try {
           await ctx.reply(
-            '❌ 图表发送失败，请重试\n\n' +
-            '<i>如果问题持续存在，请联系管理员</i>',
+            '❌ Chart sending failed, please retry\n\n' +
+            '<i>If the problem persists, please contact administrator</i>',
             { parse_mode: 'HTML' }
           );
         } catch (fallbackError) {
@@ -185,7 +185,7 @@ export class ChartHandler {
   }
 
   /**
-   * 发送帮助消息
+   * Send help message
    */
   private async sendHelpMessage(ctx: Context): Promise<void> {
     const helpMessage = messageFormatter.formatChartHelpMessage();
@@ -193,14 +193,14 @@ export class ChartHandler {
   }
 
   /**
-   * 处理参数验证错误
+   * Handle parameter validation errors
    */
   private async handleValidationError(ctx: Context, error: Error, inputSymbol: string): Promise<void> {
-    let errorMessage = `❌ <b>无效的交易对符号: ${inputSymbol}</b>\n\n`;
+    let errorMessage = `❌ <b>Invalid trading pair symbol: ${inputSymbol}</b>\n\n`;
     errorMessage += error.message;
     
-    // 提供一些常见交易对的建议
-    errorMessage += `\n\n💡 <b>试试这些热门交易对:</b>\n`;
+    // Provide suggestions for common trading pairs
+    errorMessage += `\n\n💡 <b>Try these popular trading pairs:</b>\n`;
     errorMessage += `<code>/chart BTC</code> - Bitcoin\n`;
     errorMessage += `<code>/chart ETH</code> - Ethereum\n`;
     errorMessage += `<code>/chart SOL</code> - Solana\n`;
@@ -210,33 +210,33 @@ export class ChartHandler {
   }
 
   /**
-   * 处理服务错误
+   * Handle service errors
    */
   private async handleServiceError(
     ctx: Context, 
     error: DetailedError, 
     loadingMessageId: number
   ): Promise<void> {
-    // 特殊处理数据不足的错误
+    // Special handling for insufficient data errors
     let errorMessage: string;
     if (error.message.includes('Insufficient candle data') || error.message.includes('only') && error.message.includes('candles available')) {
       errorMessage = 
-        '📊 <b>K线数据不足</b>\n\n' +
-        '该交易对在此时间框架下的历史数据有限。\n\n' +
-        '💡 <b>建议:</b>\n' +
-        '• 尝试较短的时间框架 (1h, 5m, 1m)\n' +
-        '• 选择更主流的交易对 (BTC, ETH)\n' +
-        '• 稍后重试，数据可能正在更新\n\n' +
-        '<i>如果是主流币种仍有此问题，请联系管理员</i>';
+        '📊 <b>Insufficient Candlestick Data</b>\n\n' +
+        'This trading pair has limited historical data for this timeframe.\n\n' +
+        '💡 <b>Suggestions:</b>\n' +
+        '• Try shorter timeframes (1h, 5m, 1m)\n' +
+        '• Choose more mainstream trading pairs (BTC, ETH)\n' +
+        '• Retry later, data may be updating\n\n' +
+        '<i>If this issue persists with mainstream coins, please contact administrator</i>';
     } else if (error.message.includes('Unable to get candle data') && error.message.includes('in any supported timeframe')) {
       errorMessage = 
-        '❌ <b>无法获取数据</b>\n\n' +
-        '很抱歉，无法获取该交易对的任何时间框架数据。\n\n' +
-        '💡 <b>可能的原因:</b>\n' +
-        '• 交易对不存在或已下线\n' +
-        '• 数据源暂时不可用\n' +
-        '• 网络连接问题\n\n' +
-        '请检查交易对符号是否正确，或稍后重试。';
+        '❌ <b>Unable to Get Data</b>\n\n' +
+        'Sorry, unable to get data for any timeframe of this trading pair.\n\n' +
+        '💡 <b>Possible reasons:</b>\n' +
+        '• Trading pair does not exist or has been delisted\n' +
+        '• Data source temporarily unavailable\n' +
+        '• Network connection issues\n\n' +
+        'Please check if the trading pair symbol is correct, or retry later.';
     } else {
       errorMessage = messageFormatter.formatErrorMessage(error);
     }
@@ -250,41 +250,41 @@ export class ChartHandler {
         { parse_mode: 'HTML' }
       );
     } catch (editError) {
-      // 如果编辑失败，发送新消息
+      // If editing fails, send new message
       await ctx.reply(errorMessage, { parse_mode: 'HTML' });
     }
   }
 
   /**
-   * 发送通用错误消息
+   * Send generic error message
    */
   private async sendGenericErrorMessage(ctx: Context): Promise<void> {
     const errorMessage = 
-      '❌ <b>系统错误</b>\n\n' +
-      '很抱歉，处理您的请求时出现了意外错误。\n\n' +
-      '💡 <b>您可以尝试:</b>\n' +
-      '• 稍后重试\n' +
-      '• 检查交易对符号是否正确\n' +
-      '• 使用常见交易对 (如 BTC, ETH, SOL)\n' +
-      '• 检查时间框架是否支持\n\n' +
-      '<i>如果问题持续存在，请联系管理员</i>';
+      '❌ <b>System Error</b>\n\n' +
+      'Sorry, an unexpected error occurred while processing your request.\n\n' +
+      '💡 <b>You can try:</b>\n' +
+      '• Retry later\n' +
+      '• Check if trading pair symbol is correct\n' +
+      '• Use common trading pairs (like BTC, ETH, SOL)\n' +
+      '• Check if timeframe is supported\n\n' +
+      '<i>If the problem persists, please contact administrator</i>';
 
     await ctx.reply(errorMessage, { parse_mode: 'HTML' });
   }
 
   /**
-   * 创建图表交互键盘
+   * Create chart interactive keyboard
    */
   private createChartKeyboard(symbol: string, currentTimeFrame: TimeFrame): InlineKeyboardMarkup {
     const timeframes: TimeFrame[] = ['1m', '5m', '1h', '1d'];
     
-    // 时间框架按钮行
+    // Timeframe button row
     const timeframeButtons = timeframes.map(tf => ({
       text: tf === currentTimeFrame ? `• ${tf.toUpperCase()} •` : tf.toUpperCase(),
       callback_data: `chart_${symbol}_${tf}`
     }));
 
-    // 交易按钮行 (连接到实际的交易命令)
+    // Trading button row (connected to actual trading commands)
     const tradingButtons = [
       {
         text: `📉 Short ${symbol}`,
@@ -305,7 +305,7 @@ export class ChartHandler {
   }
 
   /**
-   * 处理图表回调查询
+   * Handle chart callback queries
    */
   public async handleCallback(ctx: ExtendedContext): Promise<void> {
     const callbackData = ctx.callbackQuery && 'data' in ctx.callbackQuery ? ctx.callbackQuery.data : undefined;
@@ -313,11 +313,11 @@ export class ChartHandler {
 
     try {
       if (callbackData.startsWith('chart_')) {
-        // 解析回调数据: chart_BTC_1h
+        // Parse callback data: chart_BTC_1h
         const [, symbol, newTimeFrame] = callbackData.split('_');
         await this.regenerateChart(ctx, symbol, newTimeFrame as TimeFrame);
       } else if (callbackData.startsWith('short_') || callbackData.startsWith('long_')) {
-        // 处理交易按钮
+        // Handle trading buttons
         await this.handleTradingCallback(ctx, callbackData);
       }
     } catch (error) {
@@ -327,28 +327,28 @@ export class ChartHandler {
         userId: ctx.from?.id
       });
 
-      await ctx.answerCbQuery('❌ 操作失败，请重试');
+      await ctx.answerCbQuery('❌ Operation failed, please retry');
     }
   }
 
   /**
-   * 重新生成图表
+   * Regenerate chart
    */
   private async regenerateChart(ctx: ExtendedContext, symbol: string, timeFrame: TimeFrame): Promise<void> {
     const userId = ctx.from?.id;
     const requestId = `callback_${Date.now()}`;
 
     try {
-      // 检查是否点击了相同的时间框架
+      // Check if clicked the same timeframe
       const currentTimeFrame = this.getCurrentTimeFrameFromMessage(ctx);
       if (currentTimeFrame === timeFrame) {
-        // 用户点击了已选择的时间框架，显示提示而不进行更新
-        await ctx.answerCbQuery(`📊 当前已显示 ${timeFrame.toUpperCase()} 时间框架`, { show_alert: false });
+        // User clicked already selected timeframe, show hint without updating
+        await ctx.answerCbQuery(`📊 Currently showing ${timeFrame.toUpperCase()} timeframe`, { show_alert: false });
         return;
       }
 
-      // 显示加载状态
-      await ctx.answerCbQuery('🔄 正在更新图表...');
+      // Show loading status
+      await ctx.answerCbQuery('🔄 Updating chart...');
 
       logger.info(`Regenerating chart for ${symbol} ${timeFrame}`, {
         userId,
@@ -356,10 +356,10 @@ export class ChartHandler {
         trigger: 'callback'
       });
 
-      // 获取K线数据 (固定20根K线)
+      // Get candlestick data (fixed 20 candles)
       const candleData = await chartService.getCandleData(symbol, timeFrame, 20);
 
-      // 生成图表图像
+      // Generate chart image
       let chartImage;
       let useImageChart = true;
 
@@ -376,7 +376,7 @@ export class ChartHandler {
       }
 
       if (useImageChart && chartImage) {
-        // 更新图表和按钮
+        // Update chart and buttons
         const keyboard = this.createChartKeyboard(symbol, timeFrame);
         
         await ctx.editMessageMedia({
@@ -386,12 +386,12 @@ export class ChartHandler {
           reply_markup: keyboard
         });
       } else {
-        // 回退到文本消息
+        // Fallback to text message
         const responseMessage = messageFormatter.formatChartMessage(candleData);
         await ctx.editMessageText(responseMessage, { parse_mode: 'HTML' });
       }
 
-      // 移除fallback通知 - 现在始终使用用户选择的时间框架
+      // Remove fallback notification - now always use user-selected timeframe
 
     } catch (error) {
       logger.error('Chart regeneration failed', {
@@ -402,25 +402,25 @@ export class ChartHandler {
         requestId
       });
 
-      await ctx.answerCbQuery('❌ 图表更新失败，请重试');
+      await ctx.answerCbQuery('❌ Chart update failed, please retry');
     }
   }
 
   /**
-   * 处理交易按钮回调
+   * Handle trading button callbacks
    */
   private async handleTradingCallback(ctx: ExtendedContext, callbackData: string): Promise<void> {
     const isShort = callbackData.startsWith('short_');
     const symbol = callbackData.split('_')[1];
     const action = isShort ? 'Short' : 'Long';
 
-    // 确认用户操作
+    // Confirm user operation
     await ctx.answerCbQuery(
-      `正在打开 ${action} ${symbol} 交易界面...`,
+      `Opening ${action} ${symbol} trading interface...`,
       { show_alert: false }
     );
 
-    // 调用相应的交易处理器
+    // Call corresponding trading handler
     try {
       if (isShort) {
         const { default: shortHandler } = await import('./short.handler');
@@ -438,13 +438,13 @@ export class ChartHandler {
       });
       
       await ctx.reply(
-        `❌ 无法打开 ${action} ${symbol} 交易界面，请稍后重试。`
+        `❌ Unable to open ${action} ${symbol} trading interface, please retry later.`
       );
     }
   }
 
   /**
-   * 从消息的内联键盘中检测当前选中的时间框架
+   * Detect currently selected timeframe from message's inline keyboard
    */
   private getCurrentTimeFrameFromMessage(ctx: ExtendedContext): TimeFrame | null {
     try {
@@ -453,11 +453,11 @@ export class ChartHandler {
         return null;
       }
 
-      // 查找带有 • 标记的按钮（表示当前选中的时间框架）
+      // Look for buttons with • marker (indicating currently selected timeframe)
       for (const row of message.reply_markup.inline_keyboard) {
         for (const button of row) {
           if (button.text.includes('•')) {
-            // 提取时间框架，移除 • 符号和空格
+            // Extract timeframe, remove • symbols and spaces
             const timeFrame = button.text.replace(/[•\s]/g, '').toLowerCase();
             return timeFrame as TimeFrame;
           }
@@ -474,7 +474,7 @@ export class ChartHandler {
   }
 
   /**
-   * 获取处理器统计信息
+   * Get handler statistics
    */
   public getStats(): any {
     return {
