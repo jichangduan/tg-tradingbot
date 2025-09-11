@@ -33,14 +33,14 @@ export class PriceHandler {
 
       if (args.length > 1) {
         await ctx.reply(
-          '⚠️ 请一次只查询一个代币\n\n' +
-          '正确格式: <code>/price BTC</code>',
+          '⚠️ Please query only one token at a time\n\n' +
+          'Correct format: <code>/price BTC</code>',
           { parse_mode: 'HTML' }
         );
         return;
       }
 
-      // 2. 验证代币符号
+      // 2. Validate token symbol
       let symbol: string;
       try {
         symbol = validateSymbol(args[0]);
@@ -49,13 +49,13 @@ export class PriceHandler {
         return;
       }
 
-      // 3. 发送"查询中..."消息
+      // 3. Send "querying..." message
       const loadingMessage = await ctx.reply(
         messageFormatter.formatLoadingMessage(symbol),
         { parse_mode: 'HTML' }
       );
 
-      // 4. 调用Token服务获取价格数据
+      // 4. Call Token service to get price data
       let tokenData;
       try {
         tokenData = await tokenService.getTokenPrice(symbol);
@@ -76,7 +76,7 @@ export class PriceHandler {
           { parse_mode: 'HTML' }
         );
 
-        // 记录成功的查询
+        // Log successful query
         const duration = Date.now() - startTime;
         logger.logPerformance('price_query_success', duration, {
           symbol,
@@ -95,10 +95,10 @@ export class PriceHandler {
           requestId
         });
 
-        // 如果编辑消息失败，尝试发送新消息
+        // If message edit fails, try sending new message
         await ctx.reply(
-          '❌ 消息发送失败，请重试\n\n' +
-          '<i>如果问题持续存在，请联系管理员</i>',
+          '❌ Message failed to send, please retry\n\n' +
+          '<i>If the problem persists, please contact administrator</i>',
           { parse_mode: 'HTML' }
         );
       }
@@ -115,7 +115,7 @@ export class PriceHandler {
         requestId
       });
 
-      // 发送通用错误消息
+      // Send generic error message
       await this.sendGenericErrorMessage(ctx);
     }
   }
@@ -129,14 +129,14 @@ export class PriceHandler {
   }
 
   /**
-   * 处理参数验证错误
+   * Handle parameter validation errors
    */
   private async handleValidationError(ctx: Context, error: Error, inputSymbol: string): Promise<void> {
-    let errorMessage = `❌ <b>无效的代币符号: ${inputSymbol}</b>\n\n`;
+    let errorMessage = `❌ <b>Invalid token symbol: ${inputSymbol}</b>\n\n`;
     errorMessage += error.message;
     
-    // 提供一些常见代币的建议
-    errorMessage += `\n\n💡 <b>试试这些热门代币:</b>\n`;
+    // Provide suggestions for common tokens
+    errorMessage += `\n\n💡 <b>Try these popular tokens:</b>\n`;
     errorMessage += `<code>/price BTC</code> - Bitcoin\n`;
     errorMessage += `<code>/price ETH</code> - Ethereum\n`;
     errorMessage += `<code>/price SOL</code> - Solana\n`;
@@ -146,7 +146,7 @@ export class PriceHandler {
   }
 
   /**
-   * 处理服务错误
+   * Handle service errors
    */
   private async handleServiceError(
     ctx: Context, 

@@ -47,9 +47,8 @@ export class PushDataService {
       
       // 检查推送数据是否存在
       if (!response?.data?.push_data) {
-        const testPushData = this.createTestPushData();
-        PushLogger.logTestDataCreated(userId, testPushData);
-        return testPushData;
+        PushLogger.logDataFetchSuccess(userId, duration);
+        return undefined; // 返回undefined而不是测试数据
       }
       
       // 直接返回AIW3真实推送数据
@@ -72,12 +71,8 @@ export class PushDataService {
       
       PushLogger.logDataFetchError(userId, duration, error as Error);
       
-      // 🚨 临时注释fallback数据，让错误直接暴露
-      logger.warn(`⚠️ [PUSH_DATA] Throwing error instead of using fallback data for debugging`);
+      // 直接抛出错误，不使用fallback测试数据
       throw error;
-      
-      // 返回测试数据以便继续测试推送流程
-      // return this.createFallbackTestData();
     }
   }
 
@@ -107,55 +102,6 @@ export class PushDataService {
     return hasAnyContent;
   }
 
-  /**
-   * 创建测试推送数据
-   */
-  private createTestPushData(): PushData {
-    return {
-      flash_news: [
-        {
-          title: "🚀 测试快讯",
-          content: "这是一条测试推送消息，用于验证推送功能是否正常工作。",
-          timestamp: new Date().toISOString(),
-          symbol: "BTC"
-        }
-      ],
-      whale_actions: [
-        {
-          address: "0x123...abc",
-          action: "买入",
-          amount: "1000000",
-          timestamp: new Date().toISOString(),
-          symbol: "ETH"
-        }
-      ],
-      fund_flows: [
-        {
-          from: "交易所A",
-          to: "交易所B",
-          amount: "500000",
-          timestamp: new Date().toISOString(),
-          symbol: "USDT"
-        }
-      ]
-    };
-  }
-
-  /**
-   * 创建错误备用测试数据
-   */
-  private createFallbackTestData(): PushData {
-    return {
-      flash_news: [
-        {
-          title: "📢 系统测试",
-          content: "推送系统正在进行功能测试，此消息用于验证推送机制是否正常。",
-          timestamp: new Date().toISOString(),
-          symbol: "BTC"
-        }
-      ]
-    };
-  }
 
   /**
    * 根据用户设置筛选推送内容

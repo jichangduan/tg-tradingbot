@@ -158,27 +158,27 @@ export class StartHandler {
    */
   private getWelcomeMessage(): string {
     return `
-🎉 <b>欢迎使用 AIW3 交易机器人!</b>
+🎉 <b>Welcome to AIW3 Trading Bot!</b>
 
-正在为您初始化账户，请稍候...
+Initializing your account, please wait...
 
-<b>🚀 主要功能:</b>
-• 💰 实时价格查询
-• 📊 24小时涨跌数据  
-• 💹 交易量和市值
-• 📈 交易执行 (/long, /short)
-• 💼 钱包管理 (/wallet)
-• 🎁 邀请奖励系统
+<b>🚀 Main Features:</b>
+• 💰 Real-time price queries
+• 📊 24-hour price change data  
+• 💹 Trading volume and market cap
+• 📈 Trade execution (/long, /short)
+• 💼 Wallet management (/wallet)
+• 🎁 Referral reward system
 
-<b>📝 常用命令:</b>
-<code>/price BTC</code> - 查询比特币价格
-<code>/long ETH 10</code> - 做多以太坊
-<code>/markets</code> - 查看市场行情
-<code>/wallet</code> - 查看钱包信息
+<b>📝 Common Commands:</b>
+<code>/price BTC</code> - Check Bitcoin price
+<code>/long ETH 10</code> - Long Ethereum
+<code>/markets</code> - View market overview
+<code>/wallet</code> - View wallet info
 
-<b>🤖 Bot标识:</b> @yuze_trading_bot
+<b>🤖 Bot ID:</b> @yuze_trading_bot
 
-<i>💡 正在为您创建专属钱包地址...</i>
+<i>💡 Creating your exclusive wallet address...</i>
     `.trim();
   }
 
@@ -318,60 +318,60 @@ export class StartHandler {
   }
 
   /**
-   * 获取邀请链接的欢迎消息
+   * Get invitation link welcome message
    */
   private getInvitationWelcomeMessage(invitationCode: string): string {
     return `
-🎁 <b>欢迎通过邀请链接加入 AIW3 TGBot!</b>
+🎁 <b>Welcome to AIW3 TGBot via invitation link!</b>
 
-邀请码: <code>${invitationCode}</code>
+Invitation code: <code>${invitationCode}</code>
 
-正在为您初始化账户并处理邀请奖励...
+Initializing your account and processing invitation rewards...
 
-<b>🎉 邀请福利:</b>
-• 💰 额外能量奖励
-• 🚀 优先功能体验
-• 💎 专属用户标识
+<b>🎉 Invitation Benefits:</b>
+• 💰 Extra energy rewards
+• 🚀 Priority feature access
+• 💎 Exclusive user badge
 
-<b>📝 快速开始:</b>
-<code>/price BTC</code> - 查询价格
-<code>/help</code> - 查看更多功能
+<b>📝 Quick Start:</b>
+<code>/price BTC</code> - Check prices
+<code>/help</code> - View more features
 
-<i>💡 正在为您创建专属钱包并处理邀请奖励...</i>
+<i>💡 Creating your exclusive wallet and processing invitation rewards...</i>
     `.trim();
   }
 
   /**
-   * 获取群组欢迎消息
+   * Get group welcome message
    */
   private getGroupWelcomeMessage(): string {
     return `
-👋 <b>AIW3 交易机器人已添加到群组！</b>
+👋 <b>AIW3 Trading Bot added to group!</b>
 
-🤖 我是 @yuze_trading_bot，专业的加密货币交易助手
+🤖 I'm @yuze_trading_bot, your professional crypto trading assistant
 
-<b>🚀 核心功能:</b>
-• 💰 实时价格查询 - <code>/price BTC</code>
-• 📈 交易执行 - <code>/long ETH 10</code> | <code>/short BTC 5</code>
-• 💼 钱包管理 - <code>/wallet</code> | <code>/positions</code>
-• 📊 市场数据 - <code>/markets</code>
-• 📈 图表分析 - <code>/chart BTC</code>
-• 💹 订单管理 - <code>/orders</code>
+<b>🚀 Core Features:</b>
+• 💰 Real-time price queries - <code>/price BTC</code>
+• 📈 Trade execution - <code>/long ETH 10</code> | <code>/short BTC 5</code>
+• 💼 Wallet management - <code>/wallet</code> | <code>/positions</code>
+• 📊 Market data - <code>/markets</code>
+• 📈 Chart analysis - <code>/chart BTC</code>
+• 💹 Order management - <code>/orders</code>
 
-<b>⚠️ 重要说明:</b>
-• 这是 <b>AIW3 交易机器人</b>，不是管理工具
-• 支持真实交易功能，请谨慎使用
-• 所有交易需要钱包初始化和资金充值
+<b>⚠️ Important Notes:</b>
+• This is <b>AIW3 Trading Bot</b>, not a management tool
+• Supports real trading functions, use with caution
+• All trades require wallet initialization and funding
 
-<b>📝 快速开始:</b>
-1. <code>/start</code> - 初始化您的交易账户
-2. <code>/price BTC</code> - 查询比特币价格  
-3. <code>/wallet</code> - 查看钱包状态
-4. <code>/help</code> - 获取完整命令列表
+<b>📝 Quick Start:</b>
+1. <code>/start</code> - Initialize your trading account
+2. <code>/price BTC</code> - Check Bitcoin price  
+3. <code>/wallet</code> - View wallet status
+4. <code>/help</code> - Get complete command list
 
-<b>🤖 Bot标识确认:</b> @yuze_trading_bot
+<b>🤖 Bot Identity Confirmed:</b> @yuze_trading_bot
 
-<i>🎉 开始您的加密货币交易之旅！</i>
+<i>🎉 Start your crypto trading journey!</i>
     `.trim();
   }
 
@@ -427,10 +427,10 @@ export class StartHandler {
         requestId
       });
 
-      // 发送错误消息
+      // Send error message
       await ctx.reply(
-        '❌ 群组初始化失败\n\n' +
-        '请稍后重试或联系管理员。',
+        '❌ Group initialization failed\n\n' +
+        'Please try again later or contact administrator.',
         { parse_mode: 'HTML' }
       );
     }
@@ -480,35 +480,35 @@ export class StartHandler {
   public async handleGroupUsageGuide(ctx: any): Promise<void> {
     try {
       const guideMessage = `
-📖 <b>群组添加使用说明</b>
+📖 <b>Group Addition Usage Guide</b>
 
-<b>⚠️ 重要提醒：</b>
-请确保您添加的是正确的交易机器人：
+<b>⚠️ Important Reminder:</b>
+Please ensure you're adding the correct trading bot:
 
-<b>✅ 正确的Bot:</b>
-• 用户名: @yuze_trading_bot
-• 名称: Test_Trading_Bot  
-• 功能: 加密货币交易和价格查询
+<b>✅ Correct Bot:</b>
+• Username: @yuze_trading_bot
+• Name: Test_Trading_Bot  
+• Function: Cryptocurrency trading and price queries
 
-<b>❌ 如果群组中出现设置界面的Bot，说明添加错误</b>
+<b>❌ If a settings interface bot appears in the group, it means wrong bot was added</b>
 
-<b>🔧 正确添加步骤:</b>
-1. 点击下方"🤖 添加到群组"按钮
-2. 选择目标群组
-3. 确认Bot用户名为 @yuze_trading_bot
-4. 添加成功后，bot会自动发送欢迎消息
+<b>🔧 Correct Addition Steps:</b>
+1. Click "🤖 Add to Group" button below
+2. Select target group
+3. Confirm bot username is @yuze_trading_bot
+4. After successful addition, bot will automatically send welcome message
 
-<b>🎯 验证方法:</b>
-添加后在群组中发送 <code>/price BTC</code>
-如果能正常查询价格，说明添加成功
+<b>🎯 Verification Method:</b>
+After adding, send <code>/price BTC</code> in the group
+If it can query prices normally, addition was successful
 
-<b>🔄 如果添加错误：</b>
-1. 移除当前Bot
-2. 重新点击"添加到群组"按钮
-3. 确认Bot信息后再添加
+<b>🔄 If Added Wrong Bot:</b>
+1. Remove current Bot
+2. Re-click "Add to Group" button
+3. Confirm bot info before adding
 
-<b>📞 需要帮助？</b>
-请联系管理员或重新开始 /start
+<b>📞 Need Help?</b>
+Please contact administrator or restart with /start
       `.trim();
 
       await ctx.answerCbQuery();
@@ -519,7 +519,7 @@ export class StartHandler {
         error: (error as Error).message,
         userId: ctx.from?.id
       });
-      await ctx.answerCbQuery('❌ 获取说明失败');
+      await ctx.answerCbQuery('❌ Failed to get guide');
     }
   }
 

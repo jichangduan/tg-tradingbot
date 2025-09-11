@@ -14,8 +14,8 @@ import {
 } from '../../types/api.types';
 
 /**
- * Telegram消息格式化工具类
- * 负责将数据格式化为用户友好的Telegram消息
+ * Telegram Message Formatter Utility Class
+ * Responsible for formatting data into user-friendly Telegram messages
  */
 export class MessageFormatter {
   private readonly defaultOptions: FormatOptions = {
@@ -26,133 +26,133 @@ export class MessageFormatter {
   };
 
   /**
-   * 格式化代币价格消息
+   * Format token price message
    */
   public formatPriceMessage(tokenData: CachedTokenData, options?: Partial<FormatOptions>): string {
     const opts = { ...this.defaultOptions, ...options };
     const { symbol, name, price, change24h, volume24h, marketCap, high24h, low24h, isCached } = tokenData;
     
-    // 计算价格趋势
+    // Calculate price trend
     const trend = this.calculateTrend(change24h);
     
-    // 选择相应的emoji和颜色
+    // Choose appropriate emoji and color
     const trendEmoji = this.getTrendEmoji(trend.type);
     const changeText = this.formatPercentage(change24h, true);
     
-    // 构建主要信息
+    // Build main information
     const priceText = this.formatPrice(price, opts);
     const volumeText = this.formatLargeNumber(volume24h);
     const marketCapText = this.formatLargeNumber(marketCap);
     
-    // 构建完整消息
+    // Build complete message
     let message = `<b>💰 ${symbol}`;
     if (name && name !== symbol) {
       message += ` (${name})`;
     }
-    message += ` 价格信息</b> ${trendEmoji}\n\n`;
+    message += ` Price Info</b> ${trendEmoji}\n\n`;
     
-    message += `🏷️ <b>当前价格:</b> ${priceText}\n`;
-    message += `📊 <b>24h涨跌:</b> ${changeText}\n`;
+    message += `🏷️ <b>Current Price:</b> ${priceText}\n`;
+    message += `📊 <b>24h Change:</b> ${changeText}\n`;
     
-    // 如果有24小时高低价，显示它们
+    // Show 24h high/low if available
     if (high24h && low24h && high24h > 0 && low24h > 0) {
-      message += `📈 <b>24h最高:</b> ${this.formatPrice(high24h, opts)}\n`;
-      message += `📉 <b>24h最低:</b> ${this.formatPrice(low24h, opts)}\n`;
+      message += `📈 <b>24h High:</b> ${this.formatPrice(high24h, opts)}\n`;
+      message += `📉 <b>24h Low:</b> ${this.formatPrice(low24h, opts)}\n`;
     }
     
-    message += `📈 <b>24h交易量:</b> $${volumeText}\n`;
+    message += `📈 <b>24h Volume:</b> $${volumeText}\n`;
     
     if (marketCap > 0) {
-      message += `💎 <b>市值:</b> $${marketCapText}\n`;
+      message += `💎 <b>Market Cap:</b> $${marketCapText}\n`;
     }
     
-    // 添加数据来源信息
-    message += `\n<i>🕐 更新时间: ${this.formatTimestamp(tokenData.updatedAt)}</i>\n`;
+    // Add data source information
+    message += `\n<i>🕐 Updated: ${this.formatTimestamp(tokenData.updatedAt)}</i>\n`;
     
     if (isCached) {
-      message += `<i>⚡ 缓存数据 (更新间隔: 5分钟)</i>\n`;
+      message += `<i>⚡ Cached data (refresh every 5 minutes)</i>\n`;
     }
     
-    message += `<i>📡 数据来源: AIW3</i>`;
+    message += `<i>📡 Data source: AIW3</i>`;
     
     return message;
   }
 
   /**
-   * 格式化错误消息
+   * Format error message
    */
   public formatErrorMessage(error: DetailedError | Error): string {
-    let message = `❌ <b>查询失败</b>\n\n`;
+    let message = `❌ <b>Query Failed</b>\n\n`;
     
     if ('code' in error && error.context) {
-      // DetailedError - 提供更详细的错误信息
+      // DetailedError - Provide more detailed error information
       message += error.message;
       
       if (error.retryable) {
-        message += `\n\n💡 <i>请稍后重试</i>`;
+        message += `\n\n💡 <i>Please retry later</i>`;
       }
       
-      // 根据错误类型提供特定建议
+      // Provide specific suggestions based on error type
       switch (error.code) {
         case 'TOKEN_NOT_FOUND':
-          message += `\n\n📝 <b>建议:</b>\n`;
-          message += `• 检查代币符号是否正确\n`;
-          message += `• 尝试使用常见代币: BTC, ETH, SOL\n`;
-          message += `• 确保代币符号为大写字母`;
+          message += `\n\n📝 <b>Suggestions:</b>\n`;
+          message += `• Check if the token symbol is correct\n`;
+          message += `• Try common tokens: BTC, ETH, SOL\n`;
+          message += `• Ensure token symbol is in uppercase`;
           break;
           
         case 'RATE_LIMIT_EXCEEDED':
-          message += `\n\n⏰ <i>请等待 30-60 秒后重试</i>`;
+          message += `\n\n⏰ <i>Please wait 30-60 seconds before retrying</i>`;
           break;
           
         case 'NETWORK_ERROR':
-          message += `\n\n🌐 <i>请检查网络连接并稍后重试</i>`;
+          message += `\n\n🌐 <i>Please check your connection and try again later</i>`;
           break;
       }
     } else {
-      // 普通Error
+      // Regular Error
       message += error.message;
     }
     
-    message += `\n\n<i>如果问题持续存在，请联系管理员</i>`;
+    message += `\n\n<i>If the problem persists, please contact administrator</i>`;
     
     return message;
   }
 
   /**
-   * 格式化帮助消息
+   * Format help message
    */
   public formatHelpMessage(): string {
     return `
-💡 <b>价格查询使用方法</b>
+💡 <b>Price Query Usage</b>
 
-<code>/price BTC</code> - 查询BTC价格
-<code>/price ETH</code> - 查询ETH价格  
-<code>/price SOL</code> - 查询SOL价格
+<code>/price BTC</code> - Get BTC price
+<code>/price ETH</code> - Get ETH price  
+<code>/price SOL</code> - Get SOL price
 
-<b>支持的主流代币:</b>
+<b>Supported Major Tokens:</b>
 BTC, ETH, SOL, USDT, USDC, BNB, ADA, DOT, LINK, MATIC, AVAX, UNI
 
-<b>功能特点:</b>
-• 🚀 实时价格数据
-• 📊 24小时涨跌幅
-• 💹 交易量和市值
-• ⚡ 5分钟智能缓存
-• 🎯 毫秒级响应
+<b>Features:</b>
+• 🚀 Real-time price data
+• 📊 24-hour price changes
+• 💹 Trading volume and market cap
+• ⚡ 5-minute smart caching
+• 🎯 Lightning-fast response
 
-<i>💡 提示: 代币符号不区分大小写</i>
+<i>💡 Tip: Token symbols are case insensitive</i>
     `.trim();
   }
 
   /**
-   * 格式化"正在查询"消息
+   * Format "querying" message
    */
   public formatLoadingMessage(symbol: string): string {
-    return `🔍 正在查询 ${symbol.toUpperCase()} 价格信息...`;
+    return `🔍 Querying ${symbol.toUpperCase()} price information...`;
   }
 
   /**
-   * 格式化价格数字
+   * Format price number
    */
   private formatPrice(price: number, options: FormatOptions): string {
     const { precision, showSymbol, compact } = options;
@@ -166,16 +166,16 @@ BTC, ETH, SOL, USDT, USDC, BNB, ADA, DOT, LINK, MATIC, AVAX, UNI
     if (compact && price >= 1000) {
       formatted = this.formatLargeNumber(price);
     } else if (price >= 1) {
-      // 大于等于1的价格，显示2位小数
+      // Prices >= 1, show 2 decimal places
       formatted = price.toLocaleString('en-US', {
         minimumFractionDigits: precision,
         maximumFractionDigits: precision
       });
     } else if (price >= 0.01) {
-      // 0.01到1之间，显示4位小数
+      // Between 0.01-1, show 4 decimal places
       formatted = price.toFixed(4);
     } else {
-      // 小于0.01，显示6位小数或更多
+      // Less than 0.01, show 6+ decimal places
       formatted = price.toFixed(8).replace(/\.?0+$/, '');
     }
     
@@ -183,7 +183,7 @@ BTC, ETH, SOL, USDT, USDC, BNB, ADA, DOT, LINK, MATIC, AVAX, UNI
   }
 
   /**
-   * 格式化大数字（使用K, M, B, T后缀）
+   * Format large numbers (using K, M, B, T suffixes)
    */
   private formatLargeNumber(num: number): string {
     if (num === 0) return '0';
@@ -198,7 +198,7 @@ BTC, ETH, SOL, USDT, USDC, BNB, ADA, DOT, LINK, MATIC, AVAX, UNI
     for (const unit of units) {
       if (Math.abs(num) >= unit.value) {
         const formatted = (num / unit.value).toFixed(1);
-        // 移除不必要的 .0
+        // Remove unnecessary .0
         return formatted.replace(/\.0$/, '') + unit.suffix;
       }
     }
@@ -207,7 +207,7 @@ BTC, ETH, SOL, USDT, USDC, BNB, ADA, DOT, LINK, MATIC, AVAX, UNI
   }
 
   /**
-   * 格式化百分比
+   * Format percentage
    */
   private formatPercentage(value: number, withSign: boolean = false): string {
     const sign = value >= 0 ? '+' : '';
@@ -227,7 +227,7 @@ BTC, ETH, SOL, USDT, USDC, BNB, ADA, DOT, LINK, MATIC, AVAX, UNI
   }
 
   /**
-   * 格式化时间戳
+   * Format timestamp
    */
   private formatTimestamp(date: Date): string {
     return date.toLocaleString('zh-CN', {
@@ -241,7 +241,7 @@ BTC, ETH, SOL, USDT, USDC, BNB, ADA, DOT, LINK, MATIC, AVAX, UNI
   }
 
   /**
-   * 计算价格趋势
+   * Calculate price trend
    */
   private calculateTrend(change24h: number): { type: PriceChangeType; isSignificant: boolean } {
     const absChange = Math.abs(change24h);
@@ -257,12 +257,12 @@ BTC, ETH, SOL, USDT, USDC, BNB, ADA, DOT, LINK, MATIC, AVAX, UNI
     
     return {
       type,
-      isSignificant: absChange >= 5 // 5%或以上认为是显著变化
+      isSignificant: absChange >= 5 // 5% or more considered significant change
     };
   }
 
   /**
-   * 根据趋势类型获取相应的emoji
+   * Get emoji based on trend type
    */
   private getTrendEmoji(type: PriceChangeType): string {
     switch (type) {
@@ -278,7 +278,7 @@ BTC, ETH, SOL, USDT, USDC, BNB, ADA, DOT, LINK, MATIC, AVAX, UNI
   }
 
   /**
-   * 格式化紧凑型价格消息（用于批量查询）
+   * Format compact price message (for batch queries)
    */
   public formatCompactPriceMessage(tokenData: TokenData): string {
     const { symbol, price, change24h } = tokenData;
@@ -289,27 +289,27 @@ BTC, ETH, SOL, USDT, USDC, BNB, ADA, DOT, LINK, MATIC, AVAX, UNI
   }
 
   /**
-   * 格式化多代币价格消息
+   * Format multi-token price message
    */
   public formatMultiTokenMessage(tokens: CachedTokenData[]): string {
     if (tokens.length === 0) {
-      return '❌ <b>未找到任何代币价格信息</b>';
+      return '❌ <b>No token price information found</b>';
     }
     
-    let message = `📈 <b>代币价格概览</b> (${tokens.length}个)\n\n`;
+    let message = `📈 <b>Token Price Overview</b> (${tokens.length} tokens)\n\n`;
     
     tokens.forEach(token => {
       message += this.formatCompactPriceMessage(token) + '\n';
     });
     
-    message += `\n<i>🕐 更新时间: ${this.formatTimestamp(new Date())}</i>`;
-    message += `\n<i>📡 数据来源: AIW3</i>`;
+    message += `\n<i>🕐 Updated: ${this.formatTimestamp(new Date())}</i>`;
+    message += `\n<i>📡 Data source: AIW3</i>`;
     
     return message;
   }
 
   /**
-   * 转义HTML特殊字符（Telegram HTML模式）
+   * Escape HTML special characters (Telegram HTML mode)
    */
   public escapeHtml(text: string): string {
     return text
@@ -321,31 +321,31 @@ BTC, ETH, SOL, USDT, USDC, BNB, ADA, DOT, LINK, MATIC, AVAX, UNI
   }
 
   /**
-   * 格式化系统状态消息
+   * Format system status message
    */
   public formatSystemStatusMessage(apiHealthy: boolean, cacheHealthy: boolean): string {
-    const apiStatus = apiHealthy ? '🟢 正常' : '🔴 异常';
-    const cacheStatus = cacheHealthy ? '🟢 正常' : '🟡 降级';
+    const apiStatus = apiHealthy ? '🟢 Normal' : '🔴 Error';
+    const cacheStatus = cacheHealthy ? '🟢 Normal' : '🟡 Degraded';
     
-    let message = `⚙️ <b>系统状态</b>\n\n`;
-    message += `📡 <b>API服务:</b> ${apiStatus}\n`;
-    message += `⚡ <b>缓存服务:</b> ${cacheStatus}\n`;
+    let message = `⚙️ <b>System Status</b>\n\n`;
+    message += `📡 <b>API Service:</b> ${apiStatus}\n`;
+    message += `⚡ <b>Cache Service:</b> ${cacheStatus}\n`;
     
     if (!apiHealthy) {
-      message += `\n⚠️ <i>API服务异常，部分功能可能不可用</i>`;
+      message += `\n⚠️ <i>API service error, some features may be unavailable</i>`;
     }
     
     if (!cacheHealthy) {
-      message += `\n💡 <i>缓存服务异常，响应可能较慢</i>`;
+      message += `\n💡 <i>Cache service error, response may be slower</i>`;
     }
     
-    message += `\n\n<i>🕐 检查时间: ${this.formatTimestamp(new Date())}</i>`;
+    message += `\n\n<i>🕐 Check time: ${this.formatTimestamp(new Date())}</i>`;
     
     return message;
   }
 
   /**
-   * 格式化用户初始化成功消息
+   * Format user initialization success message
    */
   public formatUserInitSuccessMessage(userData: UserInitData): string {
     const { userId, walletAddress, nickname, referralCode, energy, isNewUser } = userData;
@@ -353,67 +353,67 @@ BTC, ETH, SOL, USDT, USDC, BNB, ADA, DOT, LINK, MATIC, AVAX, UNI
     let message: string;
     
     if (isNewUser) {
-      // 新用户欢迎消息
-      message = `✅ <b>账户创建成功！</b>\n\n`;
-      message += `🎉 欢迎加入 AIW3 社区，${this.escapeHtml(nickname)}！\n\n`;
+      // New user welcome message
+      message = `✅ <b>Account Created Successfully!</b>\n\n`;
+      message += `🎉 Welcome to AIW3 Community, ${this.escapeHtml(nickname)}!\n\n`;
       
-      message += `<b>🏦 您的专属信息:</b>\n`;
-      message += `👤 <b>用户ID:</b> <code>${userId}</code>\n`;
-      message += `💎 <b>钱包地址:</b> <code>${this.truncateAddress(walletAddress)}</code>\n`;
-      message += `⚡ <b>初始能量:</b> ${energy} ⚡\n`;
-      message += `🔗 <b>邀请码:</b> <code>${referralCode}</code>\n\n`;
+      message += `<b>🏦 Your Account Info:</b>\n`;
+      message += `👤 <b>User ID:</b> <code>${userId}</code>\n`;
+      message += `💎 <b>Wallet Address:</b> <code>${this.truncateAddress(walletAddress)}</code>\n`;
+      message += `⚡ <b>Initial Energy:</b> ${energy} ⚡\n`;
+      message += `🔗 <b>Referral Code:</b> <code>${referralCode}</code>\n\n`;
       
-      message += `<b>🚀 现在您可以:</b>\n`;
-      message += `• 💰 查询实时币价: <code>/price BTC</code>\n`;
-      message += `• 📊 查看市场行情: <code>/markets</code>\n`;
-      message += `• 📱 分享您的邀请码赚取奖励\n`;
-      message += `• 💡 查看帮助信息: <code>/help</code>\n\n`;
+      message += `<b>🚀 Now you can:</b>\n`;
+      message += `• 💰 Check live prices: <code>/price BTC</code>\n`;
+      message += `• 📊 View market overview: <code>/markets</code>\n`;
+      message += `• 📱 Share your referral code to earn rewards\n`;
+      message += `• 💡 Get help info: <code>/help</code>\n\n`;
       
-      message += `<b>🎁 邀请好友奖励:</b>\n`;
-      message += `分享邀请码 <code>${referralCode}</code> 给朋友，双方都能获得额外奖励！\n\n`;
+      message += `<b>🎁 Refer Friends Rewards:</b>\n`;
+      message += `Share referral code <code>${referralCode}</code> with friends, both get extra rewards!\n\n`;
       
     } else {
-      // 老用户回归消息  
-      message = `👋 <b>欢迎回来，${this.escapeHtml(nickname)}！</b>\n\n`;
+      // Returning user welcome message  
+      message = `👋 <b>Welcome back, ${this.escapeHtml(nickname)}!</b>\n\n`;
       
-      message += `<b>🏦 您的账户信息:</b>\n`;
-      message += `👤 <b>用户ID:</b> <code>${userId}</code>\n`;
-      message += `💎 <b>钱包地址:</b> <code>${this.truncateAddress(walletAddress)}</code>\n`;
-      message += `⚡ <b>当前能量:</b> ${energy} ⚡\n`;
-      message += `🔗 <b>邀请码:</b> <code>${referralCode}</code>\n\n`;
+      message += `<b>🏦 Your Account Info:</b>\n`;
+      message += `👤 <b>User ID:</b> <code>${userId}</code>\n`;
+      message += `💎 <b>Wallet Address:</b> <code>${this.truncateAddress(walletAddress)}</code>\n`;
+      message += `⚡ <b>Current Energy:</b> ${energy} ⚡\n`;
+      message += `🔗 <b>Referral Code:</b> <code>${referralCode}</code>\n\n`;
       
-      message += `<b>💡 快速开始:</b>\n`;
-      message += `• <code>/price BTC</code> - 查询比特币价格\n`;
-      message += `• <code>/markets</code> - 查看市场概况\n`;
-      message += `• <code>/help</code> - 查看完整功能\n\n`;
+      message += `<b>💡 Quick Start:</b>\n`;
+      message += `• <code>/price BTC</code> - Check Bitcoin price\n`;
+      message += `• <code>/markets</code> - View market overview\n`;
+      message += `• <code>/help</code> - View all features\n\n`;
     }
     
-    message += `<i>🔐 您的钱包地址和私钥由系统安全保管</i>\n`;
-    message += `<i>💎 更多功能正在开发中，敬请期待！</i>`;
+    message += `<i>🔐 Your wallet address and private key are securely managed by the system</i>\n`;
+    message += `<i>💎 More features coming soon, stay tuned!</i>`;
     
     return message;
   }
 
   /**
-   * 格式化用户初始化错误消息
+   * Format user initialization error message
    */
   public formatUserInitErrorMessage(error: DetailedError): string {
-    let message = `❌ <b>账户初始化失败</b>\n\n`;
+    let message = `❌ <b>Account Initialization Failed</b>\n\n`;
     
-    // 根据错误类型提供特定的错误信息
+    // Provide specific error information based on error type
     switch (error.code) {
       case 'NETWORK_ERROR':
-        message += `🌐 网络连接异常\n\n`;
-        message += `可能的原因：\n`;
-        message += `• 网络连接不稳定\n`;
-        message += `• 服务器正在维护\n\n`;
-        message += `💡 <b>建议:</b> 请检查网络后重新发送 <code>/start</code>`;
+        message += `🌐 Network connection error\n\n`;
+        message += `Possible causes:\n`;
+        message += `• Unstable network connection\n`;
+        message += `• Server under maintenance\n\n`;
+        message += `💡 <b>Suggestion:</b> Please check your network and resend <code>/start</code>`;
         break;
         
       case 'TIMEOUT_ERROR':
-        message += `⏱️ 请求超时\n\n`;
-        message += `服务器响应时间过长，请稍后重试。\n\n`;
-        message += `💡 <b>建议:</b> 等待30秒后重新发送 <code>/start</code>`;
+        message += `⏱️ Request timeout\n\n`;
+        message += `Server response time too long, please try again later.\n\n`;
+        message += `💡 <b>Suggestion:</b> Wait 30 seconds and resend <code>/start</code>`;
         break;
         
       case 'SERVER_ERROR':
@@ -423,43 +423,43 @@ BTC, ETH, SOL, USDT, USDC, BNB, ADA, DOT, LINK, MATIC, AVAX, UNI
         break;
         
       case 'RATE_LIMIT_EXCEEDED':
-        message += `🚦 请求过于频繁\n\n`;
-        message += `为了保护系统稳定性，请稍后重试。\n\n`;
-        message += `💡 <b>建议:</b> 等待1-2分钟后重新发送 <code>/start</code>`;
+        message += `🚦 Requests too frequent\n\n`;
+        message += `To protect system stability, please try again later.\n\n`;
+        message += `💡 <b>Suggestion:</b> Wait 1-2 minutes and resend <code>/start</code>`;
         break;
         
       default:
         message += `${error.message}\n\n`;
         if (error.retryable) {
-          message += `💡 <b>建议:</b> 请重新发送 <code>/start</code> 命令`;
+          message += `💡 <b>Suggestion:</b> Please resend <code>/start</code> command`;
         } else {
-          message += `💡 <b>建议:</b> 请联系管理员获取帮助`;
+          message += `💡 <b>Suggestion:</b> Please contact administrator for help`;
         }
     }
     
-    message += `\n\n<b>🆘 需要帮助？</b>\n`;
-    message += `• 📱 发送 <code>/help</code> 查看使用指南\n`;
-    message += `• 💰 直接使用 <code>/price BTC</code> 开始体验\n`;
-    message += `• 💬 联系客服获取技术支持\n\n`;
+    message += `\n\n<b>🆘 Need Help?</b>\n`;
+    message += `• 📱 Send <code>/help</code> to view usage guide\n`;
+    message += `• 💰 Try <code>/price BTC</code> directly to start\n`;
+    message += `• 💬 Contact support for technical help\n\n`;
     
-    message += `<i>如果问题持续存在，请联系管理员</i>`;
+    message += `<i>If the problem persists, please contact administrator</i>`;
     
     return message;
   }
 
   /**
-   * 格式化邀请成功消息
+   * Format invitation success message
    */
   public formatInvitationSuccessMessage(invitationCode: string, userData: UserInitData): string {
-    let message = `🎁 <b>邀请成功！欢迎加入 AIW3！</b>\n\n`;
+    let message = `🎁 <b>Invitation Success! Welcome to AIW3!</b>\n\n`;
     
-    message += `使用邀请码: <code>${invitationCode}</code>\n`;
-    message += `欢迎新成员: <b>${this.escapeHtml(userData.nickname)}</b>\n\n`;
+    message += `Used invitation code: <code>${invitationCode}</code>\n`;
+    message += `Welcome new member: <b>${this.escapeHtml(userData.nickname)}</b>\n\n`;
     
-    message += `<b>🎉 邀请奖励已发放:</b>\n`;
-    message += `• ⚡ 额外能量奖励\n`;
-    message += `• 🎯 专属用户标识\n`;
-    message += `• 🚀 优先功能体验权\n\n`;
+    message += `<b>🎉 Invitation rewards distributed:</b>\n`;
+    message += `• ⚡ Extra energy bonus\n`;
+    message += `• 🎯 Exclusive user badge\n`;
+    message += `• 🚀 Priority feature access\n\n`;
     
     message += `<b>🏦 您的账户信息:</b>\n`;
     message += `👤 <b>用户ID:</b> <code>${userData.userId}</code>\n`;
@@ -478,8 +478,8 @@ BTC, ETH, SOL, USDT, USDC, BNB, ADA, DOT, LINK, MATIC, AVAX, UNI
   }
 
   /**
-   * 截断钱包地址（只显示前后几位）
-   * 修改为显示完整地址用于测试
+   * Truncate wallet address (show only first and last few characters)
+   * Modified to show full address for testing
    */
   private truncateAddress(address: string): string {
     // 显示完整钱包地址
@@ -543,17 +543,7 @@ BTC, ETH, SOL, USDT, USDC, BNB, ADA, DOT, LINK, MATIC, AVAX, UNI
         }
       }
       
-      // 现货余额
-      message += `\n💰 <b>现货余额:</b>\n`;
-      if (balance.tokenBalances.length > 0) {
-        balance.tokenBalances.forEach(token => {
-          const usdValue = token.usdValue !== undefined ? ` ($${this.formatCurrency(token.usdValue)})` : '';
-          const formattedAmount = token.uiAmount.toFixed(2);
-          message += `• ${token.symbol}: ${formattedAmount}${usdValue}\n`;
-        });
-      } else {
-        message += `• USDC: 0.00 ($0.00)\n`;
-      }
+      // 现货余额 - 不显示钱包现货余额
       
       // 资金用途说明
       message += `\n📝 <b>资金用途说明:</b>\n`;

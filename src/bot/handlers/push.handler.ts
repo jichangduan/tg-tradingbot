@@ -165,8 +165,8 @@ export class PushHandler {
                   `🐋 鲸鱼动向: ${whaleStatus}\n` +
                   `💰 资金流向: ${fundStatus}\n\n`;
 
-    // 如果有推送数据，显示最新的推送内容
-    if (pushData) {
+    // 显示推送内容状态
+    if (pushData && this.hasValidPushContent(pushData)) {
       message += `<b>📈 最新推送内容</b>\n\n`;
 
       // 显示快讯
@@ -186,6 +186,9 @@ export class PushHandler {
         const latestFund = pushData.fund_flows[0];
         message += `💰 <b>资金流向</b>\n从: ${latestFund.from} → 到: ${latestFund.to}\n金额: ${latestFund.amount}\n⏰ ${this.formatTimestamp(latestFund.timestamp)}\n\n`;
       }
+    } else {
+      message += `<b>📋 推送状态</b>\n\n`;
+      message += `📭 <i>暂无最新推送内容</i>\n\n`;
     }
 
     message += `点击下方按钮管理推送设置:`;
@@ -433,6 +436,19 @@ export class PushHandler {
       case 'fund': return '资金流向';
       default: return '未知';
     }
+  }
+
+  /**
+   * 检查是否有有效的推送内容
+   */
+  private hasValidPushContent(pushData: PushData): boolean {
+    if (!pushData) return false;
+    
+    const hasFlashNews = pushData.flash_news && pushData.flash_news.length > 0;
+    const hasWhaleActions = pushData.whale_actions && pushData.whale_actions.length > 0;
+    const hasFundFlows = pushData.fund_flows && pushData.fund_flows.length > 0;
+    
+    return !!(hasFlashNews || hasWhaleActions || hasFundFlows);
   }
 
   /**

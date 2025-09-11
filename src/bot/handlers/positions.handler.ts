@@ -462,7 +462,7 @@ export class PositionsHandler {
       
       positionsText += `
 ${sideIcon} <b>${position.symbol} ${sideText}</b>
-• 仓位大小: ${Math.abs(parseFloat(position.size)).toFixed(4)}
+• 仓位大小: ${Math.abs(parseFloat(position.size)).toFixed(4)} ${position.symbol}
 • 开仓价格: $${parseFloat(position.entryPrice).toFixed(4)}
 • 标记价格: $${parseFloat(position.markPrice).toFixed(4)}
 • 未实现盈亏: ${pnlColor} ${pnlPrefix}$${position.pnl} (${pnlPrefix}${position.pnlPercentage}%)
