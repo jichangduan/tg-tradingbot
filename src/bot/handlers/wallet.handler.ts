@@ -28,7 +28,7 @@ export class WalletHandler {
         throw this.createError(
           ApiErrorCode.INVALID_SYMBOL,
           'Unable to identify user',
-          '无法识别用户身份，请重试'
+          'Unable to identify user, please retry'
         );
       }
 
@@ -145,7 +145,7 @@ export class WalletHandler {
         
         // 最后的fallback - 发送简单错误消息
         try {
-          await ctx.reply('❌ 钱包查询失败，请稍后重试');
+          await ctx.reply('❌ Wallet query failed, please try again later');
         } catch (fallbackError) {
           logger.error('Failed to send fallback error message', {
             telegramId,
@@ -170,7 +170,7 @@ export class WalletHandler {
     return this.createError(
       ApiErrorCode.UNKNOWN_ERROR,
       error.message || 'Service error',
-      '钱包余额查询失败，请稍后重试'
+      'Wallet balance query failed, please try again later'
     );
   }
 
@@ -183,7 +183,7 @@ export class WalletHandler {
       return this.createError(
         ApiErrorCode.RATE_LIMIT_EXCEEDED,
         'Telegram rate limit exceeded',
-        '请求过于频繁，请稍后重试'
+        'Too many requests, please try again later'
       );
     }
 
@@ -191,7 +191,7 @@ export class WalletHandler {
       return this.createError(
         ApiErrorCode.INVALID_SYMBOL,
         error.message,
-        '请求参数错误，请重试'
+        'Invalid request parameters, please retry'
       );
     }
 
@@ -199,7 +199,7 @@ export class WalletHandler {
     return this.createError(
       ApiErrorCode.UNKNOWN_ERROR,
       error.message || 'Handler error',
-      '系统异常，请稍后重试'
+      'System error, please try again later'
     );
   }
 
@@ -239,24 +239,24 @@ export class WalletHandler {
    */
   public getUsage(): string {
     return `
-💰 <b>/wallet 命令使用说明</b>
+💰 <b>/wallet Command Usage</b>
 
-<b>功能:</b>
-查看您的钱包余额和账户信息
+<b>Function:</b>
+View your wallet balance and account information
 
-<b>使用方法:</b>
-<code>/wallet</code> - 显示钱包余额详情
+<b>Usage:</b>
+<code>/wallet</code> - Display wallet balance details
 
-<b>显示信息包括:</b>
-• 总资产和可用余额
-• 冻结资金和资金使用率
-• 风险提醒和操作建议
-• 最后更新时间
+<b>Information displayed:</b>
+• Total assets and available balance
+• Used margin and fund utilization
+• Risk warnings and operational suggestions
+• Last update time
 
-<b>注意事项:</b>
-• 需要先完成账户初始化 (<code>/start</code>)
-• 数据每10秒自动更新
-• 如遇问题请稍后重试
+<b>Notes:</b>
+• Account initialization required first (<code>/start</code>)
+• Data updates automatically every 10 seconds
+• Please retry if any issues occur
     `.trim();
   }
 

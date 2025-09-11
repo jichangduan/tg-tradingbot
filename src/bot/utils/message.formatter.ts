@@ -521,88 +521,74 @@ BTC, ETH, SOL, USDT, USDC, BNB, ADA, DOT, LINK, MATIC, AVAX, UNI
    * 格式化链上钱包余额消息
    */
   private formatOnChainWalletMessage(balance: FormattedWalletBalance, warnings?: string[]): string {
-    // 根据网络类型判断钱包名称
-    const walletName = balance.network.toLowerCase() === 'arbitrum' ? 'Hyperliquid钱包' : 'Solana钱包';
+    // Determine wallet name based on network type
+    const walletName = balance.network.toLowerCase() === 'arbitrum' ? 'Hyperliquid Wallet' : 'Solana Wallet';
     let message = `💰 <b>${walletName}</b>\n\n`;
     
-    // 钱包地址信息
-    message += `📍 <b>钱包地址:</b> <code>${this.truncateAddress(balance.address)}</code>\n`;
-    message += `🌐 <b>网络:</b> ${balance.network.toUpperCase()}\n\n`;
+    // Wallet address information
+    message += `📍 <b>Wallet Address:</b> <code>${this.truncateAddress(balance.address)}</code>\n`;
+    message += `🌐 <b>Network:</b> ${balance.network.toUpperCase()}\n\n`;
     
-    // 针对Hyperliquid钱包的特殊显示
+    // Special display for Hyperliquid wallet
     if (balance.network.toLowerCase() === 'arbitrum') {
-      // 合约账户余额 (主要资金)
-      message += `💎 <b>合约账户总价值:</b> ${balance.nativeBalance.toFixed(2)} ${balance.nativeSymbol} ($${this.formatCurrency(balance.nativeBalance)})\n`;
+      // Contract account balance (main funds)
+      message += `💎 <b>Contract Account Value:</b> ${balance.nativeBalance.toFixed(2)} ${balance.nativeSymbol} ($${this.formatCurrency(balance.nativeBalance)})\n`;
       
-      // 可提取金额 (可用保证金)
+      // Withdrawable amount (available margin)
       if (balance.withdrawableAmount !== undefined) {
         const occupiedMargin = balance.nativeBalance - balance.withdrawableAmount;
-        message += `💸 <b>可用保证金:</b> ${balance.withdrawableAmount.toFixed(2)} ${balance.nativeSymbol} ($${this.formatCurrency(balance.withdrawableAmount)})\n`;
+        message += `💸 <b>Available Margin:</b> ${balance.withdrawableAmount.toFixed(2)} ${balance.nativeSymbol} ($${this.formatCurrency(balance.withdrawableAmount)})\n`;
         if (occupiedMargin > 0) {
-          message += `🔒 <b>占用保证金:</b> ${occupiedMargin.toFixed(2)} ${balance.nativeSymbol} ($${this.formatCurrency(occupiedMargin)})\n`;
+          message += `🔒 <b>Used Margin:</b> ${occupiedMargin.toFixed(2)} ${balance.nativeSymbol} ($${this.formatCurrency(occupiedMargin)})\n`;
         }
       }
       
-      // 现货余额 - 不显示钱包现货余额
-      
-      // 资金用途说明
-      message += `\n📝 <b>资金用途说明:</b>\n`;
-      message += `• <b>现货余额:</b> 用于1x杠杆交易\n`;
-      message += `• <b>合约账户:</b> 用于>1x杠杆交易\n`;
-      message += `• <b>可用保证金:</b> 新杠杆交易的可用额度\n`;
-      message += `• <b>占用保证金:</b> 当前持仓锁定的保证金\n`;
+      // Fund usage description
+      message += `\n📝 <b>Fund Usage Description:</b>\n`;
+      message += `• <b>Contract Account:</b> Used for >1x leverage trading\n`;
+      message += `• <b>Available Margin:</b> Available funds for new leverage trades\n`;
+      message += `• <b>Used Margin:</b> Margin locked by current positions\n`;
     } else {
-      // 其他网络的原有显示方式
-      message += `💎 <b>合约账户余额:</b> ${balance.nativeBalance.toFixed(6)} ${balance.nativeSymbol}\n`;
-      
-      message += `\n💰 <b>现货余额:</b>\n`;
-      if (balance.tokenBalances.length > 0) {
-        balance.tokenBalances.forEach(token => {
-          const usdValue = token.usdValue !== undefined ? ` ($${this.formatCurrency(token.usdValue)})` : '';
-          const formattedAmount = token.uiAmount.toFixed(2);
-          message += `• ${token.symbol}: ${formattedAmount} ${token.symbol}${usdValue}\n`;
-        });
-      } else {
-        message += `• USDC: 0.00 USDC ($0.00)\n`;
-      }
+      // Original display for other networks (contract account only)
+      message += `💎 <b>Contract Account Balance:</b> ${balance.nativeBalance.toFixed(6)} ${balance.nativeSymbol}\n`;
     }
     
-    // 总价值 - 总是显示，即使为0
-    message += `\n📈 <b>总价值:</b> $${this.formatCurrency(balance.totalUsdValue)}\n`;
+    // Total value - always display, even if 0
+    message += `\n📈 <b>Total Value:</b> $${this.formatCurrency(balance.totalUsdValue)}\n`;
     
-    // 如果总价值为0，添加提示信息
+    // Add notification if total value is 0
     if (balance.totalUsdValue === 0) {
-      message += `\n💡 <b>提示:</b> 钱包暂无资产，请先充值USDC到交易钱包地址\n`;
+      message += `\n💡 <b>Note:</b> Wallet has no assets, please deposit USDC to trading wallet address first\n`;
     }
     
-    // 最后更新时间
-    message += `🕐 <b>更新时间:</b> ${this.formatTimestamp(balance.lastUpdated)}\n`;
+    // Last update time
+    message += `🕐 <b>Updated:</b> ${this.formatTimestamp(balance.lastUpdated)}\n`;
 
-    // 警告信息
+    // Warning information
     if (warnings && warnings.length > 0) {
-      message += `\n<b>⚠️ 提醒:</b>\n`;
+      message += `\n<b>⚠️ Warnings:</b>\n`;
       warnings.forEach(warning => {
         message += `• ${warning}\n`;
       });
     }
 
-    // 分割线
+    // Separator
     message += `\n━━━━━━━━━━━━━━━━━━━━━━━\n`;
     
-    // 相关操作建议
-    message += `🔧 <b>可用操作:</b>\n`;
+    // Related operation suggestions
+    message += `🔧 <b>Available Actions:</b>\n`;
     if (balance.nativeBalance > 0.01) {
-      message += `• 发送代币到其他地址\n`;
-      message += `• 参与DeFi协议交互\n`;
+      message += `• Send tokens to other addresses\n`;
+      message += `• Participate in DeFi protocols\n`;
     }
-    message += `• <code>/price SOL</code> - 查看SOL价格\n`;
-    message += `• <code>/price USDT</code> - 查看USDT价格\n`;
+    message += `• <code>/price SOL</code> - Check SOL price\n`;
+    message += `• <code>/price USDT</code> - Check USDT price\n`;
     
     if (balance.nativeBalance < 0.001) {
-      message += `\n💡 <i>SOL余额过低，可能影响交易手续费支付</i>`;
+      message += `\n💡 <i>SOL balance too low, may affect transaction fee payment</i>`;
     }
 
-    message += `\n\n⚡ <i>实时链上数据</i>`;
+    message += `\n\n⚡ <i>Real-time on-chain data</i>`;
 
     return message;
   }
@@ -698,66 +684,66 @@ BTC, ETH, SOL, USDT, USDC, BNB, ADA, DOT, LINK, MATIC, AVAX, UNI
    * 格式化钱包余额加载消息
    */
   public formatWalletLoadingMessage(): string {
-    return `🔍 <b>正在查询钱包余额...</b>\n\n💡 <i>正在获取您的账户信息</i>`;
+    return `🔍 <b>Querying wallet balance...</b>\n\n💡 <i>Fetching your account information</i>`;
   }
 
   /**
    * 格式化钱包余额错误消息
    */
   public formatWalletErrorMessage(error: DetailedError): string {
-    let message = `❌ <b>钱包余额查询失败</b>\n\n`;
+    let message = `❌ <b>Wallet Balance Query Failed</b>\n\n`;
     
-    // 根据错误类型提供特定的错误信息
+    // Provide specific error information based on error type
     switch (error.code) {
       case 'TOKEN_NOT_FOUND':
-        message += `🏦 未找到交易账户\n\n`;
-        message += `可能的原因：\n`;
-        message += `• 您尚未创建交易账户\n`;
-        message += `• 账户信息同步延迟\n\n`;
-        message += `💡 <b>建议:</b> 请先发送 <code>/start</code> 完成账户初始化`;
+        message += `🏦 Trading account not found\n\n`;
+        message += `Possible reasons:\n`;
+        message += `• You haven't created a trading account yet\n`;
+        message += `• Account information sync delay\n\n`;
+        message += `💡 <b>Suggestion:</b> Please send <code>/start</code> to initialize your account first`;
         break;
         
       case 'NETWORK_ERROR':
-        message += `🌐 网络连接异常\n\n`;
-        message += `可能的原因：\n`;
-        message += `• 网络连接不稳定\n`;
-        message += `• 服务器正在维护\n\n`;
-        message += `💡 <b>建议:</b> 请稍后重新发送 <code>/wallet</code>`;
+        message += `🌐 Network connection error\n\n`;
+        message += `Possible reasons:\n`;
+        message += `• Unstable network connection\n`;
+        message += `• Server under maintenance\n\n`;
+        message += `💡 <b>Suggestion:</b> Please retry <code>/wallet</code> later`;
         break;
         
       case 'TIMEOUT_ERROR':
-        message += `⏱️ 请求超时\n\n`;
-        message += `服务器响应时间过长，请稍后重试。\n\n`;
-        message += `💡 <b>建议:</b> 等待30秒后重新发送 <code>/wallet</code>`;
+        message += `⏱️ Request timeout\n\n`;
+        message += `Server response time too long, please retry later.\n\n`;
+        message += `💡 <b>Suggestion:</b> Wait 30 seconds then retry <code>/wallet</code>`;
         break;
         
       case 'SERVER_ERROR':
-        message += `🛠️ 服务器内部错误\n\n`;
-        message += `我们的技术团队正在处理此问题。\n\n`;
-        message += `💡 <b>建议:</b> 请稍后重试或联系客服`;
+        message += `🛠️ Internal server error\n\n`;
+        message += `Our technical team is handling this issue.\n\n`;
+        message += `💡 <b>Suggestion:</b> Please retry later or contact support`;
         break;
         
       case 'RATE_LIMIT_EXCEEDED':
-        message += `🚦 请求过于频繁\n\n`;
-        message += `为了保护系统稳定性，请稍后重试。\n\n`;
-        message += `💡 <b>建议:</b> 等待1-2分钟后重新发送 <code>/wallet</code>`;
+        message += `🚦 Too many requests\n\n`;
+        message += `To protect system stability, please retry later.\n\n`;
+        message += `💡 <b>Suggestion:</b> Wait 1-2 minutes then retry <code>/wallet</code>`;
         break;
         
       default:
         message += `${error.message}\n\n`;
         if (error.retryable) {
-          message += `💡 <b>建议:</b> 请重新发送 <code>/wallet</code> 命令`;
+          message += `💡 <b>Suggestion:</b> Please retry <code>/wallet</code> command`;
         } else {
-          message += `💡 <b>建议:</b> 请联系管理员获取帮助`;
+          message += `💡 <b>Suggestion:</b> Please contact administrator for help`;
         }
     }
     
-    message += `\n\n<b>🆘 需要帮助？</b>\n`;
-    message += `• 📱 发送 <code>/help</code> 查看使用指南\n`;
-    message += `• 💰 发送 <code>/start</code> 初始化账户\n`;
-    message += `• 💬 联系客服获取技术支持\n\n`;
+    message += `\n\n<b>🆘 Need Help?</b>\n`;
+    message += `• 📱 Send <code>/help</code> for usage guide\n`;
+    message += `• 💰 Send <code>/start</code> to initialize account\n`;
+    message += `• 💬 Contact support for technical assistance\n\n`;
     
-    message += `<i>如果问题持续存在，请联系管理员</i>`;
+    message += `<i>If the problem persists, please contact administrator</i>`;
     
     return message;
   }
