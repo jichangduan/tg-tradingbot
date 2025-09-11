@@ -12,6 +12,7 @@ export class PushDataService {
   /**
    * 为用户获取推送数据
    * 从push.service.ts的getUserPushSettings中获取推送数据
+   * 临时增加模拟快讯用于测试
    */
   public async getPushDataForUser(userId: string): Promise<PushData | undefined> {
     const startTime = Date.now();
@@ -45,15 +46,23 @@ export class PushDataService {
       const duration = Date.now() - startTime;
       PushLogger.logApiResponse(userId, response, duration);
       
-      // 检查推送数据是否存在
-      if (!response?.data?.push_data) {
-        PushLogger.logDataFetchSuccess(userId, duration);
-        return undefined; // 返回undefined而不是测试数据
-      }
+      // 临时添加一条测试快讯数据
+      const realPushData = response?.data?.push_data;
+      const testFlashNews = [{
+        title: "🔥 Bitcoin突破$95,000大关！",
+        content: "机构资金大量流入，市场情绪极度乐观",
+        timestamp: new Date().toISOString(),
+        symbol: "BTC"
+      }];
       
-      // 直接返回AIW3真实推送数据
+      const combinedPushData: PushData = {
+        flash_news: [...testFlashNews, ...(realPushData?.flash_news || [])],
+        whale_actions: realPushData?.whale_actions || [],
+        fund_flows: realPushData?.fund_flows || []
+      };
+      
       PushLogger.logDataFetchSuccess(userId, duration);
-      return response.data.push_data;
+      return combinedPushData;
       
     } catch (error) {
       const duration = Date.now() - startTime;
