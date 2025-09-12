@@ -471,8 +471,7 @@ export class PnlHandler {
     // 按时间排序交易记录
     const sortedTrades = [...trades].sort((a, b) => a.timestamp - b.timestamp);
     
-    // 计算累计已实现PnL历史
-    let cumulativeRealizedPnl = 0;
+    // 存储图表数据点
     const pnlDataPoints: PnlDataPoint[] = [];
     
     // 🔧 检测时间戳格式并标准化为毫秒
@@ -485,63 +484,105 @@ export class PnlHandler {
       return timestamp;
     };
 
+    // 🔧 筛选关键交易节点（重要盈亏交易）
+    const isSignificantTrade = (trade: EnhancedTrade): boolean => {
+      return (
+        Math.abs(trade.realizedPnl) >= 5 ||  // 盈亏大于等于$5
+        trade.direction.includes('Close') ||  // 平仓交易
+        trade.direction.includes('Open')      // 开仓交易
+      );
+    };
+
+    // 先计算所有交易的累计PnL映射
+    const cumulativePnlMap = new Map<number, number>();
+    let runningPnl = 0;
+    
+    for (const trade of sortedTrades) {
+      runningPnl += trade.realizedPnl;
+      cumulativePnlMap.set(trade.tradeId, runningPnl);
+    }
+
+    // 筛选关键交易节点
+    const significantTrades = sortedTrades.filter(isSignificantTrade);
+    
+    // 确保包含第一笔和最后一笔交易
+    const keyTrades = [...new Set([
+      sortedTrades[0],  // 第一笔交易
+      ...significantTrades,  // 重要交易
+      sortedTrades[sortedTrades.length - 1]  // 最后一笔交易
+    ])].filter(Boolean).sort((a, b) => a.timestamp - b.timestamp);
+
+    logger.info('Key Trades Selection', {
+      totalTrades: sortedTrades.length,
+      significantTrades: significantTrades.length,
+      keyTradesSelected: keyTrades.length,
+      criteriaUsed: 'realizedPnl >= $5 OR Close/Open trades'
+    });
+
     // 添加起始点 (第一笔交易前的0点)
-    if (sortedTrades.length > 0) {
-      const firstTimestamp = normalizeTimestamp(sortedTrades[0].timestamp);
+    if (keyTrades.length > 0) {
+      const firstTimestamp = normalizeTimestamp(keyTrades[0].timestamp);
       pnlDataPoints.push({
         x: firstTimestamp,
         y: 0
       });
       
       logger.debug('Chart Start Point', {
-        originalTimestamp: sortedTrades[0].timestamp,
+        originalTimestamp: keyTrades[0].timestamp,
         normalizedTimestamp: firstTimestamp,
         date: new Date(firstTimestamp).toISOString()
       });
     }
     
-    for (const trade of sortedTrades) {
-      // 使用真实的已实现PnL数据累计计算
-      cumulativeRealizedPnl += trade.realizedPnl;
-      
+    // 只为关键交易创建图表数据点
+    for (const trade of keyTrades) {
+      const cumulativePnlAtTrade = cumulativePnlMap.get(trade.tradeId) || 0;
       const normalizedTimestamp = normalizeTimestamp(trade.timestamp);
+      
       pnlDataPoints.push({
         x: normalizedTimestamp,
-        y: cumulativeRealizedPnl
+        y: cumulativePnlAtTrade
       });
       
-      // 🔧 记录关键PnL计算过程（只记录前3个点，避免日志过多）
-      if (pnlDataPoints.length <= 4) {
-        logger.debug('PnL Chart Data Point', {
-          tradeId: trade.tradeId,
-          symbol: trade.symbol,
-          direction: trade.direction,
-          realizedPnl: trade.realizedPnl,
-          cumulativeRealizedPnl: cumulativeRealizedPnl,
-          originalTimestamp: trade.timestamp,
-          normalizedTimestamp: normalizedTimestamp,
-          date: trade.date,
-          formattedDate: new Date(normalizedTimestamp).toISOString()
-        });
-      }
+      // 🔧 记录关键交易节点
+      logger.debug('Key PnL Chart Data Point', {
+        tradeId: trade.tradeId,
+        symbol: trade.symbol,
+        direction: trade.direction,
+        realizedPnl: trade.realizedPnl,
+        cumulativePnlAtTrade: cumulativePnlAtTrade,
+        isSignificant: isSignificantTrade(trade),
+        originalTimestamp: trade.timestamp,
+        normalizedTimestamp: normalizedTimestamp,
+        date: trade.date,
+        formattedDate: new Date(normalizedTimestamp).toISOString()
+      });
     }
     
     // 使用API返回的总已实现PnL值
     const totalRealizedPnl = parseFloat(pnlData.data.totalRealizedPnl);
     
+    const finalCumulativePnl = runningPnl; // 使用计算出的最终累计PnL
+    
     logger.info('PnL Chart Preparation Complete', {
+      totalTrades: sortedTrades.length,
+      keyTradesUsed: keyTrades.length,
       totalDataPoints: pnlDataPoints.length,
-      finalCumulativePnl: cumulativeRealizedPnl,
+      finalCumulativePnl: finalCumulativePnl,
       apiTotalRealizedPnl: totalRealizedPnl,
-      dataConsistency: Math.abs(cumulativeRealizedPnl - totalRealizedPnl) < 0.01 ? 'consistent' : 'inconsistent'
+      dataConsistency: Math.abs(finalCumulativePnl - totalRealizedPnl) < 0.01 ? 'consistent' : 'inconsistent',
+      timeSpan: keyTrades.length > 0 ? {
+        start: new Date(normalizeTimestamp(keyTrades[0].timestamp)).toISOString(),
+        end: new Date(normalizeTimestamp(keyTrades[keyTrades.length - 1].timestamp)).toISOString()
+      } : null
     });
     
     return {
       totalPnl: totalRealizedPnl,
       pnlHistory: pnlDataPoints,
       timeRange: {
-        start: sortedTrades[0] ? normalizeTimestamp(sortedTrades[0].timestamp) : Date.now(),
-        end: sortedTrades[sortedTrades.length - 1] ? normalizeTimestamp(sortedTrades[sortedTrades.length - 1].timestamp) : Date.now()
+        start: keyTrades[0] ? normalizeTimestamp(keyTrades[0].timestamp) : Date.now(),
+        end: keyTrades[keyTrades.length - 1] ? normalizeTimestamp(keyTrades[keyTrades.length - 1].timestamp) : Date.now()
       }
     };
   }
