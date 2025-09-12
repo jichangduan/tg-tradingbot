@@ -9,17 +9,19 @@ import { getUserAccessToken } from '../../utils/auth';
 import { chartImageService, PnlChartData, PnlDataPoint } from '../../services/chart-image.service';
 
 /**
- * 交易记录接口
+ * PnL历史记录接口
  */
-interface Trade {
+interface PnlHistoryItem {
   tradeId: string;
   symbol: string;
-  side: 'buy' | 'sell';
-  quantity: string;
+  side: 'profit' | 'loss';
+  size: string;
   price: string;
   fee: string;
   timestamp: number;
+  date: string;
   value: string;
+  pnl: string;
 }
 
 /**
@@ -62,8 +64,9 @@ interface DailyBreakdown {
 interface PnlResponse {
   code: number;
   data: {
-    trades: Trade[];
-    totalTrades: number;
+    pnlHistory: PnlHistoryItem[];
+    totalPnl: string;
+    currentAccountValue: string;
     statistics: Statistics;
     symbolBreakdown: SymbolBreakdown[];
     dailyBreakdown: DailyBreakdown[];
@@ -134,7 +137,7 @@ export class PnlHandler {
 
       // 🔧 生成并发送PNL趋势图表
       try {
-        if (pnlData.data.trades.length > 0) {
+        if (pnlData.data.pnlHistory.length > 0) {
           const chartData = this.preparePnlChartData(pnlData);
           const chartImage = await chartImageService.generatePnlChart(chartData);
           
@@ -205,25 +208,28 @@ export class PnlHandler {
       responseCode: response.code,
       responseMessage: response.message,
       dataStructure: {
-        hasTrades: response.data?.trades ? true : false,
-        tradesCount: response.data?.trades?.length || 0,
-        totalTrades: response.data?.totalTrades || 0,
+        hasPnlHistory: response.data?.pnlHistory ? true : false,
+        pnlHistoryCount: response.data?.pnlHistory?.length || 0,
+        totalPnl: response.data?.totalPnl || null,
+        currentAccountValue: response.data?.currentAccountValue || null,
         hasStatistics: response.data?.statistics ? true : false,
         hasSymbolBreakdown: response.data?.symbolBreakdown ? true : false,
         hasDailyBreakdown: response.data?.dailyBreakdown ? true : false
       },
-      // 记录前3笔交易的详细信息用于调试
-      sampleTrades: response.data?.trades?.slice(0, 3).map(trade => ({
-        tradeId: trade.tradeId,
-        symbol: trade.symbol,
-        side: trade.side,
-        quantity: trade.quantity,
-        quantityType: typeof trade.quantity,
-        price: trade.price,
-        priceType: typeof trade.price,
-        fee: trade.fee,
-        timestamp: trade.timestamp,
-        value: trade.value
+      // 记录前3笔PnL记录的详细信息用于调试
+      samplePnlHistory: response.data?.pnlHistory?.slice(0, 3).map(item => ({
+        tradeId: item.tradeId,
+        symbol: item.symbol,
+        side: item.side,
+        size: item.size,
+        sizeType: typeof item.size,
+        price: item.price,
+        priceType: typeof item.price,
+        fee: item.fee,
+        timestamp: item.timestamp,
+        value: item.value,
+        pnl: item.pnl,
+        pnlType: typeof item.pnl
       })) || [],
       fullResponse: JSON.stringify(response, null, 2)
     });
@@ -240,15 +246,19 @@ export class PnlHandler {
    * 格式化PNL分析消息
    */
   private formatPnlMessage(data: PnlResponse): string {
-    const { totalTrades, statistics } = data.data;
+    const { pnlHistory, totalPnl, currentAccountValue, statistics } = data.data;
 
-    // If no trading records
-    if (totalTrades === 0) {
+    // If no PnL records
+    if (pnlHistory.length === 0) {
       return `
 📊 <b>PNL Analysis Report</b>
 
+💰 <b>Portfolio Summary:</b>
+• Total PnL: $0.00
+• Account Value: $0.00
+• PnL Records: 0
+
 📈 <b>Trading Statistics:</b>
-• Total Trades: 0
 • Volume: $0.00
 • Fees: $0.00
 • Trading Days: 0
@@ -257,12 +267,16 @@ export class PnlHandler {
       `.trim();
     }
 
-    // Generate simple PNL analysis report
+    // Generate PNL analysis report with real portfolio data
     let analysisMessage = `
 📊 <b>PNL Analysis Report</b>
 
+💰 <b>Portfolio Summary:</b>
+• Total PnL: $${this.formatNumber(totalPnl)}
+• Account Value: $${this.formatNumber(currentAccountValue)}
+• PnL Records: ${pnlHistory.length}
+
 📈 <b>Trading Statistics:</b>
-• Total Trades: ${totalTrades.toLocaleString()}
 • Total Volume: $${this.formatNumber(statistics.totalVolume)}
 • Total Fees: $${this.formatNumber(statistics.totalFees)}
 • Trading Days: ${statistics.tradingDays} days
@@ -399,55 +413,26 @@ export class PnlHandler {
    * 准备PNL图表数据
    */
   private preparePnlChartData(pnlData: PnlResponse): PnlChartData {
-    const trades = pnlData.data.trades;
+    const pnlHistory = pnlData.data.pnlHistory;
     
-    // 按时间排序交易记录
-    const sortedTrades = [...trades].sort((a, b) => a.timestamp - b.timestamp);
+    // 按时间排序PnL记录
+    const sortedPnlHistory = [...pnlHistory].sort((a, b) => a.timestamp - b.timestamp);
     
-    // 计算累计PNL历史
-    let cumulativePnl = 0;
-    const pnlHistory: PnlDataPoint[] = [];
+    // 直接使用API返回的真实PnL数据，无需复杂计算
+    const pnlDataPoints: PnlDataPoint[] = sortedPnlHistory.map(item => ({
+      x: item.timestamp * 1000,
+      y: parseFloat(item.pnl)  // 使用真实的PnL值
+    }));
     
-    // 添加起始点 (第一笔交易前的0点)
-    if (sortedTrades.length > 0) {
-      pnlHistory.push({
-        x: sortedTrades[0].timestamp * 1000,
-        y: 0
-      });
-    }
-    
-    for (const trade of sortedTrades) {
-      // 计算这笔交易的PNL影响 (简化计算，实际应该考虑买卖方向和价格差)
-      const tradeValue = parseFloat(trade.value);
-      const tradeFee = parseFloat(trade.fee);
-      
-      // 买入为负现金流，卖出为正现金流
-      if (trade.side === 'buy') {
-        cumulativePnl -= (tradeValue + tradeFee);
-      } else {
-        cumulativePnl += (tradeValue - tradeFee);
-      }
-      
-      pnlHistory.push({
-        x: trade.timestamp * 1000,
-        y: cumulativePnl
-      });
-    }
-    
-    // 计算总PNL (使用统计数据)
-    const statistics = pnlData.data.statistics;
-    const totalVolume = parseFloat(statistics.totalVolume);
-    const totalFees = parseFloat(statistics.totalFees);
-    
-    // 估算总PNL (这里使用简化计算，实际需要更精确的计算)
-    const finalPnl = cumulativePnl;
+    // 使用API返回的总PnL值
+    const totalPnl = parseFloat(pnlData.data.totalPnl);
     
     return {
-      totalPnl: finalPnl,
-      pnlHistory: pnlHistory,
+      totalPnl: totalPnl,
+      pnlHistory: pnlDataPoints,
       timeRange: {
-        start: sortedTrades[0]?.timestamp * 1000 || Date.now(),
-        end: sortedTrades[sortedTrades.length - 1]?.timestamp * 1000 || Date.now()
+        start: sortedPnlHistory[0]?.timestamp * 1000 || Date.now(),
+        end: sortedPnlHistory[sortedPnlHistory.length - 1]?.timestamp * 1000 || Date.now()
       }
     };
   }
