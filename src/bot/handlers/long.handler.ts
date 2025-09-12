@@ -175,6 +175,15 @@ export class LongHandler {
         last_name: ctx.from?.last_name
       });
 
+      // 🔍 Verify user data acquisition
+      logger.info(`🔍 User Data Check:`, {
+        telegramId: userId!.toString(),
+        internalUserId: userData.userId,
+        userIdType: typeof userData.userId,
+        accessTokenLength: accessToken?.length,
+        hasAccessToken: !!accessToken
+      });
+
       // Get token price for size calculation
       const tokenData = await tokenService.getTokenPrice(symbol);
       const size = parseFloat(amountStr) / tokenData.price;
@@ -187,6 +196,16 @@ export class LongHandler {
         size: size,                                       // Calculated token quantity
         orderType: "market"
       };
+      
+      // 📋 Verify trading data construction
+      logger.info(`📋 Trading Data Built:`, {
+        userId: tradingData.userId,
+        userIdType: typeof tradingData.userId,
+        symbol: tradingData.symbol,
+        leverage: tradingData.leverage,
+        size: tradingData.size,
+        orderType: tradingData.orderType
+      });
 
       // Check if balance is sufficient
       const requiredAmount = parseFloat(amountStr);
@@ -291,12 +310,8 @@ export class LongHandler {
         // 如果余额检查失败，继续执行交易（让后端处理）
       }
 
-      // 关键交易请求日志
       logger.info(`🚀 [LONG ORDER] ${symbol.toUpperCase()} ${leverageStr} $${amountStr}`);
       
-      // 简化接口数据日志
-      logger.debug(`📤 Request data: ${JSON.stringify(tradingData)}`);
-
       // 显示订单预览而不是直接执行交易
       // 修复：用户实际购买的代币数量（不考虑杠杆）
       const orderSize = parseFloat(amountStr) / tokenData.price;
@@ -325,7 +340,6 @@ export class LongHandler {
         }
       );
 
-      // 移除详细性能日志，减少噪音
 
     } catch (apiError: any) {
       // 关键交易失败日志
@@ -435,6 +449,15 @@ export class LongHandler {
         last_name: ctx.from?.last_name
       });
 
+      // 🔍 Verify user data acquisition  
+      logger.info(`🔍 User Data Check (executeTrading):`, {
+        telegramId: userId!.toString(),
+        internalUserId: userData.userId,
+        userIdType: typeof userData.userId,
+        accessTokenLength: accessToken?.length,
+        hasAccessToken: !!accessToken
+      });
+
       // 获取代币价格用于计算size
       const tokenData = await tokenService.getTokenPrice(symbol);
       const size = parseFloat(amount) / tokenData.price;
@@ -448,35 +471,22 @@ export class LongHandler {
         orderType: "market"
       };
 
-      // 🚀 显眼的API参数日志
-      logger.info('🚀🚀🚀 LONG TRADING API CALL - DETAILED PARAMETERS 🚀🚀🚀');
-      logger.info('═══════════════════════════════════════════════════════');
-      logger.info('📋 Trading Request Details:', {
+      // 📋 Verify trading data construction
+      logger.info(`📋 Trading Data Built (executeTrading):`, {
+        userId: tradingData.userId,
+        userIdType: typeof tradingData.userId,
+        symbol: tradingData.symbol,
+        leverage: tradingData.leverage,
+        size: tradingData.size,
+        orderType: tradingData.orderType
+      });
+
+      // 🚀 Final API Call Verification
+      logger.info(`🚀 API Call:`, {
         endpoint: '/api/tgbot/trading/long',
-        userId,
-        symbol: symbol.toUpperCase(),
-        leverage: `${leverage.replace('x', '')} (${leverage})`,
-        userInputAmount: `$${amount}`,
-        tokenPrice: `$${tokenData.price.toFixed(2)}`,
-        calculatedSize: `${size.toFixed(8)} ${symbol.toUpperCase()}`,
-        orderType: 'market'
+        userId: tradingData.userId,
+        hasToken: !!accessToken
       });
-      logger.info('📦 Complete Request Payload:', tradingData);
-      logger.info('🔐 Authentication Status:', {
-        hasAccessToken: !!accessToken,
-        tokenLength: accessToken?.length || 0,
-        tokenPreview: accessToken ? `${accessToken.substring(0, 10)}...` : 'none'
-      });
-      
-      // 验证关键参数
-      logger.info('🔍 Parameter Validation:', {
-        hasSize: tradingData.hasOwnProperty('size'),
-        sizeValue: tradingData.size,
-        sizeType: typeof tradingData.size,
-        hasAmount: tradingData.hasOwnProperty('amount'),
-        hasTelegramId: tradingData.hasOwnProperty('telegram_id')
-      });
-      logger.info('═══════════════════════════════════════════════════════');
 
       const result = await apiService.postWithAuth(
         '/api/tgbot/trading/long',
@@ -484,34 +494,19 @@ export class LongHandler {
         tradingData
       );
       
-      // 简化接口返回数据日志
-      logger.debug(`📥 Response data: ${JSON.stringify(result)}`);
+      logger.info(`📥 API Response Success:`, result);
 
       // 检查API响应以确定是否真正成功
       const apiResult = result as any; // 类型断言
       let successMessage = '';
       if (apiResult && apiResult.success !== false && !apiResult.error) {
-        // 打印显眼的交易成功日志
-        logger.info('🎯 [TRADING SUCCESS] Long position opened');
-        logger.info('==============================================');
-        logger.info('📊 Trading Details:', {
+        // 交易成功日志
+        logger.info('🎯 [TRADING SUCCESS] Long position opened', {
           symbol: symbol.toUpperCase(),
           leverage: leverage,
           amount: `$${amount}`,
-          orderId: apiResult.data?.orderId || 'N/A',
-          side: 'LONG'
+          orderId: apiResult.data?.orderId || 'N/A'
         });
-        
-        // 打印保证金信息（如果API返回了）
-        if (apiResult.data) {
-          logger.info('💰 Margin Information:', {
-            requiredMargin: apiResult.data.requiredMargin || 'N/A',
-            availableMargin: apiResult.data.availableMargin || 'N/A',
-            marginUsage: apiResult.data.marginUsage || 'N/A',
-            leverageConfirmed: apiResult.data.leverage || leverage
-          });
-        }
-        logger.info('==============================================');
         
         // 只有确认成功才显示成功消息
         successMessage = `✅ <b>做多开仓成功</b>\n\n` +
@@ -535,18 +530,9 @@ export class LongHandler {
         symbol: symbol.toUpperCase(),
         leverage,
         amount,
-        requestParameters: {
-          userId: 'internal_user_id',
-          symbol: symbol.toUpperCase(),
-          leverage: parseInt(leverage.replace('x', '')),
-          size: 'calculated_from_amount_and_price',
-          orderType: 'market'
-        },
         errorStatus: error.response?.status,
         errorData: error.response?.data,
-        errorMessage: error.message,
-        errorHeaders: error.response?.headers,
-        fullError: error.toString()
+        errorMessage: error.message
       });
       
       await ctx.answerCbQuery('❌ 交易执行失败');
