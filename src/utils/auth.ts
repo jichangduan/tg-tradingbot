@@ -139,6 +139,64 @@ export async function clearUserAccessToken(telegramId: string): Promise<boolean>
 }
 
 /**
+ * 获取用户完整数据和访问令牌（避免重复调用userService）
+ * @param telegramId 用户的Telegram ID
+ * @param userInfo 用户信息（用于API调用）
+ * @param forceRefresh 是否强制刷新（跳过缓存）
+ * @returns 包含用户数据和访问令牌的对象
+ */
+export async function getUserDataAndToken(
+  telegramId: string,
+  userInfo?: {
+    username?: string;
+    first_name?: string;
+    last_name?: string;
+  },
+  forceRefresh: boolean = false
+): Promise<{ userData: UserInitData; accessToken: string }> {
+  const requestId = `user_data_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  
+  try {
+    logger.info(`Getting user data and access token [${requestId}]`, {
+      telegramId,
+      forceRefresh,
+      requestId
+    });
+
+    const initRequest: UserInitRequest = {
+      telegram_id: telegramId,
+      username: userInfo?.username,
+      first_name: userInfo?.first_name,
+      last_name: userInfo?.last_name
+    };
+
+    const userData: UserInitData = await userService.initializeUser(initRequest);
+    
+    // 自动缓存获取到的token
+    await cacheUserAccessToken(telegramId, userData.accessToken, requestId);
+    
+    logger.info(`User data and access token obtained successfully [${requestId}]`, {
+      telegramId,
+      userId: userData.userId,
+      requestId
+    });
+
+    return {
+      userData,
+      accessToken: userData.accessToken
+    };
+
+  } catch (error) {
+    logger.error(`Failed to get user data and access token [${requestId}]`, {
+      telegramId,
+      error: (error as Error).message,
+      requestId
+    });
+    throw error;
+  }
+}
+
+/**
  * 简化的获取用户token函数（用于PushHandler）
  * 尝试从缓存获取token，如果没有则返回null（需要用户重新认证）
  */

@@ -2,7 +2,8 @@ import { Context } from 'telegraf';
 import { InlineKeyboardMarkup } from 'telegraf/typings/core/types/typegram';
 import { apiService } from '../../services/api.service';
 import { tokenService } from '../../services/token.service';
-import { getUserAccessToken } from '../../utils/auth';
+import { userService } from '../../services/user.service';
+import { getUserAccessToken, getUserDataAndToken } from '../../utils/auth';
 import { logger } from '../../utils/logger';
 import { handleTradingError } from '../../utils/error-handler';
 import { ExtendedContext } from '../index';
@@ -167,8 +168,8 @@ export class ShortHandler {
     );
 
     try {
-      // 获取用户访问令牌
-      const accessToken = await getUserAccessToken(userId!.toString(), {
+      // 获取用户数据和访问令牌（一次调用）
+      const { userData, accessToken } = await getUserDataAndToken(userId!.toString(), {
         username,
         first_name: ctx.from?.first_name,
         last_name: ctx.from?.last_name
@@ -178,8 +179,9 @@ export class ShortHandler {
       const tokenData = await tokenService.getTokenPrice(symbol);
       const size = parseFloat(amountStr) / tokenData.price;
       
-      // 准备交易数据
+      // 准备交易数据 - 添加内部userId
       const tradingData = {
+        userId: userData.userId,                          // ✅ 使用内部用户ID
         symbol: symbol.toUpperCase(),
         leverage: parseInt(leverageStr.replace('x', '')), // 转换为数字
         size: size,                                       // 计算的代币数量
@@ -426,8 +428,8 @@ export class ShortHandler {
     try {
       await ctx.answerCbQuery('🔄 正在执行交易...');
       
-      // 获取用户访问令牌
-      const accessToken = await getUserAccessToken(userId!.toString(), {
+      // 获取用户数据和访问令牌（一次调用）
+      const { userData, accessToken } = await getUserDataAndToken(userId!.toString(), {
         username,
         first_name: ctx.from?.first_name,
         last_name: ctx.from?.last_name
@@ -437,8 +439,9 @@ export class ShortHandler {
       const tokenData = await tokenService.getTokenPrice(symbol);
       const size = parseFloat(amount) / tokenData.price;
       
-      // 调用交易API
+      // 调用交易API - 添加内部userId
       const tradingData = {
+        userId: userData.userId,                       // ✅ 使用内部用户ID
         symbol: symbol.toUpperCase(),
         leverage: parseInt(leverage.replace('x', '')), // 转换为数字
         size: size,                                    // 计算的代币数量

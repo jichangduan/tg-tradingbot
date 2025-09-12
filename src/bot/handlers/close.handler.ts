@@ -1,6 +1,7 @@
 import { Context } from 'telegraf';
 import { apiService } from '../../services/api.service';
-import { getUserAccessToken } from '../../utils/auth';
+import { userService } from '../../services/user.service';
+import { getUserAccessToken, getUserDataAndToken } from '../../utils/auth';
 import { logger } from '../../utils/logger';
 import { handleTradingError } from '../../utils/error-handler';
 import { ExtendedContext } from '../index';
@@ -77,9 +78,17 @@ export class CloseHandler {
         { parse_mode: 'HTML' }
       );
 
+      // 获取用户数据和访问令牌（一次调用）
+      const { userData, accessToken: initialAccessToken } = await getUserDataAndToken(userId!.toString(), {
+        username,
+        first_name: ctx.from?.first_name,
+        last_name: ctx.from?.last_name
+      });
+
       // 准备平仓数据（移到try块外以便重试时使用）
-      // 修复：根据后端API期望格式化参数 (TgBotController.js line 428)
+      // 修复：根据后端API期望格式化参数 - 添加内部userId
       const closeData = {
+        userId: userData.userId,                              // ✅ 使用内部用户ID
         symbol: symbol.toUpperCase(),
         // 如果是百分比，发送原始用户输入（已包含%）；如果是数量，发送数量字符串
         percentage: isPercentage ? closeAmount : amount.toString(),
@@ -87,12 +96,8 @@ export class CloseHandler {
       };
 
       try {
-        // 获取用户访问令牌
-        const accessToken = await getUserAccessToken(userId!.toString(), {
-          username,
-          first_name: ctx.from?.first_name,
-          last_name: ctx.from?.last_name
-        });
+        // 使用已获取的访问令牌
+        const accessToken = initialAccessToken;
 
         // 调用平仓API
         logger.info(`Close position API call attempt [${requestId}]`, {
