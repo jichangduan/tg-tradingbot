@@ -9,19 +9,22 @@ import { getUserAccessToken } from '../../utils/auth';
 import { chartImageService, PnlChartData, PnlDataPoint } from '../../services/chart-image.service';
 
 /**
- * PnL历史记录接口
+ * 增强的交易记录接口（包含真实PnL数据）
  */
-interface PnlHistoryItem {
-  tradeId: string;
+interface EnhancedTrade {
+  tradeId: number;
   symbol: string;
-  side: 'profit' | 'loss';
+  side: 'buy' | 'sell';
   size: string;
   price: string;
   fee: string;
   timestamp: number;
   date: string;
   value: string;
-  pnl: string;
+  closedPnl: string;        // 平仓盈亏
+  realizedPnl: number;      // 已实现盈亏
+  direction: string;        // 交易方向
+  startPosition: number;    // 起始持仓
 }
 
 /**
@@ -59,14 +62,18 @@ interface DailyBreakdown {
 }
 
 /**
- * PNL查询响应接口
+ * PNL查询响应接口（真实PnL数据格式）
  */
 interface PnlResponse {
   code: number;
   data: {
-    pnlHistory: PnlHistoryItem[];
-    totalPnl: string;
-    currentAccountValue: string;
+    trades: EnhancedTrade[];       // 增强的交易记录
+    totalTrades: number;
+    totalRealizedPnl: string;      // 总已实现盈亏
+    profitableTrades: number;      // 盈利交易数
+    losingTrades: number;          // 亏损交易数
+    winRate: string;               // 胜率
+    dataSource: string;            // 数据源标识
     statistics: Statistics;
     symbolBreakdown: SymbolBreakdown[];
     dailyBreakdown: DailyBreakdown[];
@@ -137,20 +144,21 @@ export class PnlHandler {
 
       // 🔧 生成并发送PNL趋势图表
       try {
-        if (pnlData.data.pnlHistory.length > 0) {
+        if (pnlData.data.trades.length > 0) {
           const chartData = this.preparePnlChartData(pnlData);
           const chartImage = await chartImageService.generatePnlChart(chartData);
           
           // 发送图表图片
           await ctx.replyWithPhoto({ source: chartImage.imageBuffer }, {
-            caption: '📈 PNL Trend Chart',
+            caption: '📈 Realized PNL Trend Chart',
             parse_mode: 'HTML'
           });
           
-          logger.info('PNL chart sent successfully', {
+          logger.info('Enhanced PNL chart sent successfully', {
             userId,
-            totalPnl: chartData.totalPnl,
-            dataPoints: chartData.pnlHistory.length
+            totalRealizedPnl: chartData.totalPnl,
+            dataPoints: chartData.pnlHistory.length,
+            dataSource: pnlData.data.dataSource
           });
         }
       } catch (chartError) {
@@ -203,33 +211,37 @@ export class PnlHandler {
     );
 
     // 🔧 详细记录API响应用于诊断
-    logger.info('PNL API Response - Full Debug', {
+    logger.info('PNL API Response - Enhanced PnL Data Debug', {
       userId,
       responseCode: response.code,
       responseMessage: response.message,
+      enhancedPnlData: {
+        totalTrades: response.data?.totalTrades || 0,
+        totalRealizedPnl: response.data?.totalRealizedPnl || null,
+        profitableTrades: response.data?.profitableTrades || 0,
+        losingTrades: response.data?.losingTrades || 0,
+        winRate: response.data?.winRate || null,
+        dataSource: response.data?.dataSource || null,
+        hasTradesData: response.data?.trades ? true : false,
+        tradesCount: response.data?.trades?.length || 0
+      },
       dataStructure: {
-        hasPnlHistory: response.data?.pnlHistory ? true : false,
-        pnlHistoryCount: response.data?.pnlHistory?.length || 0,
-        totalPnl: response.data?.totalPnl || null,
-        currentAccountValue: response.data?.currentAccountValue || null,
         hasStatistics: response.data?.statistics ? true : false,
         hasSymbolBreakdown: response.data?.symbolBreakdown ? true : false,
         hasDailyBreakdown: response.data?.dailyBreakdown ? true : false
       },
-      // 记录前3笔PnL记录的详细信息用于调试
-      samplePnlHistory: response.data?.pnlHistory?.slice(0, 3).map(item => ({
-        tradeId: item.tradeId,
-        symbol: item.symbol,
-        side: item.side,
-        size: item.size,
-        sizeType: typeof item.size,
-        price: item.price,
-        priceType: typeof item.price,
-        fee: item.fee,
-        timestamp: item.timestamp,
-        value: item.value,
-        pnl: item.pnl,
-        pnlType: typeof item.pnl
+      // 记录前3笔交易的增强PnL信息用于调试
+      sampleEnhancedTrades: response.data?.trades?.slice(0, 3).map(trade => ({
+        tradeId: trade.tradeId,
+        symbol: trade.symbol,
+        side: trade.side,
+        size: trade.size,
+        price: trade.price,
+        closedPnl: trade.closedPnl,
+        realizedPnl: trade.realizedPnl,
+        direction: trade.direction,
+        timestamp: trade.timestamp,
+        date: trade.date
       })) || [],
       fullResponse: JSON.stringify(response, null, 2)
     });
@@ -246,41 +258,63 @@ export class PnlHandler {
    * 格式化PNL分析消息
    */
   private formatPnlMessage(data: PnlResponse): string {
-    const { pnlHistory, totalPnl, currentAccountValue, statistics } = data.data;
+    const { 
+      trades, 
+      totalTrades, 
+      totalRealizedPnl, 
+      profitableTrades, 
+      losingTrades, 
+      winRate,
+      dataSource,
+      statistics 
+    } = data.data;
 
-    // If no PnL records
-    if (pnlHistory.length === 0) {
+    // 🔧 添加增强PnL数据处理日志
+    logger.info('Enhanced PNL Data Processing', {
+      totalTrades,
+      totalRealizedPnl,
+      winRate,
+      profitableTrades,
+      losingTrades,
+      dataSource
+    });
+
+    // If no trading records
+    if (totalTrades === 0) {
       return `
 📊 <b>PNL Analysis Report</b>
 
-💰 <b>Portfolio Summary:</b>
-• Total PnL: $0.00
-• Account Value: $0.00
-• PnL Records: 0
+💰 <b>Realized PnL Summary:</b>
+• Total Realized PnL: $0.00
+• Win Rate: 0%
+• Total Trades: 0
 
 📈 <b>Trading Statistics:</b>
 • Volume: $0.00
 • Fees: $0.00
 • Trading Days: 0
 
+<i>📊 Data Source: Real PnL from trading history</i>
 <i>🕐 Analysis time: ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Shanghai' })}</i>
       `.trim();
     }
 
-    // Generate PNL analysis report with real portfolio data
+    // Generate enhanced PNL analysis report with real realized PnL data
     let analysisMessage = `
 📊 <b>PNL Analysis Report</b>
 
-💰 <b>Portfolio Summary:</b>
-• Total PnL: $${this.formatNumber(totalPnl)}
-• Account Value: $${this.formatNumber(currentAccountValue)}
-• PnL Records: ${pnlHistory.length}
+💰 <b>Realized PnL Summary:</b>
+• Total Realized PnL: $${this.formatNumber(totalRealizedPnl)}
+• Win Rate: ${winRate}
+• Profitable Trades: ${profitableTrades}/${totalTrades}
+• Losing Trades: ${losingTrades}/${totalTrades}
 
 📈 <b>Trading Statistics:</b>
 • Total Volume: $${this.formatNumber(statistics.totalVolume)}
 • Total Fees: $${this.formatNumber(statistics.totalFees)}
 • Trading Days: ${statistics.tradingDays} days
 
+<i>📊 Data Source: ${dataSource || 'Real PnL from trading history'}</i>
 <i>🕐 Analysis time: ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Shanghai' })}</i>
     `.trim();
 
@@ -410,29 +444,63 @@ export class PnlHandler {
   }
 
   /**
-   * 准备PNL图表数据
+   * 准备PNL图表数据（使用真实已实现PnL）
    */
   private preparePnlChartData(pnlData: PnlResponse): PnlChartData {
-    const pnlHistory = pnlData.data.pnlHistory;
+    const trades = pnlData.data.trades;
     
-    // 按时间排序PnL记录
-    const sortedPnlHistory = [...pnlHistory].sort((a, b) => a.timestamp - b.timestamp);
+    // 按时间排序交易记录
+    const sortedTrades = [...trades].sort((a, b) => a.timestamp - b.timestamp);
     
-    // 直接使用API返回的真实PnL数据，无需复杂计算
-    const pnlDataPoints: PnlDataPoint[] = sortedPnlHistory.map(item => ({
-      x: item.timestamp * 1000,
-      y: parseFloat(item.pnl)  // 使用真实的PnL值
-    }));
+    // 计算累计已实现PnL历史
+    let cumulativeRealizedPnl = 0;
+    const pnlDataPoints: PnlDataPoint[] = [];
     
-    // 使用API返回的总PnL值
-    const totalPnl = parseFloat(pnlData.data.totalPnl);
+    // 添加起始点 (第一笔交易前的0点)
+    if (sortedTrades.length > 0) {
+      pnlDataPoints.push({
+        x: sortedTrades[0].timestamp * 1000,
+        y: 0
+      });
+    }
+    
+    for (const trade of sortedTrades) {
+      // 使用真实的已实现PnL数据累计计算
+      cumulativeRealizedPnl += trade.realizedPnl;
+      
+      pnlDataPoints.push({
+        x: trade.timestamp * 1000,
+        y: cumulativeRealizedPnl
+      });
+      
+      // 🔧 记录关键PnL计算过程
+      logger.debug('PnL Chart Data Point', {
+        tradeId: trade.tradeId,
+        symbol: trade.symbol,
+        direction: trade.direction,
+        realizedPnl: trade.realizedPnl,
+        cumulativeRealizedPnl: cumulativeRealizedPnl,
+        timestamp: trade.timestamp,
+        date: trade.date
+      });
+    }
+    
+    // 使用API返回的总已实现PnL值
+    const totalRealizedPnl = parseFloat(pnlData.data.totalRealizedPnl);
+    
+    logger.info('PnL Chart Preparation Complete', {
+      totalDataPoints: pnlDataPoints.length,
+      finalCumulativePnl: cumulativeRealizedPnl,
+      apiTotalRealizedPnl: totalRealizedPnl,
+      dataConsistency: Math.abs(cumulativeRealizedPnl - totalRealizedPnl) < 0.01 ? 'consistent' : 'inconsistent'
+    });
     
     return {
-      totalPnl: totalPnl,
+      totalPnl: totalRealizedPnl,
       pnlHistory: pnlDataPoints,
       timeRange: {
-        start: sortedPnlHistory[0]?.timestamp * 1000 || Date.now(),
-        end: sortedPnlHistory[sortedPnlHistory.length - 1]?.timestamp * 1000 || Date.now()
+        start: sortedTrades[0]?.timestamp * 1000 || Date.now(),
+        end: sortedTrades[sortedTrades.length - 1]?.timestamp * 1000 || Date.now()
       }
     };
   }
