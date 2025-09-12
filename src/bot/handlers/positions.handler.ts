@@ -215,34 +215,46 @@ export class PositionsHandler {
       requestId: reqId
     });
     
-    // 获取用户的access token，支持fallback重新认证
-    logger.info(`Getting user access token [${reqId}]`, {
-      userId,
-      requestId: reqId
+    // 获取用户数据和访问令牌（统一调用，获取内部userId）
+    const { getUserDataAndToken } = await import('../../utils/auth');
+    const { userData, accessToken } = await getUserDataAndToken(userId.toString(), {
+      username: ctx?.from?.username,
+      first_name: ctx?.from?.first_name,
+      last_name: ctx?.from?.last_name
     });
     
-    const userToken = await this.getUserAccessToken(userId, ctx, reqId);
+    logger.info(`🔍 User Data Check (positions):`, {
+      telegramId: userId.toString(),
+      internalUserId: userData.userId,
+      userIdType: typeof userData.userId,
+      accessTokenLength: accessToken?.length,
+      hasAccessToken: !!accessToken
+    });
     
-    if (!userToken) {
+    if (!accessToken) {
       logger.error(`No access token available [${reqId}]`, {
         userId,
         requestId: reqId
       });
       throw new Error('User not logged in, please use /start command to login first');
     }
-    
-    logger.info(`Access token obtained, making API call [${reqId}]`, {
-      userId,
-      tokenLength: userToken.length,
-      apiUrl: '/api/tgbot/trading/positions',
-      requestId: reqId
-    });
 
     try {
+      // 为positions接口也添加userId参数支持
+      const positionsParams = {
+        userId: userData.userId  // ✅ 添加内部用户ID
+      };
+      
+      logger.info(`🚀 Positions API Call:`, {
+        endpoint: '/api/tgbot/trading/positions',
+        userId: userData.userId,
+        hasToken: !!accessToken
+      });
+
       const response = await apiService.getWithAuth<PositionsResponse>(
         '/api/tgbot/trading/positions',
-        userToken,
-        {},
+        accessToken,
+        positionsParams,  // ✅ 传递包含userId的参数
         { timeout: 10000 }
       );
       
