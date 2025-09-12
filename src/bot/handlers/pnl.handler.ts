@@ -269,13 +269,32 @@ export class PnlHandler {
       statistics 
     } = data.data;
 
+    // 🔧 计算盈亏统计（如果API没有提供，则手动计算）
+    let calculatedProfitableTrades = profitableTrades;
+    let calculatedLosingTrades = losingTrades;  
+    let calculatedWinRate = winRate;
+    
+    // 如果API没有返回统计数据，则从交易记录中计算
+    if (profitableTrades === undefined || losingTrades === undefined || winRate === undefined) {
+      const profitableCount = trades.filter(trade => trade.realizedPnl > 0).length;
+      const losingCount = trades.filter(trade => trade.realizedPnl < 0).length;
+      const totalCount = totalTrades || trades.length;
+      
+      calculatedProfitableTrades = profitableCount;
+      calculatedLosingTrades = losingCount;
+      calculatedWinRate = totalCount > 0 ? ((profitableCount / totalCount) * 100).toFixed(2) + '%' : '0%';
+    }
+
     // 🔧 添加增强PnL数据处理日志
     logger.info('Enhanced PNL Data Processing', {
       totalTrades,
       totalRealizedPnl,
-      winRate,
-      profitableTrades,
-      losingTrades,
+      originalWinRate: winRate,
+      calculatedWinRate,
+      originalProfitableTrades: profitableTrades,
+      calculatedProfitableTrades,
+      originalLosingTrades: losingTrades,
+      calculatedLosingTrades,
       dataSource
     });
 
@@ -305,9 +324,9 @@ export class PnlHandler {
 
 💰 <b>Realized PnL Summary:</b>
 • Total Realized PnL: $${this.formatNumber(totalRealizedPnl)}
-• Win Rate: ${winRate}
-• Profitable Trades: ${profitableTrades}/${totalTrades}
-• Losing Trades: ${losingTrades}/${totalTrades}
+• Win Rate: ${calculatedWinRate}
+• Profitable Trades: ${calculatedProfitableTrades}/${totalTrades}
+• Losing Trades: ${calculatedLosingTrades}/${totalTrades}
 
 📈 <b>Trading Statistics:</b>
 • Total Volume: $${this.formatNumber(statistics.totalVolume)}
@@ -456,11 +475,28 @@ export class PnlHandler {
     let cumulativeRealizedPnl = 0;
     const pnlDataPoints: PnlDataPoint[] = [];
     
+    // 🔧 检测时间戳格式并标准化为毫秒
+    const normalizeTimestamp = (timestamp: number): number => {
+      // 如果时间戳小于13位，假设是秒，转换为毫秒
+      if (timestamp < 10000000000000) {
+        return timestamp * 1000;
+      }
+      // 否则已经是毫秒，直接使用
+      return timestamp;
+    };
+
     // 添加起始点 (第一笔交易前的0点)
     if (sortedTrades.length > 0) {
+      const firstTimestamp = normalizeTimestamp(sortedTrades[0].timestamp);
       pnlDataPoints.push({
-        x: sortedTrades[0].timestamp * 1000,
+        x: firstTimestamp,
         y: 0
+      });
+      
+      logger.debug('Chart Start Point', {
+        originalTimestamp: sortedTrades[0].timestamp,
+        normalizedTimestamp: firstTimestamp,
+        date: new Date(firstTimestamp).toISOString()
       });
     }
     
@@ -468,21 +504,26 @@ export class PnlHandler {
       // 使用真实的已实现PnL数据累计计算
       cumulativeRealizedPnl += trade.realizedPnl;
       
+      const normalizedTimestamp = normalizeTimestamp(trade.timestamp);
       pnlDataPoints.push({
-        x: trade.timestamp * 1000,
+        x: normalizedTimestamp,
         y: cumulativeRealizedPnl
       });
       
-      // 🔧 记录关键PnL计算过程
-      logger.debug('PnL Chart Data Point', {
-        tradeId: trade.tradeId,
-        symbol: trade.symbol,
-        direction: trade.direction,
-        realizedPnl: trade.realizedPnl,
-        cumulativeRealizedPnl: cumulativeRealizedPnl,
-        timestamp: trade.timestamp,
-        date: trade.date
-      });
+      // 🔧 记录关键PnL计算过程（只记录前3个点，避免日志过多）
+      if (pnlDataPoints.length <= 4) {
+        logger.debug('PnL Chart Data Point', {
+          tradeId: trade.tradeId,
+          symbol: trade.symbol,
+          direction: trade.direction,
+          realizedPnl: trade.realizedPnl,
+          cumulativeRealizedPnl: cumulativeRealizedPnl,
+          originalTimestamp: trade.timestamp,
+          normalizedTimestamp: normalizedTimestamp,
+          date: trade.date,
+          formattedDate: new Date(normalizedTimestamp).toISOString()
+        });
+      }
     }
     
     // 使用API返回的总已实现PnL值
@@ -499,8 +540,8 @@ export class PnlHandler {
       totalPnl: totalRealizedPnl,
       pnlHistory: pnlDataPoints,
       timeRange: {
-        start: sortedTrades[0]?.timestamp * 1000 || Date.now(),
-        end: sortedTrades[sortedTrades.length - 1]?.timestamp * 1000 || Date.now()
+        start: sortedTrades[0] ? normalizeTimestamp(sortedTrades[0].timestamp) : Date.now(),
+        end: sortedTrades[sortedTrades.length - 1] ? normalizeTimestamp(sortedTrades[sortedTrades.length - 1].timestamp) : Date.now()
       }
     };
   }
