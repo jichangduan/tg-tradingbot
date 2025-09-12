@@ -618,28 +618,28 @@ BTC, ETH, SOL, USDT, USDC, BNB, ADA, DOT, LINK, MATIC, AVAX, UNI
     // Last update time
     message += `🕐 <b>Updated:</b> ${this.formatTimestamp(balance.lastUpdated)}\n`;
 
-    // 警告信息
+    // Warning information
     if (warnings && warnings.length > 0) {
-      message += `\n<b>⚠️ 风险提醒:</b>\n`;
+      message += `\n<b>⚠️ Risk Warnings:</b>\n`;
       warnings.forEach(warning => {
         message += `• ${warning}\n`;
       });
     }
 
-    // 分割线
+    // Separator
     message += `\n━━━━━━━━━━━━━━━━━━━━━━━\n`;
     
-    // 相关操作建议
-    message += `💹 <b>可用操作:</b>\n`;
+    // Related operation suggestions
+    message += `💹 <b>Available Actions:</b>\n`;
     if (balance.availableEquity >= 100) {
-      message += `• <code>/long BTC</code> - 开多仓\n`;
-      message += `• <code>/short ETH</code> - 开空仓\n`;
+      message += `• <code>/long BTC</code> - Open long position\n`;
+      message += `• <code>/short ETH</code> - Open short position\n`;
     }
-    message += `• <code>/positions</code> - 查看持仓\n`;
-    message += `• <code>/orders</code> - 查看订单\n`;
+    message += `• <code>/positions</code> - View positions\n`;
+    message += `• <code>/orders</code> - View orders\n`;
     
     if (balance.availableEquity < 100) {
-      message += `\n💡 <i>余额不足，建议先充值后进行交易</i>`;
+      message += `\n💡 <i>Insufficient balance, recommend depositing funds before trading</i>`;
     }
 
     return message;
@@ -749,42 +749,42 @@ BTC, ETH, SOL, USDT, USDC, BNB, ADA, DOT, LINK, MATIC, AVAX, UNI
   }
 
   /**
-   * 格式化余额不足警告消息
+   * Format insufficient balance warning message
    */
   public formatInsufficientBalanceMessage(
     requiredAmount: number, 
     availableAmount: number
   ): string {
-    let message = `⚠️ <b>余额不足</b>\n\n`;
+    let message = `⚠️ <b>Insufficient Balance</b>\n\n`;
     
-    message += `💰 <b>所需金额:</b> $${this.formatCurrency(requiredAmount)} USDT\n`;
-    message += `💳 <b>可用余额:</b> $${this.formatCurrency(availableAmount)} USDT\n`;
-    message += `📉 <b>缺少金额:</b> $${this.formatCurrency(requiredAmount - availableAmount)} USDT\n\n`;
+    message += `💰 <b>Required Amount:</b> $${this.formatCurrency(requiredAmount)} USDT\n`;
+    message += `💳 <b>Available Balance:</b> $${this.formatCurrency(availableAmount)} USDT\n`;
+    message += `📉 <b>Shortage:</b> $${this.formatCurrency(requiredAmount - availableAmount)} USDT\n\n`;
     
-    message += `💡 <b>建议操作:</b>\n`;
-    message += `• 📈 充值更多资金\n`;
-    message += `• 📊 减少交易数量\n`;
-    message += `• 🔄 取消部分挂单释放冻结资金\n\n`;
+    message += `💡 <b>Suggested Actions:</b>\n`;
+    message += `• 📈 Deposit more funds\n`;
+    message += `• 📊 Reduce trading amount\n`;
+    message += `• 🔄 Cancel some orders to free frozen funds\n\n`;
     
-    message += `📱 发送 <code>/wallet</code> 查看最新余额`;
+    message += `📱 Send <code>/wallet</code> to check latest balance`;
     
     return message;
   }
 
   /**
-   * 格式化邀请统计消息
+   * Format invitation statistics message
    */
   public formatInviteStatsMessage(stats: FormattedInviteStats): string {
-    let message = `🎁 <b>邀请统计</b>\n\n`;
+    let message = `🎁 <b>Invitation Statistics</b>\n\n`;
     
-    // 核心统计数据
-    message += `👥 <b>邀请人数:</b> ${stats.inviteeCount} 人\n`;
-    message += `💰 <b>总交易量:</b> $${this.formatCurrency(stats.totalTradingVolume)}\n`;
-    message += `⭐ <b>当前积分:</b> ${this.formatPoints(stats.currentPoints)} 分\n`;
+    // Core statistics
+    message += `👥 <b>Invitees:</b> ${stats.inviteeCount} users\n`;
+    message += `💰 <b>Total Trading Volume:</b> $${this.formatCurrency(stats.totalTradingVolume)}\n`;
+    message += `⭐ <b>Current Points:</b> ${this.formatPoints(stats.currentPoints)} pts\n`;
     
-    // 邀请记录
+    // Invitation records
     if (stats.inviteRecords.length > 0) {
-      message += `\n📊 <b>邀请记录 (第${stats.pagination.page}页):</b>\n`;
+      message += `\n📊 <b>Invitation Records (Page ${stats.pagination.page}):</b>\n`;
       stats.inviteRecords.forEach((record, index) => {
         const number = (stats.pagination.page - 1) * 10 + index + 1;
         const address = this.truncateAddress(record.wallet_address);
@@ -792,74 +792,74 @@ BTC, ETH, SOL, USDT, USDC, BNB, ADA, DOT, LINK, MATIC, AVAX, UNI
         message += `${number}. <code>${address}</code> (${date})\n`;
       });
       
-      // 分页信息
+      // Pagination info
       if (stats.pagination.totalPages > 1) {
-        message += `\n📖 <b>分页:</b> ${stats.pagination.page}/${stats.pagination.totalPages}`;
+        message += `\n📖 <b>Pagination:</b> ${stats.pagination.page}/${stats.pagination.totalPages}`;
         
         if (stats.pagination.hasNext) {
-          message += `\n使用 <code>/invite ${stats.pagination.page + 1}</code> 查看下一页`;
+          message += `\nUse <code>/invite ${stats.pagination.page + 1}</code> to view next page`;
         }
         if (stats.pagination.hasPrev) {
-          message += `\n使用 <code>/invite ${stats.pagination.page - 1}</code> 查看上一页`;
+          message += `\nUse <code>/invite ${stats.pagination.page - 1}</code> to view previous page`;
         }
       }
     } else {
-      message += `\n📭 <b>邀请记录:</b> 暂无邀请记录\n`;
-      message += `💡 开始邀请朋友使用Bot获得积分奖励！`;
+      message += `\n📭 <b>Invitation Records:</b> No invitations yet\n`;
+      message += `💡 Start inviting friends to earn points rewards!`;
     }
     
-    // 积分说明
-    message += `\n\n🏆 <b>积分规则:</b>\n`;
-    message += `• 每$100交易量 = 1积分\n`;
-    message += `• 实时统计，及时到账\n`;
-    message += `• 积分可用于兑换奖励\n`;
+    // Points explanation
+    message += `\n\n🏆 <b>Points Rules:</b>\n`;
+    message += `• Every $100 trading volume = 1 point\n`;
+    message += `• Real-time statistics, instant crediting\n`;
+    message += `• Points can be redeemed for rewards\n`;
     
-    // 邀请链接
-    message += `\n\n🔗 <b>您的专属邀请链接:</b>\n`;
+    // Invitation link
+    message += `\n\n🔗 <b>Your Exclusive Invitation Link:</b>\n`;
     if (stats.invitationLink) {
       message += `<code>${stats.invitationLink}</code>\n\n`;
-      message += `💡 <b>如何使用:</b>\n`;
-      message += `• 复制上方链接分享给朋友\n`;
-      message += `• 朋友点击链接开始使用Bot\n`;
-      message += `• 朋友交易时您将获得积分奖励`;
+      message += `💡 <b>How to use:</b>\n`;
+      message += `• Copy the link above and share with friends\n`;
+      message += `• Friends click the link to start using the Bot\n`;
+      message += `• You earn points when friends trade`;
     } else {
-      message += `<i>暂无可用的邀请链接</i>`;
+      message += `<i>No available invitation link</i>`;
     }
     
-    // 更新时间
-    message += `\n\n🕐 <b>更新时间:</b> ${this.formatTimestamp(stats.lastUpdated)}`;
+    // Update time
+    message += `\n\n🕐 <b>Updated:</b> ${this.formatTimestamp(stats.lastUpdated)}`;
     
     return message;
   }
 
   /**
-   * 格式化邀请错误消息
+   * Format invitation error message
    */
   public formatInviteErrorMessage(error: DetailedError): string {
-    let message = `❌ <b>邀请统计查询失败</b>\n\n`;
+    let message = `❌ <b>Invitation Statistics Query Failed</b>\n\n`;
     
-    // 根据错误类型提供特定的错误信息
+    // Provide specific error information based on error type
     switch (error.code) {
       case 'TOKEN_NOT_FOUND':
-        message += `🎁 未找到邀请记录\n\n`;
-        message += `可能的原因：\n`;
-        message += `• 您还没有邀请过其他用户\n`;
-        message += `• 邀请数据同步延迟\n\n`;
-        message += `💡 <b>建议:</b> 开始邀请朋友使用Bot`;
+        message += `🎁 No invitation records found\n\n`;
+        message += `Possible reasons:\n`;
+        message += `• You haven't invited other users yet\n`;
+        message += `• Invitation data sync delay\n\n`;
+        message += `💡 <b>Suggestion:</b> Start inviting friends to use the Bot`;
         break;
         
       case 'NETWORK_ERROR':
-        message += `🌐 网络连接异常\n\n`;
-        message += `可能的原因：\n`;
-        message += `• 网络连接不稳定\n`;
-        message += `• 服务器正在维护\n\n`;
-        message += `💡 <b>建议:</b> 请稍后重新发送 <code>/invite</code>`;
+        message += `🌐 Network connection error\n\n`;
+        message += `Possible reasons:\n`;
+        message += `• Unstable network connection\n`;
+        message += `• Server under maintenance\n\n`;
+        message += `💡 <b>Suggestion:</b> Please resend <code>/invite</code> later`;
         break;
         
       case 'TIMEOUT_ERROR':
-        message += `⏱️ 请求超时\n\n`;
-        message += `服务器响应时间过长，请稍后重试。\n\n`;
-        message += `💡 <b>建议:</b> 等待30秒后重新发送 <code>/invite</code>`;
+        message += `⏱️ Request timeout\n\n`;
+        message += `Server response time too long, please try again later.\n\n`;
+        message += `💡 <b>Suggestion:</b> Wait 30 seconds then resend <code>/invite</code>`;
         break;
         
       case 'SERVER_ERROR':
@@ -869,42 +869,42 @@ BTC, ETH, SOL, USDT, USDC, BNB, ADA, DOT, LINK, MATIC, AVAX, UNI
         break;
         
       case 'RATE_LIMIT_EXCEEDED':
-        message += `🚦 请求过于频繁\n\n`;
-        message += `为了保护系统稳定性，请稍后重试。\n\n`;
-        message += `💡 <b>建议:</b> 等待1-2分钟后重新发送 <code>/invite</code>`;
+        message += `🚦 Too many requests\n\n`;
+        message += `To protect system stability, please try again later.\n\n`;
+        message += `💡 <b>Suggestion:</b> Wait 1-2 minutes then resend <code>/invite</code>`;
         break;
         
       case 'DATA_UNAVAILABLE':
-        message += `📊 API数据格式异常\n\n`;
-        message += `服务器返回的数据格式不符合预期，可能是：\n`;
-        message += `• API接口正在升级维护\n`;
-        message += `• 数据同步出现临时问题\n`;
-        message += `• 服务器配置更新中\n\n`;
-        message += `💡 <b>建议:</b> 请稍后重新发送 <code>/invite</code> 命令\n`;
-        message += `如果问题持续存在，我们的技术团队将尽快修复`;
+        message += `📊 API data format exception\n\n`;
+        message += `Server returned data format doesn't match expectations, possibly:\n`;
+        message += `• API interface undergoing maintenance\n`;
+        message += `• Temporary data synchronization issues\n`;
+        message += `• Server configuration updates in progress\n\n`;
+        message += `💡 <b>Suggestion:</b> Please resend <code>/invite</code> command later\n`;
+        message += `If the problem persists, our technical team will fix it soon`;
         break;
         
       default:
         message += `${error.message}\n\n`;
         if (error.retryable) {
-          message += `💡 <b>建议:</b> 请重新发送 <code>/invite</code> 命令`;
+          message += `💡 <b>Suggestion:</b> Please resend <code>/invite</code> command`;
         } else {
-          message += `💡 <b>建议:</b> 请联系管理员获取帮助`;
+          message += `💡 <b>Suggestion:</b> Please contact administrator for help`;
         }
     }
     
-    message += `\n\n<b>🆘 需要帮助？</b>\n`;
-    message += `• 📱 发送 <code>/help</code> 查看使用指南\n`;
-    message += `• 💰 发送 <code>/wallet</code> 查看钱包余额\n`;
-    message += `• 📊 发送 <code>/markets</code> 查看市场行情\n\n`;
+    message += `\n\n<b>🆘 Need Help?</b>\n`;
+    message += `• 📱 Send <code>/help</code> to view usage guide\n`;
+    message += `• 💰 Send <code>/wallet</code> to check wallet balance\n`;
+    message += `• 📊 Send <code>/markets</code> to view market data\n\n`;
     
-    message += `<i>如果问题持续存在，请联系管理员</i>`;
+    message += `<i>If the problem persists, please contact administrator</i>`;
     
     return message;
   }
 
   /**
-   * 格式化积分数值显示
+   * Format points value display
    */
   private formatPoints(points: number): string {
     if (points === 0) {
@@ -1144,7 +1144,7 @@ BTC, ETH, SOL, ETC, LINK, AVAX, UNI and other major cryptocurrencies
   }
 
   /**
-   * 格式化交易订单预览
+   * Format trading order preview
    */
   public formatTradingOrderPreview(
     action: 'long' | 'short', 

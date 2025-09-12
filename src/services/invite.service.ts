@@ -99,7 +99,7 @@ export class InviteService {
         throw this.createDetailedError(
           ApiErrorCode.DATA_UNAVAILABLE,
           `Invalid invite stats API response format: ${validationResult.errors.join(', ')}`,
-          `API返回数据格式不正确：${validationResult.errors.slice(0, 2).join('，')}`
+          `API response format is incorrect: ${validationResult.errors.slice(0, 2).join(', ')}`
         );
       }
 
@@ -345,7 +345,7 @@ export class InviteService {
       return this.createDetailedError(
         ApiErrorCode.NETWORK_ERROR,
         error.message,
-        '网络连接失败，请检查网络连接'
+        'Network connection failed, please check your connection'
       );
     }
 
@@ -354,7 +354,7 @@ export class InviteService {
       return this.createDetailedError(
         ApiErrorCode.TIMEOUT_ERROR,
         error.message,
-        '请求超时，请稍后重试'
+        'Request timeout, please try again later'
       );
     }
 
@@ -368,31 +368,31 @@ export class InviteService {
           return this.createDetailedError(
             ApiErrorCode.INVALID_SYMBOL,
             message,
-            '请求参数错误，请检查输入信息'
+            'Request parameters error, please check input information'
           );
         case 401:
           return this.createDetailedError(
             ApiErrorCode.UNAUTHORIZED,
             message,
-            'API认证失败，请联系管理员'
+            'API authentication failed, please contact administrator'
           );
         case 403:
           return this.createDetailedError(
             ApiErrorCode.FORBIDDEN,
             message,
-            '访问权限不足'
+            'Insufficient access permissions'
           );
         case 404:
           return this.createDetailedError(
             ApiErrorCode.TOKEN_NOT_FOUND,
             message,
-            '邀请服务不可用'
+            'Invitation service unavailable'
           );
         case 429:
           return this.createDetailedError(
             ApiErrorCode.RATE_LIMIT_EXCEEDED,
             message,
-            '请求过于频繁，请稍后重试'
+            'Too many requests, please try again later'
           );
         case 500:
         case 502:
@@ -401,13 +401,13 @@ export class InviteService {
           return this.createDetailedError(
             ApiErrorCode.SERVER_ERROR,
             message,
-            '服务器内部错误，请稍后重试'
+            'Server internal error, please try again later'
           );
         default:
           return this.createDetailedError(
             ApiErrorCode.UNKNOWN_ERROR,
             message || error.message,
-            `服务异常 (${status})`
+            `Service error (${status})`
           );
       }
     }
@@ -416,7 +416,7 @@ export class InviteService {
     return this.createDetailedError(
       ApiErrorCode.UNKNOWN_ERROR,
       error.message || 'Unknown error',
-      '邀请统计查询失败，请稍后重试'
+      'Invitation statistics query failed, please try again later'
     );
   }
 

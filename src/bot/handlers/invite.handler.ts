@@ -32,9 +32,9 @@ export class InviteHandler {
         const pageArg = parseInt(args[0]);
         if (isNaN(pageArg) || pageArg < 1) {
           await ctx.reply(
-            '⚠️ 页码格式不正确\n\n' +
-            '正确格式: <code>/invite [页码]</code>\n' +
-            '例如: <code>/invite 2</code> 查看第2页',
+            '⚠️ Invalid page number format\n\n' +
+            'Correct format: <code>/invite [page]</code>\n' +
+            'Example: <code>/invite 2</code> to view page 2',
             { parse_mode: 'HTML' }
           );
           return;
@@ -44,8 +44,8 @@ export class InviteHandler {
 
       if (args.length > 1) {
         await ctx.reply(
-          '⚠️ 参数过多\n\n' +
-          '正确格式: <code>/invite [页码]</code>',
+          '⚠️ Too many parameters\n\n' +
+          'Correct format: <code>/invite [page]</code>',
           { parse_mode: 'HTML' }
         );
         return;
@@ -53,7 +53,7 @@ export class InviteHandler {
 
       // 发送"查询中..."消息
       const loadingMessage = await ctx.reply(
-        '🔍 正在获取邀请统计数据...',
+        '🔍 Fetching your invitation statistics...',
         { parse_mode: 'HTML' }
       );
 
@@ -100,8 +100,8 @@ export class InviteHandler {
 
         // 如果编辑消息失败，尝试发送新消息
         await ctx.reply(
-          '❌ 消息发送失败，请重试\n\n' +
-          '<i>如果问题持续存在，请联系管理员</i>',
+          '❌ Message sending failed, please try again\n\n' +
+          '<i>If the problem persists, please contact administrator</i>',
           { parse_mode: 'HTML' }
         );
       }
@@ -152,13 +152,13 @@ export class InviteHandler {
    */
   private async sendGenericErrorMessage(ctx: Context): Promise<void> {
     const errorMessage = 
-      '❌ <b>系统错误</b>\n\n' +
-      '很抱歉，处理您的邀请查询时出现了意外错误。\n\n' +
-      '💡 <b>您可以尝试:</b>\n' +
-      '• 稍后重试 <code>/invite</code>\n' +
-      '• 查看其他功能 <code>/help</code>\n' +
-      '• 检查钱包余额 <code>/wallet</code>\n\n' +
-      '<i>如果问题持续存在，请联系管理员</i>';
+      '❌ <b>System Error</b>\n\n' +
+      'Sorry, an unexpected error occurred while processing your invitation query.\n\n' +
+      '💡 <b>You can try:</b>\n' +
+      '• Retry <code>/invite</code> later\n' +
+      '• Check other features <code>/help</code>\n' +
+      '• View wallet balance <code>/wallet</code>\n\n' +
+      '<i>If the problem persists, please contact administrator</i>';
 
     await ctx.reply(errorMessage, { parse_mode: 'HTML' });
   }
@@ -190,7 +190,7 @@ export class InviteHandler {
       const targetPage = action === 'next' ? page + 1 : page - 1;
       
       if (targetPage < 1) {
-        await ctx.answerCbQuery('已经是第一页了');
+        await ctx.answerCbQuery('Already at first page');
         return;
       }
 
@@ -199,7 +199,7 @@ export class InviteHandler {
       const inviteStats = await inviteService.getInviteStats(telegramId, targetPage, 10);
 
       if (targetPage > inviteStats.pagination.totalPages) {
-        await ctx.answerCbQuery('已经是最后一页了');
+        await ctx.answerCbQuery('Already at last page');
         return;
       }
 
@@ -207,7 +207,7 @@ export class InviteHandler {
       const responseMessage = messageFormatter.formatInviteStatsMessage(inviteStats);
       
       await ctx.editMessageText(responseMessage, { parse_mode: 'HTML' });
-      await ctx.answerCbQuery(`已切换到第${targetPage}页`);
+      await ctx.answerCbQuery(`Switched to page ${targetPage}`);
 
       const duration = Date.now() - startTime;
       logger.logPerformance('invite_page_navigation_success', duration, {
@@ -230,7 +230,7 @@ export class InviteHandler {
         requestId
       });
 
-      await ctx.answerCbQuery('分页导航失败，请重试');
+      await ctx.answerCbQuery('Page navigation failed, please try again');
     }
   }
 
@@ -256,17 +256,17 @@ export class InviteHandler {
       const inviteLink = inviteService.generateInviteLink(userReferralCode);
 
       const linkMessage = 
-        '🔗 <b>您的邀请链接</b>\n\n' +
+        '🔗 <b>Your Invitation Link</b>\n\n' +
         `<code>${inviteLink}</code>\n\n` +
-        '💡 <b>如何使用:</b>\n' +
-        '• 复制链接分享给朋友\n' +
-        '• 朋友点击链接开始使用Bot\n' +
-        '• 朋友交易时您将获得积分奖励\n\n' +
-        '🎁 <b>奖励规则:</b>\n' +
-        '• 每$100交易量 = 1积分\n' +
-        '• 积分可用于兑换奖励\n' +
-        '• 实时统计，及时到账\n\n' +
-        '使用 <code>/invite</code> 查看邀请统计';
+        '💡 <b>How to use:</b>\n' +
+        '• Copy and share the link with friends\n' +
+        '• Friends click the link to start using the Bot\n' +
+        '• You earn points when friends trade\n\n' +
+        '🎁 <b>Reward Rules:</b>\n' +
+        '• Every $100 trading volume = 1 point\n' +
+        '• Points can be redeemed for rewards\n' +
+        '• Real-time statistics, instant crediting\n\n' +
+        'Use <code>/invite</code> to view invitation statistics';
 
       await ctx.reply(linkMessage, { parse_mode: 'HTML' });
 
@@ -288,7 +288,7 @@ export class InviteHandler {
       });
 
       await ctx.reply(
-        '❌ 邀请链接生成失败\n\n请稍后重试',
+        '❌ Invitation link generation failed\n\nPlease try again later',
         { parse_mode: 'HTML' }
       );
     }
