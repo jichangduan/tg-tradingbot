@@ -494,7 +494,7 @@ export class LongHandler {
         tradingData
       );
       
-      logger.info(`📥 API Response Success:`, result);
+      logger.info(`📥 API Response Success:`, { result });
 
       // 检查API响应以确定是否真正成功
       const apiResult = result as any; // 类型断言
