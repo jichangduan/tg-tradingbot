@@ -493,8 +493,17 @@ export class PushSchedulerService {
   private async updateLastPushTime(): Promise<void> {
     try {
       const cacheKey = `${this.cachePrefix}:${this.lastPushCacheKey}`;
-      await cacheService.set(cacheKey, new Date().toISOString(), 24 * 60 * 60);
-      // 删除更新推送时间的debug日志
+      const result = await cacheService.set(cacheKey, new Date().toISOString(), 24 * 60 * 60);
+      
+      if (!result.success) {
+        const errorMessage = result.error || 'Unknown cache error';
+        // Redis配置问题不影响推送核心功能
+        if (errorMessage.includes('Redis config issue')) {
+          logger.debug('🔧 Redis config prevents caching push time, but push system continues normally');
+        } else {
+          logger.warn('Failed to cache push time - push tracking may be affected', { error: errorMessage });
+        }
+      }
     } catch (error) {
       logger.warn('Failed to update last push time', { error: (error as Error).message });
     }

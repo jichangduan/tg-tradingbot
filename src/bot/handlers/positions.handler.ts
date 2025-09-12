@@ -681,11 +681,17 @@ An error occurred while fetching position information, please try again later.
           cacheTTL: this.cacheTTL
         });
       } else {
-        logger.warn('Failed to cache positions data', {
-          userId,
-          cacheKey: key,
-          cacheError: result.error
-        });
+        const errorMessage = result.error || 'Unknown cache error';
+        // Redis配置问题不影响positions查询核心功能
+        if (errorMessage.includes('Redis config issue')) {
+          logger.debug('🔧 Redis config prevents caching positions, but query completed successfully');
+        } else {
+          logger.warn('Failed to cache positions data', {
+            userId,
+            cacheKey: key,
+            cacheError: errorMessage
+          });
+        }
       }
     } catch (error) {
       logger.warn('Failed to cache positions', { 
@@ -860,12 +866,18 @@ An error occurred while fetching position information, please try again later.
           requestId: reqId
         });
       } else {
-        logger.error(`Failed to cache accessToken [${reqId}]`, {
-          userId,
-          tokenKey,
-          error: result.error,
-          requestId: reqId
-        });
+        const errorMessage = result.error || 'Unknown cache error';
+        // Redis配置问题不影响token使用，只是下次需要重新获取
+        if (errorMessage.includes('Redis config issue')) {
+          logger.debug(`🔧 Redis config prevents token caching, but token is valid and usable [${reqId}]`);
+        } else {
+          logger.error(`Failed to cache accessToken [${reqId}]`, {
+            userId,
+            tokenKey,
+            error: errorMessage,
+            requestId: reqId
+          });
+        }
       }
     } catch (error) {
       logger.error(`Error caching accessToken [${reqId}]`, {

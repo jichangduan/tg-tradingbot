@@ -145,6 +145,17 @@ export class CacheService {
 
     } catch (error) {
       const errorMessage = (error as Error).message;
+      
+      // 特殊处理Redis配置问题（MISCONF错误）
+      if (errorMessage.includes('MISCONF') || errorMessage.includes('stop-writes-on-bgsave-error')) {
+        logger.warn(`🔧 Redis configuration issue detected for key: ${key}`, { 
+          error: errorMessage,
+          suggestion: 'Redis RDB save failed, but application continues normally',
+          impact: 'Cache disabled, core functionality unaffected'
+        });
+        return { success: false, error: 'Redis config issue - cache temporarily disabled' };
+      }
+      
       logger.error(`Cache set failed for key: ${key}`, { error: errorMessage });
       return { success: false, error: errorMessage };
     }
@@ -194,6 +205,16 @@ export class CacheService {
 
     } catch (error) {
       const errorMessage = (error as Error).message;
+      
+      // 特殊处理Redis配置问题（MISCONF错误）
+      if (errorMessage.includes('MISCONF') || errorMessage.includes('stop-writes-on-bgsave-error')) {
+        logger.warn(`🔧 Redis configuration issue for delete key: ${key}`, { 
+          error: errorMessage,
+          impact: 'Cache delete skipped, operation continues'
+        });
+        return { success: false, error: 'Redis config issue - delete skipped' };
+      }
+      
       logger.error(`Cache delete failed for key: ${key}`, { error: errorMessage });
       return { success: false, error: errorMessage };
     }
@@ -343,16 +364,24 @@ export class CacheService {
     // 尝试从缓存获取
     const cacheResult = await this.get<T>(key);
     if (cacheResult.success && cacheResult.data !== undefined) {
+      logger.debug(`🎯 Cache hit for key: ${key}`);
       return cacheResult.data;
     }
 
     // 缓存未命中，执行回调函数
     try {
+      logger.debug(`📥 Cache miss for key: ${key}, executing fallback function`);
       const data = await fallbackFn();
       
       // 尝试设置缓存（不阻塞主流程）
       this.set(key, data, ttlSeconds).catch(error => {
-        logger.warn(`Failed to cache data for key: ${key}`, { error });
+        const errorMessage = (error as Error).message || error;
+        if (typeof errorMessage === 'string' && 
+            (errorMessage.includes('MISCONF') || errorMessage.includes('stop-writes-on-bgsave-error'))) {
+          logger.debug(`🔧 Redis config issue prevents caching key: ${key}, but data retrieved successfully`);
+        } else {
+          logger.warn(`Failed to cache data for key: ${key}`, { error: errorMessage });
+        }
       });
       
       return data;
