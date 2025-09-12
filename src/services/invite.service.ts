@@ -449,7 +449,7 @@ export class InviteService {
   public generateInviteLink(userReferralCode: string): string {
     // 这里可以构建完整的邀请链接
     // 例如: https://t.me/YourBot?start=invite_ABC123
-    const botUsername = process.env.BOT_USERNAME || 'aiw3_bot';
+    const botUsername = process.env.TELEGRAM_BOT_USERNAME || process.env.BOT_USERNAME || 'aiw3_bot';
     return `https://t.me/${botUsername}?start=invite_${userReferralCode}`;
   }
 

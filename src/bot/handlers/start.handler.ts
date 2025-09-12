@@ -105,10 +105,12 @@ export class StartHandler {
         invitation_code: invitationCode
       };
 
-      logger.info(`Starting user initialization [${requestId}]`, {
+      logger.info(`🚀 Starting user initialization [${requestId}]`, {
         telegramId: initRequest.telegram_id,
         username: initRequest.username,
         hasInvitationCode: !!invitationCode,
+        invitationCode: invitationCode || 'none',  // 显示具体邀请码
+        fullInitRequest: JSON.stringify(initRequest, null, 2),  // 完整请求体
         requestId
       });
 
@@ -144,13 +146,28 @@ export class StartHandler {
    * 从命令参数中解析邀请码
    */
   private parseInvitationCodeFromArgs(args: string[]): string | undefined {
+    logger.info('🔍 Parsing invitation code from /start args', {
+      argsLength: args.length,
+      args: args,
+      firstArg: args[0] || 'none'
+    });
+
     if (args.length === 0) {
+      logger.info('❌ No args provided - no invitation code');
       return undefined;
     }
 
     // 取第一个参数作为潜在的邀请码
     const potentialCode = args[0];
-    return userService.parseInvitationCode(potentialCode);
+    const parsedCode = userService.parseInvitationCode(potentialCode);
+    
+    logger.info('🎯 Invitation code parsing result', {
+      originalArg: potentialCode,
+      parsedCode: parsedCode,
+      isValidCode: !!parsedCode
+    });
+
+    return parsedCode;
   }
 
   /**
