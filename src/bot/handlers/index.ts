@@ -3,8 +3,8 @@ import { priceHandler } from './price.handler';
 import { marketsHandler } from './markets.handler';
 import { startHandler } from './start.handler';
 import { walletHandler } from './wallet.handler';
-import { inviteHandler } from './invite.handler';
-import { pointsHandler } from './points.handler';
+// import { inviteHandler } from './invite.handler';
+// import { pointsHandler } from './points.handler';
 import { chartHandler } from './chart.handler';
 import { longHandler } from './long.handler';
 import { shortHandler } from './short.handler';
@@ -357,8 +357,8 @@ Examples: <code>/long BTC 10x 200</code>, <code>/short ETH 5x 100</code>, <code>
 
 <b>💰 Account Management:</b>
 <code>/wallet</code> - View wallet balance
-<code>/invite</code> - View invitation stats and points
-<code>/points</code> - View your earned points
+<!-- <code>/invite</code> - View invitation stats and points -->
+<!-- <code>/points</code> - View your earned points -->
 
 <b>📢 Push Notifications:</b>
 <code>/push</code> - Manage push notification settings
@@ -416,17 +416,17 @@ Need help? Contact administrator 👨‍💻
     createCommandWrapper('wallet', walletHandler.handle.bind(walletHandler))
   );
 
-  // /invite 命令 - 邀请统计
-  bot.command(
-    'invite', 
-    createCommandWrapper('invite', inviteHandler.handle.bind(inviteHandler))
-  );
+  // /invite 命令 - 邀请统计 (temporarily disabled)
+  // bot.command(
+  //   'invite', 
+  //   createCommandWrapper('invite', inviteHandler.handle.bind(inviteHandler))
+  // );
 
-  // /points 命令 - 积分查询
-  bot.command(
-    'points', 
-    createCommandWrapper('points', pointsHandler.handle.bind(pointsHandler))
-  );
+  // /points 命令 - 积分查询 (temporarily disabled)
+  // bot.command(
+  //   'points', 
+  //   createCommandWrapper('points', pointsHandler.handle.bind(pointsHandler))
+  // );
 
   // /long 命令 - 做多交易
   bot.command(
@@ -589,8 +589,8 @@ I don't recognize this command. Try these available commands:
 
 <b>💰 Account Management:</b>
 <code>/wallet</code> - View wallet balance
-<code>/invite</code> - View invitation stats
-<code>/points</code> - View points details
+<!-- <code>/invite</code> - View invitation stats -->
+<!-- <code>/points</code> - View points details -->
 
 <b>📢 Push Settings:</b>
 <code>/push</code> - Manage push notifications
@@ -748,8 +748,8 @@ export function getRegisteredCommands(): Array<{ command: string; description: s
     { command: '/pnl', description: 'Profit & Loss analysis report' },
     { command: '/markets', description: 'View market data' },
     { command: '/wallet', description: 'View wallet balance' },
-    { command: '/invite', description: 'View invitation stats and points' },
-    { command: '/points', description: 'View your earned points' },
+    // { command: '/invite', description: 'View invitation stats and points' }, // temporarily disabled
+    // { command: '/points', description: 'View your earned points' }, // temporarily disabled
     { command: '/push', description: 'Manage push notification settings' },
     { command: '/status', description: 'View system status' }
   ];
@@ -770,8 +770,8 @@ export async function setBotCommands(bot: Telegraf<ExtendedContext>): Promise<vo
       { command: 'pnl', description: '📈 P&L Analysis' },
       { command: 'markets', description: '📈 Market Data' },
       { command: 'wallet', description: '💰 Wallet Balance' },
-      { command: 'invite', description: '🎁 Invitation Stats' },
-      { command: 'points', description: '🎯 Points Details' },
+      // { command: 'invite', description: '🎁 Invitation Stats' }, // temporarily disabled
+      // { command: 'points', description: '🎯 Points Details' }, // temporarily disabled
       { command: 'push', description: '📢 Push Settings' },
       { command: 'status', description: '⚙️ System Status' }
     ]);

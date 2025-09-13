@@ -478,13 +478,13 @@ No positions
       const formattedSize = positionSize < 1 ? positionSize.toFixed(4) : positionSize.toFixed(2);
       
       positionsText += `
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ${sideIcon} <b>${position.symbol} ${sideText}</b>
 • Position Size    : ${formattedSize} ${position.symbol}
 • Entry Price      : $${parseFloat(position.entryPrice).toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
 • Mark Price       : $${parseFloat(position.markPrice).toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
 • Unrealized PNL   : ${pnlColor} ${pnlPrefix}$${Math.abs(parseFloat(position.pnl)).toFixed(2)} (${pnlPrefix}${parseFloat(position.pnlPercentage).toFixed(2)}%)
 • Margin Used      : $${parseFloat(position.marginUsed).toFixed(2)}
-${index < positions.length - 1 ? '\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' : ''}
       `.trim();
     });
 
