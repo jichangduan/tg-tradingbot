@@ -1,7 +1,7 @@
 import { logger } from '../utils/logger';
 
 /**
- * 推送消息的接口定义
+ * Push message interface definition
  */
 export interface FormattedPushMessage {
   content: string;
@@ -10,7 +10,7 @@ export interface FormattedPushMessage {
 }
 
 /**
- * 快讯数据接口
+ * Flash news data interface
  */
 export interface FlashNewsData {
   title: string;
@@ -20,7 +20,7 @@ export interface FlashNewsData {
 }
 
 /**
- * 鲸鱼动向数据接口
+ * Whale action data interface
  */
 export interface WhaleActionData {
   address: string;
@@ -31,7 +31,7 @@ export interface WhaleActionData {
 }
 
 /**
- * 资金流向数据接口（TGBot内部格式）
+ * Fund flow data interface (TGBot internal format)
  */
 export interface FundFlowData {
   from: string;
@@ -42,7 +42,7 @@ export interface FundFlowData {
 }
 
 /**
- * AIW3资金流向数据接口（外部API格式）
+ * AIW3 fund flow data interface (external API format)
  */
 export interface AIW3FundFlowData {
   message: string;
@@ -54,15 +54,15 @@ export interface AIW3FundFlowData {
 }
 
 /**
- * 推送消息格式化服务
- * 负责格式化各种类型的推送消息内容
+ * Push message formatter service
+ * Responsible for formatting various types of push message content
  */
 export class PushMessageFormatterService {
   
   /**
-   * 格式化快讯推送消息
-   * @param news 快讯数据
-   * @returns 格式化后的消息内容
+   * Format flash news push message
+   * @param news Flash news data
+   * @returns Formatted message content
    */
   public formatFlashNewsMessage(news: FlashNewsData): string {
     if (!news || !news.title) {
@@ -71,13 +71,13 @@ export class PushMessageFormatterService {
     }
 
     try {
-      // 简洁的标题格式
+      // Simple title format
       let message = `🚨 <b>News</b>\n\n`;
       
-      // 添加标题内容
+      // Add title content
       message += `${this.escapeHtml(news.title)}`;
 
-      // 如果有内容，清理HTML并添加内容
+      // If content exists, clean HTML and add content
       if (news.content && news.content.trim()) {
         const cleanContent = this.cleanHtmlContent(news.content);
         if (cleanContent) {
@@ -85,7 +85,7 @@ export class PushMessageFormatterService {
         }
       }
 
-      // 如果有相关代币符号，在消息末尾提示
+      // If there are related token symbols, show at message end
       if (news.symbol) {
         message += `\n\n💡 <i>Related token: ${news.symbol}</i>`;
       }
@@ -102,9 +102,9 @@ export class PushMessageFormatterService {
   }
 
   /**
-   * 格式化鲸鱼动向推送消息
-   * @param action 鲸鱼动向数据
-   * @returns 格式化后的消息内容
+   * Format whale action push message
+   * @param action Whale action data
+   * @returns Formatted message content
    */
   public formatWhaleActionMessage(action: WhaleActionData): string {
     if (!action || !action.address || !action.action) {
@@ -115,19 +115,19 @@ export class PushMessageFormatterService {
     try {
       const truncatedAddress = this.truncateAddress(action.address);
       
-      // 简洁的标题格式
+      // Simple title format
       let message = `🐋 <b>Whale Alert</b>\n\n`;
       
-      // 添加地址和操作信息
+      // Add address and action information
       message += `Address: <code>${truncatedAddress}</code>\n`;
       message += `Action: ${this.escapeHtml(action.action)}`;
 
-      // 如果有金额信息，添加金额行
+      // If amount information exists, add amount line
       if (action.amount && action.amount.trim()) {
         message += `\nAmount: ${this.escapeHtml(action.amount)}`;
       }
 
-      // 如果有相关代币符号，在消息末尾提示
+      // If there are related token symbols, show at message end
       if (action.symbol) {
         message += `\n\n💡 <i>Related token: ${action.symbol}</i>`;
       }
@@ -144,9 +144,9 @@ export class PushMessageFormatterService {
   }
 
   /**
-   * 格式化资金流向推送消息
-   * @param flow 资金流向数据（支持内部格式和AIW3格式）
-   * @returns 格式化后的消息内容
+   * Format fund flow push message
+   * @param flow Fund flow data (supports internal format and AIW3 format)
+   * @returns Formatted message content
    */
   public formatFundFlowMessage(flow: FundFlowData | AIW3FundFlowData): string {
     if (!flow) {
@@ -154,14 +154,14 @@ export class PushMessageFormatterService {
       return '💰 <b>Fund Flow</b>\n\nInvalid fund flow data';
     }
 
-    // 检查是否是AIW3格式的数据
+    // Check if it's AIW3 format data
     const isAIW3Format = 'message' in flow && 'flow1h' in flow && 'flow4h' in flow;
     
     if (isAIW3Format) {
       return this.formatAIW3FundFlowMessage(flow as AIW3FundFlowData);
     }
 
-    // 传统格式验证
+    // Traditional format validation
     const traditionalFlow = flow as FundFlowData;
     if (!traditionalFlow.from || !traditionalFlow.to) {
       logger.warn('Invalid traditional fund flow data provided', { flow });
@@ -169,19 +169,19 @@ export class PushMessageFormatterService {
     }
 
     try {
-      // 简洁的标题格式
+      // Simple title format
       let message = `💰 <b>Fund Flow</b>\n\n`;
       
-      // 添加流向信息
+      // Add flow information
       message += `From: ${this.escapeHtml(flow.from)}\n`;
       message += `To: ${this.escapeHtml(flow.to)}`;
 
-      // 如果有金额信息，添加金额行
+      // If amount information exists, add amount line
       if (flow.amount && flow.amount.trim()) {
         message += `\nAmount: ${this.escapeHtml(flow.amount)}`;
       }
 
-      // 如果有相关代币符号，在消息末尾提示
+      // If there are related token symbols, show at message end
       if (flow.symbol) {
         message += `\n\n💡 <i>Related token: ${flow.symbol}</i>`;
       }
@@ -199,19 +199,19 @@ export class PushMessageFormatterService {
   }
 
   /**
-   * 格式化AIW3格式的资金流向推送消息
-   * @param flow AIW3资金流向数据
-   * @returns 格式化后的消息内容
+   * Format AIW3 format fund flow push message
+   * @param flow AIW3 fund flow data
+   * @returns Formatted message content
    */
   public formatAIW3FundFlowMessage(flow: AIW3FundFlowData): string {
     try {
-      // 简洁的标题格式
+      // Simple title format
       let message = `💰 <b>Fund Flow</b>\n\n`;
       
-      // 添加消息内容
+      // Add message content
       message += `${this.escapeHtml(flow.message)}\n\n`;
       
-      // 添加详细信息
+      // Add detailed information
       message += `Token: ${this.escapeHtml(flow.symbol)}\n`;
       message += `Price: $${this.escapeHtml(flow.price)}\n`;
       message += `1h Flow: ${this.escapeHtml(flow.flow1h)}\n`;
@@ -231,9 +231,9 @@ export class PushMessageFormatterService {
   }
 
   /**
-   * 创建交易按钮键盘
-   * @param symbol 代币符号
-   * @returns 内联键盘配置
+   * Create trading button keyboard
+   * @param symbol Token symbol
+   * @returns Inline keyboard configuration
    */
   public createTradingKeyboard(symbol: string): any[] {
     if (!symbol || typeof symbol !== 'string') {
@@ -243,7 +243,7 @@ export class PushMessageFormatterService {
 
     const upperSymbol = symbol.toUpperCase();
     
-    // 删除创建交易键盘debug日志
+    // Create trading keyboard for the symbol
     
     return [
       [
@@ -260,19 +260,19 @@ export class PushMessageFormatterService {
   }
 
   /**
-   * 格式化时间戳为用户友好的格式
-   * @param timestamp 时间戳字符串
-   * @returns 格式化后的时间字符串
+   * Format timestamp to user-friendly format
+   * @param timestamp Timestamp string
+   * @returns Formatted time string
    */
   public formatTimestamp(timestamp: string): string {
     try {
       if (!timestamp) {
-        return '未知时间';
+        return 'Unknown time';
       }
 
       const date = new Date(timestamp);
       
-      // 检查日期是否有效
+      // Check if date is valid
       if (isNaN(date.getTime())) {
         logger.warn('Invalid timestamp provided', { timestamp });
         return timestamp;
@@ -284,17 +284,17 @@ export class PushMessageFormatterService {
       const diffHours = Math.floor(diffMinutes / 60);
       const diffDays = Math.floor(diffHours / 24);
 
-      // 根据时间差返回不同格式
+      // Return different formats based on time difference
       if (diffMinutes < 1) {
-        return '刚刚';
+        return 'Just now';
       } else if (diffMinutes < 60) {
-        return `${diffMinutes}分钟前`;
+        return `${diffMinutes} min ago`;
       } else if (diffHours < 24) {
-        return `${diffHours}小时前`;
+        return `${diffHours}h ago`;
       } else if (diffDays < 7) {
-        return `${diffDays}天前`;
+        return `${diffDays}d ago`;
       } else {
-        // 超过7天显示具体日期时间
+        // Show specific date and time for over 7 days
         return date.toLocaleString('zh-CN', {
           timeZone: 'Asia/Shanghai',
           month: 'short',
@@ -313,9 +313,9 @@ export class PushMessageFormatterService {
   }
 
   /**
-   * 清理HTML标签并格式化内容为纯文本
-   * @param htmlContent 包含HTML标签的内容
-   * @returns 清理后的纯文本内容
+   * Clean HTML tags and format content to plain text
+   * @param htmlContent Content containing HTML tags
+   * @returns Cleaned plain text content
    */
   private cleanHtmlContent(htmlContent: string): string {
     if (!htmlContent || typeof htmlContent !== 'string') {
@@ -323,38 +323,38 @@ export class PushMessageFormatterService {
     }
 
     let cleanText = htmlContent
-      // 处理段落标签：<p> -> 换行, </p> -> 换行
+      // Process paragraph tags: <p> -> newline, </p> -> newline
       .replace(/<p>/gi, '\n')
       .replace(/<\/p>/gi, '\n')
-      // 处理换行标签：<br> -> 换行
+      // Process line break tags: <br> -> newline
       .replace(/<br\s*\/?>/gi, '\n')
-      // 移除所有其他HTML标签
+      // Remove all other HTML tags
       .replace(/<[^>]*>/g, '')
-      // 清理HTML实体
+      // Clean HTML entities
       .replace(/&nbsp;/g, ' ')
       .replace(/&amp;/g, '&')
       .replace(/&lt;/g, '<')
       .replace(/&gt;/g, '>')
       .replace(/&quot;/g, '"')
       .replace(/&#39;/g, "'")
-      // 移除竖线符号（避免与边框冲突）
+      // Remove vertical line symbols (avoid border conflicts)
       .replace(/\|/g, '')
-      // 清理多余的空行：连续超过2个换行合并为2个
+      // Clean excess blank lines: merge consecutive 3+ newlines to 2
       .replace(/\n{3,}/g, '\n\n')
-      // 清理每行首尾空白
+      // Clean leading and trailing whitespace of each line
       .split('\n')
       .map(line => line.trim())
       .join('\n')
-      // 清理开头和结尾的换行
+      // Clean leading and trailing newlines
       .trim();
 
     return cleanText;
   }
 
   /**
-   * 转义HTML特殊字符
-   * @param text 原始文本
-   * @returns 转义后的文本
+   * Escape HTML special characters
+   * @param text Original text
+   * @returns Escaped text
    */
   private escapeHtml(text: string): string {
     if (!text || typeof text !== 'string') {
@@ -370,9 +370,9 @@ export class PushMessageFormatterService {
   }
 
   /**
-   * 截断长地址，保留前后部分
-   * @param address 完整地址
-   * @returns 截断后的地址
+   * Truncate long address, keep front and back parts
+   * @param address Full address
+   * @returns Truncated address
    */
   private truncateAddress(address: string): string {
     if (!address || typeof address !== 'string') {
@@ -383,16 +383,16 @@ export class PushMessageFormatterService {
       return address;
     }
 
-    // 保留前8个字符和后6个字符，中间用...连接
+    // Keep first 8 characters and last 6 characters, connect with ...
     return `${address.substring(0, 8)}...${address.substring(address.length - 6)}`;
   }
 
   /**
-   * 批量格式化推送消息
-   * @param newsItems 快讯数据数组
-   * @param whaleActions 鲸鱼动向数据数组  
-   * @param fundFlows 资金流向数据数组（支持内部格式和AIW3格式）
-   * @returns 格式化后的消息数组
+   * Batch format push messages - merge same type messages
+   * @param newsItems Flash news data array
+   * @param whaleActions Whale action data array
+   * @param fundFlows Fund flow data array (supports internal and AIW3 formats)
+   * @returns Formatted message array
    */
   public formatBatchMessages(
     newsItems: FlashNewsData[] = [],
@@ -402,38 +402,39 @@ export class PushMessageFormatterService {
     const messages: FormattedPushMessage[] = [];
 
     try {
-      // 处理快讯
-      for (const news of newsItems) {
-        messages.push({
-          content: this.formatFlashNewsMessage(news),
-          type: 'flash_news',
-          keyboard: news.symbol ? this.createTradingKeyboard(news.symbol) : undefined
-        });
+      // Process flash news - merge to one message
+      if (newsItems.length > 0) {
+        const batchMessage = this.formatBatchFlashNews(newsItems);
+        if (batchMessage) {
+          messages.push(batchMessage);
+        }
       }
 
-      // 处理鲸鱼动向
-      for (const action of whaleActions) {
-        messages.push({
-          content: this.formatWhaleActionMessage(action),
-          type: 'whale_action',
-          keyboard: action.symbol ? this.createTradingKeyboard(action.symbol) : undefined
-        });
+      // Process whale actions - merge to one message
+      if (whaleActions.length > 0) {
+        const batchMessage = this.formatBatchWhaleActions(whaleActions);
+        if (batchMessage) {
+          messages.push(batchMessage);
+        }
       }
 
-      // 处理资金流向
-      for (const flow of fundFlows) {
-        const symbol = 'symbol' in flow ? flow.symbol : undefined;
-        messages.push({
-          content: this.formatFundFlowMessage(flow),
-          type: 'fund_flow',
-          keyboard: symbol ? this.createTradingKeyboard(symbol) : undefined
-        });
+      // Process fund flows - merge to one message
+      if (fundFlows.length > 0) {
+        const batchMessage = this.formatBatchFundFlows(fundFlows);
+        if (batchMessage) {
+          messages.push(batchMessage);
+        }
       }
 
-      // 保留批量格式化完成信息但简化
+      // Output statistics information
       const totalCount = newsItems.length + whaleActions.length + fundFlows.length;
       if (totalCount > 0) {
-        logger.info(`📝 [FORMATTER] Generated ${messages.length} messages from ${totalCount} items`);
+        logger.info(`📝 [FORMATTER] Generated ${messages.length} grouped messages from ${totalCount} items`, {
+          newsItems: newsItems.length,
+          whaleActions: whaleActions.length, 
+          fundFlows: fundFlows.length,
+          groupedMessages: messages.length
+        });
       }
 
       return messages;
@@ -446,11 +447,222 @@ export class PushMessageFormatterService {
         fundFlowsCount: fundFlows.length
       });
       
-      return messages; // 返回已处理的部分
+      return messages; // Return processed parts
+    }
+  }
+
+  /**
+   * Batch format flash news messages - merge multiple flash news into one message
+   * @param newsItems Flash news data array
+   * @returns Formatted message object
+   */
+  public formatBatchFlashNews(newsItems: FlashNewsData[]): FormattedPushMessage | null {
+    if (!newsItems || newsItems.length === 0) {
+      return null;
+    }
+
+    try {
+      let message = '';
+      let symbols: string[] = [];
+      
+      if (newsItems.length === 1) {
+        // Single flash news keeps original format
+        const news = newsItems[0];
+        message = this.formatFlashNewsMessage(news);
+        if (news.symbol) symbols.push(news.symbol);
+      } else {
+        // Multiple flash news merged format
+        message = `🚨 <b>Flash News</b> (${newsItems.length} items)\n\n`;
+        
+        newsItems.forEach((news, index) => {
+          if (news.title) {
+            message += `${index + 1}. ${this.escapeHtml(news.title)}\n`;
+            if (news.symbol && !symbols.includes(news.symbol)) {
+              symbols.push(news.symbol);
+            }
+          }
+        });
+      }
+
+      // Create trading buttons - if there are related token symbols
+      let keyboard: any = undefined;
+      if (symbols.length > 0) {
+        // Use first symbol to create trading buttons
+        keyboard = this.createTradingKeyboard(symbols[0]);
+        
+        // If multiple symbols, show at message end
+        if (symbols.length > 1) {
+          message += `\n\n💡 <i>Related tokens: ${symbols.join(', ')}</i>`;
+        } else {
+          message += `\n\n💡 <i>Related token: ${symbols[0]}</i>`;
+        }
+      }
+
+      return {
+        content: message,
+        type: 'flash_news_batch',
+        keyboard
+      };
+      
+    } catch (error) {
+      logger.error('Failed to format batch flash news', {
+        error: (error as Error).message,
+        itemCount: newsItems.length
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Batch format whale action messages - merge multiple whale actions into one message
+   * @param whaleActions Whale action data array
+   * @returns Formatted message object
+   */
+  public formatBatchWhaleActions(whaleActions: WhaleActionData[]): FormattedPushMessage | null {
+    if (!whaleActions || whaleActions.length === 0) {
+      return null;
+    }
+
+    try {
+      let message = '';
+      let symbols: string[] = [];
+      
+      if (whaleActions.length === 1) {
+        // Single whale action keeps original format
+        const action = whaleActions[0];
+        message = this.formatWhaleActionMessage(action);
+        if (action.symbol) symbols.push(action.symbol);
+      } else {
+        // Multiple whale actions merged format
+        message = `🐋 <b>Whale Alert</b> (${whaleActions.length} actions)\n\n`;
+        
+        whaleActions.forEach((action, index) => {
+          if (action.address && action.action) {
+            const truncatedAddress = this.truncateAddress(action.address);
+            message += `${index + 1}. <code>${truncatedAddress}</code> | ${this.escapeHtml(action.action)}`;
+            if (action.amount) {
+              message += ` | ${this.escapeHtml(action.amount)}`;
+            }
+            message += '\n';
+            
+            if (action.symbol && !symbols.includes(action.symbol)) {
+              symbols.push(action.symbol);
+            }
+          }
+        });
+      }
+
+      // Create trading buttons - if there are related token symbols
+      let keyboard: any = undefined;
+      if (symbols.length > 0) {
+        // Use first symbol to create trading buttons
+        keyboard = this.createTradingKeyboard(symbols[0]);
+        
+        // If multiple symbols, show at message end
+        if (symbols.length > 1) {
+          message += `\n💡 <i>Related tokens: ${symbols.join(', ')}</i>`;
+        } else {
+          message += `\n💡 <i>Related token: ${symbols[0]}</i>`;
+        }
+      }
+
+      return {
+        content: message,
+        type: 'whale_action_batch',
+        keyboard
+      };
+      
+    } catch (error) {
+      logger.error('Failed to format batch whale actions', {
+        error: (error as Error).message,
+        itemCount: whaleActions.length
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Batch format fund flow messages - merge multiple fund flows into one message
+   * @param fundFlows Fund flow data array
+   * @returns Formatted message object
+   */
+  public formatBatchFundFlows(fundFlows: (FundFlowData | AIW3FundFlowData)[]): FormattedPushMessage | null {
+    if (!fundFlows || fundFlows.length === 0) {
+      return null;
+    }
+
+    try {
+      let message = '';
+      let symbols: string[] = [];
+      
+      if (fundFlows.length === 1) {
+        // Single fund flow keeps original format
+        const flow = fundFlows[0];
+        message = this.formatFundFlowMessage(flow);
+        const symbol = 'symbol' in flow ? flow.symbol : undefined;
+        if (symbol) symbols.push(symbol);
+      } else {
+        // Multiple fund flows merged format
+        message = `💰 <b>Fund Flow</b> (${fundFlows.length} flows)\n\n`;
+        
+        fundFlows.forEach((flow, index) => {
+          const isAIW3Format = 'message' in flow && 'flow1h' in flow;
+          
+          if (isAIW3Format) {
+            const aiw3Flow = flow as AIW3FundFlowData;
+            message += `${index + 1}. ${this.escapeHtml(aiw3Flow.message)}\n`;
+            message += `   Token: ${aiw3Flow.symbol} | Price: $${aiw3Flow.price}\n`;
+            
+            if (!symbols.includes(aiw3Flow.symbol)) {
+              symbols.push(aiw3Flow.symbol);
+            }
+          } else {
+            const traditionalFlow = flow as FundFlowData;
+            if (traditionalFlow.from && traditionalFlow.to) {
+              message += `${index + 1}. ${this.escapeHtml(traditionalFlow.from)} → ${this.escapeHtml(traditionalFlow.to)}`;
+              if (traditionalFlow.amount) {
+                message += ` | ${this.escapeHtml(traditionalFlow.amount)}`;
+              }
+              message += '\n';
+              
+              if (traditionalFlow.symbol && !symbols.includes(traditionalFlow.symbol)) {
+                symbols.push(traditionalFlow.symbol);
+              }
+            }
+          }
+        });
+      }
+
+      // Create trading buttons - if there are related token symbols
+      let keyboard: any = undefined;
+      if (symbols.length > 0) {
+        // Use first symbol to create trading buttons
+        keyboard = this.createTradingKeyboard(symbols[0]);
+        
+        // If multiple symbols, show at message end
+        if (symbols.length > 1) {
+          message += `\n💡 <i>Related tokens: ${symbols.join(', ')}</i>`;
+        } else {
+          message += `\n💡 <i>Related token: ${symbols[0]}</i>`;
+        }
+      }
+
+      return {
+        content: message,
+        type: 'fund_flow_batch',
+        keyboard
+      };
+      
+    } catch (error) {
+      logger.error('Failed to format batch fund flows', {
+        error: (error as Error).message,
+        itemCount: fundFlows.length
+      });
+      return null;
     }
   }
 }
 
-// 导出单例
+// Export singleton
 export const pushMessageFormatterService = new PushMessageFormatterService();
 export default pushMessageFormatterService;
