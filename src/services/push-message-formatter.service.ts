@@ -118,100 +118,119 @@ export class PushMessageFormatterService {
   public formatWhaleActionMessage(action: WhaleActionData): string {
     if (!action || !action.address || !action.action) {
       logger.warn('Invalid whale action data provided', { action });
-      return '🐋 <b>Whale Alert</b>\n\nInvalid whale action data';
+      return '🐋 Whale Alert: Invalid whale action data';
     }
 
     try {
       const truncatedAddress = this.truncateWalletAddress(action.address);
       
-      // 检查是否有详细交易信息来决定使用哪种格式
-      const hasDetailedInfo = action.position_type || action.leverage || action.pnl_amount;
-      
-      if (hasDetailedInfo) {
-        return this.formatDetailedWhaleMessage(action, truncatedAddress);
-      } else {
-        return this.formatSimpleWhaleMessage(action, truncatedAddress);
-      }
+      // 统一使用英文单行格式，不再区分详细/简单格式
+      return this.formatEnglishWhaleMessage(action, truncatedAddress);
       
     } catch (error) {
       logger.error('Failed to format whale action message', {
         error: (error as Error).message,
         action
       });
-      return `🐋 <b>Whale Alert</b>\n\nAddress: ${this.truncateWalletAddress(action.address)}\nAction: ${this.escapeHtml(action.action)}`;
+      return `🐋 Whale ${this.truncateWalletAddress(action.address)} ${action.action}`;
     }
   }
 
   /**
-   * 格式化详细的鲸鱼交易消息
+   * 格式化英文鲸鱼交易消息（统一格式）
    * 模板：🐋 Whale 0x7c33…502a just closed 1.56M FARTCOIN long position (10x cross), loss 2,484.66 USDT
    */
-  private formatDetailedWhaleMessage(action: WhaleActionData, truncatedAddress: string): string {
+  private formatEnglishWhaleMessage(action: WhaleActionData, truncatedAddress: string): string {
     const formattedAmount = this.formatTradeAmount(action.amount);
     const symbol = action.symbol || 'TOKEN';
-    const positionType = action.position_type || '';
-    const leverage = action.leverage || '';
-    const marginType = action.margin_type || '';
-    const pnlType = action.pnl_type || '';
-    const pnlAmount = action.pnl_amount || '';
-    const pnlCurrency = action.pnl_currency || 'USDT';
     
     let message = `🐋 Whale ${truncatedAddress}`;
     
-    // 动作描述
+    // 动作描述 - 优先使用trade_type，fallback到action
     if (action.trade_type === 'close') {
       message += ` just closed`;
     } else if (action.trade_type === 'open') {
       message += ` just opened`;
+    } else if (action.action) {
+      // 处理action字段，转换为英文动作
+      const actionText = this.normalizeActionText(action.action);
+      message += ` ${actionText}`;
     } else {
-      message += ` ${action.action}`;
+      message += ` traded`;
     }
     
     // 金额和币种
-    message += ` ${formattedAmount} ${symbol}`;
-    
-    // 仓位信息
-    if (positionType) {
-      message += ` ${positionType} position`;
+    message += ` ${formattedAmount}`;
+    if (symbol) {
+      message += ` ${symbol}`;
     }
     
-    // 杠杆和保证金类型
-    if (leverage || marginType) {
+    // 仓位信息（如果有）
+    if (action.position_type) {
+      message += ` ${action.position_type} position`;
+    }
+    
+    // 杠杆和保证金类型（如果有）
+    if (action.leverage || action.margin_type) {
       const leverageInfo = [];
-      if (leverage) leverageInfo.push(leverage);
-      if (marginType) leverageInfo.push(marginType);
+      if (action.leverage) leverageInfo.push(action.leverage);
+      if (action.margin_type) leverageInfo.push(action.margin_type);
       message += ` (${leverageInfo.join(' ')})`;
     }
     
-    // 盈亏信息
-    if (pnlType && pnlAmount) {
-      message += `, ${pnlType} ${pnlAmount} ${pnlCurrency}`;
+    // 盈亏信息（重要：始终尝试显示盈亏）
+    const pnlInfo = this.formatPnlInfo(action);
+    if (pnlInfo) {
+      message += `, ${pnlInfo}`;
     }
     
     return message;
   }
 
   /**
-   * 格式化简单的鲸鱼交易消息（向后兼容）
+   * 标准化动作文本为英文
    */
-  private formatSimpleWhaleMessage(action: WhaleActionData, truncatedAddress: string): string {
-    let message = `🐋 <b>Whale Alert</b>\n\n`;
+  private normalizeActionText(action: string): string {
+    if (!action) return 'traded';
     
-    // Add address and action information
-    message += `Address: <code>${truncatedAddress}</code>\n`;
-    message += `Action: ${this.escapeHtml(action.action)}`;
+    const actionLower = action.toLowerCase();
+    
+    // 常见动作映射
+    const actionMap: { [key: string]: string } = {
+      'opened': 'opened',
+      'open': 'opened', 
+      'closed': 'closed',
+      'close': 'closed',
+      'bought': 'bought',
+      'buy': 'bought',
+      'sold': 'sold',
+      'sell': 'sold',
+      'transferred': 'transferred',
+      'transfer': 'transferred',
+      '买入': 'bought',
+      '卖出': 'sold',
+      '开仓': 'opened',
+      '平仓': 'closed',
+      '转账': 'transferred'
+    };
+    
+    return actionMap[actionLower] || action;
+  }
 
-    // If amount information exists, add amount line
-    if (action.amount && action.amount.trim()) {
-      message += `\nAmount: ${this.escapeHtml(action.amount)}`;
+  /**
+   * 格式化盈亏信息
+   */
+  private formatPnlInfo(action: WhaleActionData): string {
+    // 方案1：使用pnl字段
+    if (action.pnl_type && action.pnl_amount) {
+      const pnlCurrency = action.pnl_currency || 'USDT';
+      return `${action.pnl_type} ${action.pnl_amount} ${pnlCurrency}`;
     }
-
-    // If there are related token symbols, show at message end
-    if (action.symbol) {
-      message += `\n\n💡 <i>Related token: ${action.symbol}</i>`;
-    }
-
-    return message;
+    
+    // 方案2：从action或其他字段推断盈亏（如果数据源提供）
+    // 这里可以根据实际数据源格式进行扩展
+    
+    return ''; // 无盈亏信息时返回空字符串
   }
 
   /**
