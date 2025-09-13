@@ -109,32 +109,28 @@ export class PushMessageFormatterService {
   public formatWhaleActionMessage(action: WhaleActionData): string {
     if (!action || !action.address || !action.action) {
       logger.warn('Invalid whale action data provided', { action });
-      return '🐋 <b>【鲸鱼动向】</b>\n\n无效的鲸鱼动向数据';
+      return '🐋 <b>Whale Alert</b>\n\nInvalid whale action data';
     }
 
     try {
-      const formattedTimestamp = this.formatTimestamp(action.timestamp);
       const truncatedAddress = this.truncateAddress(action.address);
       
-      let message = `🐋 <b>【鲸鱼动向】</b>\n\n` +
-                   `<code>┌──────────────────────────────────────┐</code>\n` +
-                   `<code>│ </code>地址: <code>${truncatedAddress}</code><code> │</code>\n` +
-                   `<code>│ </code>操作: ${this.escapeHtml(action.action)}<code> │</code>\n`;
+      // 简洁的标题格式
+      let message = `🐋 <b>Whale Alert</b>\n\n`;
+      
+      // 添加地址和操作信息
+      message += `Address: <code>${truncatedAddress}</code>\n`;
+      message += `Action: ${this.escapeHtml(action.action)}`;
 
       // 如果有金额信息，添加金额行
       if (action.amount && action.amount.trim()) {
-        message += `<code>│ </code>金额: ${this.escapeHtml(action.amount)}<code> │</code>\n`;
+        message += `\nAmount: ${this.escapeHtml(action.amount)}`;
       }
-
-      message += `<code>│ ⏰ ${formattedTimestamp} │</code>\n` +
-                 `<code>└──────────────────────────────────────┘</code>`;
 
       // 如果有相关代币符号，在消息末尾提示
       if (action.symbol) {
-        message += `\n\n💡 <i>代币: ${action.symbol}</i>`;
+        message += `\n\n💡 <i>Related token: ${action.symbol}</i>`;
       }
-
-      // 删除鲸鱼动向消息格式化debug日志
 
       return message;
       
@@ -143,7 +139,7 @@ export class PushMessageFormatterService {
         error: (error as Error).message,
         action
       });
-      return `🐋 <b>【鲸鱼动向】</b>\n\n地址: ${this.truncateAddress(action.address)}\n操作: ${this.escapeHtml(action.action)}\n⏰ ${action.timestamp}`;
+      return `🐋 <b>Whale Alert</b>\n\nAddress: ${this.truncateAddress(action.address)}\nAction: ${this.escapeHtml(action.action)}`;
     }
   }
 
@@ -155,7 +151,7 @@ export class PushMessageFormatterService {
   public formatFundFlowMessage(flow: FundFlowData | AIW3FundFlowData): string {
     if (!flow) {
       logger.warn('No fund flow data provided', { flow });
-      return '💰 <b>【资金流向】</b>\n\n无效的资金流向数据';
+      return '💰 <b>Fund Flow</b>\n\nInvalid fund flow data';
     }
 
     // 检查是否是AIW3格式的数据
@@ -169,31 +165,26 @@ export class PushMessageFormatterService {
     const traditionalFlow = flow as FundFlowData;
     if (!traditionalFlow.from || !traditionalFlow.to) {
       logger.warn('Invalid traditional fund flow data provided', { flow });
-      return '💰 <b>【资金流向】</b>\n\n无效的资金流向数据';
+      return '💰 <b>Fund Flow</b>\n\nInvalid fund flow data';
     }
 
     try {
-      const formattedTimestamp = this.formatTimestamp(flow.timestamp);
+      // 简洁的标题格式
+      let message = `💰 <b>Fund Flow</b>\n\n`;
       
-      let message = `💰 <b>【资金流向】</b>\n\n` +
-                   `<code>┌──────────────────────────────────────┐</code>\n` +
-                   `<code>│ </code>从: ${this.escapeHtml(flow.from)}<code> │</code>\n` +
-                   `<code>│ </code>到: ${this.escapeHtml(flow.to)}<code> │</code>\n`;
+      // 添加流向信息
+      message += `From: ${this.escapeHtml(flow.from)}\n`;
+      message += `To: ${this.escapeHtml(flow.to)}`;
 
       // 如果有金额信息，添加金额行
       if (flow.amount && flow.amount.trim()) {
-        message += `<code>│ </code>金额: ${this.escapeHtml(flow.amount)}<code> │</code>\n`;
+        message += `\nAmount: ${this.escapeHtml(flow.amount)}`;
       }
-
-      message += `<code>│ ⏰ ${formattedTimestamp} │</code>\n` +
-                 `<code>└──────────────────────────────────────┘</code>`;
 
       // 如果有相关代币符号，在消息末尾提示
       if (flow.symbol) {
-        message += `\n\n💡 <i>代币: ${flow.symbol}</i>`;
+        message += `\n\n💡 <i>Related token: ${flow.symbol}</i>`;
       }
-
-      // 删除资金流向消息格式化debug日志
 
       return message;
       
@@ -203,7 +194,7 @@ export class PushMessageFormatterService {
         flow
       });
       const traditionalFlow = flow as FundFlowData;
-      return `💰 <b>【资金流向】</b>\n\n从: ${this.escapeHtml(traditionalFlow.from)}\n到: ${this.escapeHtml(traditionalFlow.to)}\n⏰ ${traditionalFlow.timestamp}`;
+      return `💰 <b>Fund Flow</b>\n\nFrom: ${this.escapeHtml(traditionalFlow.from)}\nTo: ${this.escapeHtml(traditionalFlow.to)}`;
     }
   }
 
@@ -214,21 +205,19 @@ export class PushMessageFormatterService {
    */
   public formatAIW3FundFlowMessage(flow: AIW3FundFlowData): string {
     try {
-      const formattedTimestamp = this.formatTimestamp(flow.timestamp);
+      // 简洁的标题格式
+      let message = `💰 <b>Fund Flow</b>\n\n`;
       
-      let message = `💰 <b>【资金流向】</b>\n\n` +
-                   `<code>┌──────────────────────────────────────┐</code>\n` +
-                   `<code>│ </code>${this.escapeHtml(flow.message)}<code> │</code>\n` +
-                   `<code>│ </code>代币: ${this.escapeHtml(flow.symbol)}<code> │</code>\n` +
-                   `<code>│ </code>价格: $${this.escapeHtml(flow.price)}<code> │</code>\n` +
-                   `<code>│ </code>1h流入: ${this.escapeHtml(flow.flow1h)}<code> │</code>\n` +
-                   `<code>│ </code>4h流入: ${this.escapeHtml(flow.flow4h)}<code> │</code>\n` +
-                   `<code>│ ⏰ ${formattedTimestamp} │</code>\n` +
-                   `<code>└──────────────────────────────────────┘</code>`;
+      // 添加消息内容
+      message += `${this.escapeHtml(flow.message)}\n\n`;
+      
+      // 添加详细信息
+      message += `Token: ${this.escapeHtml(flow.symbol)}\n`;
+      message += `Price: $${this.escapeHtml(flow.price)}\n`;
+      message += `1h Flow: ${this.escapeHtml(flow.flow1h)}\n`;
+      message += `4h Flow: ${this.escapeHtml(flow.flow4h)}`;
 
-      message += `\n\n💡 <i>代币: ${flow.symbol}</i>`;
-
-      // 删除AIW3资金流向消息格式化debug日志
+      message += `\n\n💡 <i>Related token: ${flow.symbol}</i>`;
 
       return message;
       
@@ -237,7 +226,7 @@ export class PushMessageFormatterService {
         error: (error as Error).message,
         flow
       });
-      return `💰 <b>【资金流向】</b>\n\n${this.escapeHtml(flow.message)}\n代币: ${flow.symbol}\n⏰ ${flow.timestamp}`;
+      return `💰 <b>Fund Flow</b>\n\n${this.escapeHtml(flow.message)}\nToken: ${flow.symbol}`;
     }
   }
 
