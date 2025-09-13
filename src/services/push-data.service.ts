@@ -112,10 +112,116 @@ export class PushDataService {
     fundFlows: any[];
   } {
     const flashNews = settings.flash_enabled ? pushData.flash_news || [] : [];
-    const whaleActions = settings.whale_enabled ? pushData.whale_actions || [] : [];
+    let whaleActions = settings.whale_enabled ? pushData.whale_actions || [] : [];
     const fundFlows = settings.fund_enabled ? pushData.fund_flows || [] : [];
     
+    // 对鲸鱼交易进行金额过滤，小于$1,000,000的不推送
+    if (whaleActions.length > 0) {
+      whaleActions = this.filterWhaleActionsByAmount(whaleActions);
+    }
+    
     return { flashNews, whaleActions, fundFlows };
+  }
+
+  /**
+   * 根据交易金额过滤鲸鱼动作
+   * @param whaleActions 鲸鱼动作数组
+   * @returns 过滤后的鲸鱼动作数组
+   */
+  private filterWhaleActionsByAmount(whaleActions: any[]): any[] {
+    const minThreshold = 1000000; // $1,000,000 门槛
+    
+    return whaleActions.filter(action => {
+      try {
+        if (!action.amount || typeof action.amount !== 'string') {
+          return true; // 如果没有金额信息，保留
+        }
+        
+        const parsedAmount = this.parseAmountToUSD(action.amount);
+        
+        // 如果解析失败，保留该条记录（保守处理）
+        if (parsedAmount === null) {
+          logger.debug('Failed to parse whale action amount, keeping record', {
+            amount: action.amount,
+            address: action.address
+          });
+          return true;
+        }
+        
+        const shouldKeep = parsedAmount >= minThreshold;
+        
+        if (!shouldKeep) {
+          logger.debug('Filtering out whale action below threshold', {
+            amount: action.amount,
+            parsedAmount: parsedAmount,
+            threshold: minThreshold,
+            address: action.address
+          });
+        }
+        
+        return shouldKeep;
+        
+      } catch (error) {
+        logger.warn('Error filtering whale action by amount', {
+          error: (error as Error).message,
+          action
+        });
+        return true; // 出错时保留记录
+      }
+    });
+  }
+
+  /**
+   * 解析金额字符串为USD数值
+   * 支持多种格式：1.56M, 1,560,000, $1560000, 1560000 USDT等
+   * @param amountStr 金额字符串
+   * @returns 解析后的USD数值，解析失败返回null
+   */
+  private parseAmountToUSD(amountStr: string): number | null {
+    if (!amountStr || typeof amountStr !== 'string') {
+      return null;
+    }
+    
+    try {
+      // 移除常见的非数字字符，保留数字、小数点、逗号、M、K、B等单位
+      const cleanStr = amountStr.replace(/[^0-9.,MKBmkb]/g, '').trim();
+      
+      if (!cleanStr) {
+        return null;
+      }
+      
+      // 检查是否有单位后缀
+      const hasM = /[Mm]$/.test(cleanStr);
+      const hasK = /[Kk]$/.test(cleanStr);
+      const hasB = /[Bb]$/.test(cleanStr);
+      
+      // 移除单位后缀，提取数字部分
+      const numStr = cleanStr.replace(/[MKBmkb]$/, '').replace(/,/g, '');
+      const baseNum = parseFloat(numStr);
+      
+      if (isNaN(baseNum)) {
+        return null;
+      }
+      
+      // 根据单位计算最终数值
+      let finalAmount = baseNum;
+      if (hasB) {
+        finalAmount = baseNum * 1000000000; // 十亿
+      } else if (hasM) {
+        finalAmount = baseNum * 1000000; // 百万
+      } else if (hasK) {
+        finalAmount = baseNum * 1000; // 千
+      }
+      
+      return finalAmount;
+      
+    } catch (error) {
+      logger.debug('Failed to parse amount string', {
+        amountStr,
+        error: (error as Error).message
+      });
+      return null;
+    }
   }
 }
 

@@ -28,6 +28,15 @@ export interface WhaleActionData {
   amount: string;
   timestamp: string;
   symbol?: string;
+  
+  // 新增字段用于详细的鲸鱼交易信息
+  leverage?: string;       // 杠杆倍数 (如 "10x")
+  position_type?: string;  // 仓位类型 ("long" | "short")
+  trade_type?: string;     // 交易类型 ("open" | "close")
+  pnl_amount?: string;     // 盈亏金额
+  pnl_currency?: string;   // 盈亏币种 (如 "USDT")
+  pnl_type?: string;       // 盈亏类型 ("profit" | "loss")
+  margin_type?: string;    // 保证金类型 ("cross" | "isolated")
 }
 
 /**
@@ -113,33 +122,136 @@ export class PushMessageFormatterService {
     }
 
     try {
-      const truncatedAddress = this.truncateAddress(action.address);
+      const truncatedAddress = this.truncateWalletAddress(action.address);
       
-      // Simple title format
-      let message = `🐋 <b>Whale Alert</b>\n\n`;
+      // 检查是否有详细交易信息来决定使用哪种格式
+      const hasDetailedInfo = action.position_type || action.leverage || action.pnl_amount;
       
-      // Add address and action information
-      message += `Address: <code>${truncatedAddress}</code>\n`;
-      message += `Action: ${this.escapeHtml(action.action)}`;
-
-      // If amount information exists, add amount line
-      if (action.amount && action.amount.trim()) {
-        message += `\nAmount: ${this.escapeHtml(action.amount)}`;
+      if (hasDetailedInfo) {
+        return this.formatDetailedWhaleMessage(action, truncatedAddress);
+      } else {
+        return this.formatSimpleWhaleMessage(action, truncatedAddress);
       }
-
-      // If there are related token symbols, show at message end
-      if (action.symbol) {
-        message += `\n\n💡 <i>Related token: ${action.symbol}</i>`;
-      }
-
-      return message;
       
     } catch (error) {
       logger.error('Failed to format whale action message', {
         error: (error as Error).message,
         action
       });
-      return `🐋 <b>Whale Alert</b>\n\nAddress: ${this.truncateAddress(action.address)}\nAction: ${this.escapeHtml(action.action)}`;
+      return `🐋 <b>Whale Alert</b>\n\nAddress: ${this.truncateWalletAddress(action.address)}\nAction: ${this.escapeHtml(action.action)}`;
+    }
+  }
+
+  /**
+   * 格式化详细的鲸鱼交易消息
+   * 模板：🐋 Whale 0x7c33…502a just closed 1.56M FARTCOIN long position (10x cross), loss 2,484.66 USDT
+   */
+  private formatDetailedWhaleMessage(action: WhaleActionData, truncatedAddress: string): string {
+    const formattedAmount = this.formatTradeAmount(action.amount);
+    const symbol = action.symbol || 'TOKEN';
+    const positionType = action.position_type || '';
+    const leverage = action.leverage || '';
+    const marginType = action.margin_type || '';
+    const pnlType = action.pnl_type || '';
+    const pnlAmount = action.pnl_amount || '';
+    const pnlCurrency = action.pnl_currency || 'USDT';
+    
+    let message = `🐋 Whale ${truncatedAddress}`;
+    
+    // 动作描述
+    if (action.trade_type === 'close') {
+      message += ` just closed`;
+    } else if (action.trade_type === 'open') {
+      message += ` just opened`;
+    } else {
+      message += ` ${action.action}`;
+    }
+    
+    // 金额和币种
+    message += ` ${formattedAmount} ${symbol}`;
+    
+    // 仓位信息
+    if (positionType) {
+      message += ` ${positionType} position`;
+    }
+    
+    // 杠杆和保证金类型
+    if (leverage || marginType) {
+      const leverageInfo = [];
+      if (leverage) leverageInfo.push(leverage);
+      if (marginType) leverageInfo.push(marginType);
+      message += ` (${leverageInfo.join(' ')})`;
+    }
+    
+    // 盈亏信息
+    if (pnlType && pnlAmount) {
+      message += `, ${pnlType} ${pnlAmount} ${pnlCurrency}`;
+    }
+    
+    return message;
+  }
+
+  /**
+   * 格式化简单的鲸鱼交易消息（向后兼容）
+   */
+  private formatSimpleWhaleMessage(action: WhaleActionData, truncatedAddress: string): string {
+    let message = `🐋 <b>Whale Alert</b>\n\n`;
+    
+    // Add address and action information
+    message += `Address: <code>${truncatedAddress}</code>\n`;
+    message += `Action: ${this.escapeHtml(action.action)}`;
+
+    // If amount information exists, add amount line
+    if (action.amount && action.amount.trim()) {
+      message += `\nAmount: ${this.escapeHtml(action.amount)}`;
+    }
+
+    // If there are related token symbols, show at message end
+    if (action.symbol) {
+      message += `\n\n💡 <i>Related token: ${action.symbol}</i>`;
+    }
+
+    return message;
+  }
+
+  /**
+   * 截断钱包地址显示
+   * @param address 完整地址
+   * @returns 截断后的地址 (如: 0x7c33…502a)
+   */
+  private truncateWalletAddress(address: string): string {
+    if (!address || address.length < 10) {
+      return address;
+    }
+    
+    // 标准格式: 前6位...后4位
+    return `${address.substring(0, 6)}…${address.substring(address.length - 4)}`;
+  }
+
+  /**
+   * 格式化交易金额显示
+   * @param amount 原始金额字符串
+   * @returns 格式化后的金额 (如: 1.56M, 156K)
+   */
+  private formatTradeAmount(amount: string): string {
+    if (!amount) return '';
+    
+    // 提取数字部分
+    const numberMatch = amount.match(/[\d,]+\.?\d*/);
+    if (!numberMatch) return amount;
+    
+    const numStr = numberMatch[0].replace(/,/g, '');
+    const num = parseFloat(numStr);
+    
+    if (isNaN(num)) return amount;
+    
+    // 格式化为简洁显示
+    if (num >= 1000000) {
+      return `${(num / 1000000).toFixed(2).replace('.00', '')}M`;
+    } else if (num >= 1000) {
+      return `${(num / 1000).toFixed(1).replace('.0', '')}K`;
+    } else {
+      return num.toString();
     }
   }
 

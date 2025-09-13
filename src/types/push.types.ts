@@ -43,6 +43,15 @@ export interface WhaleAction {
   timestamp: string;       // 时间戳
   transaction_hash?: string; // 交易哈希
   exchange?: string;       // 交易所
+  
+  // 新增字段用于详细的鲸鱼交易信息
+  leverage?: string;       // 杠杆倍数 (如 "10x")
+  position_type?: string;  // 仓位类型 ("long" | "short")
+  trade_type?: string;     // 交易类型 ("open" | "close")
+  pnl_amount?: string;     // 盈亏金额
+  pnl_currency?: string;   // 盈亏币种 (如 "USDT")
+  pnl_type?: string;       // 盈亏类型 ("profit" | "loss")
+  margin_type?: string;    // 保证金类型 ("cross" | "isolated")
 }
 
 /**
