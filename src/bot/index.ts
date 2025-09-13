@@ -37,6 +37,9 @@ export class TelegramBot {
     // 注册命令处理器
     registerCommands(this.bot);
     
+    // 设置群组事件监听
+    this.setupGroupEventHandlers();
+    
     // 设置错误处理
     this.setupErrorHandling();
     
@@ -111,6 +114,95 @@ export class TelegramBot {
       
       await next();
     });
+  }
+
+  /**
+   * 设置群组事件处理器
+   */
+  private setupGroupEventHandlers(): void {
+    // 监听机器人被添加或移除的事件
+    this.bot.on('my_chat_member', async (ctx) => {
+      try {
+        const chatMember = ctx.myChatMember;
+        const chat = ctx.chat;
+        const requestId = ctx.requestId || 'unknown';
+        
+        // 只处理群组和超级群组
+        if (chat.type !== 'group' && chat.type !== 'supergroup') {
+          return;
+        }
+        
+        const chatId = chat.id.toString();
+        const oldStatus = chatMember.old_chat_member.status;
+        const newStatus = chatMember.new_chat_member.status;
+        
+        logger.info(`[${requestId}] Bot chat member status changed`, {
+          chatId,
+          chatType: chat.type,
+          chatTitle: chat.title,
+          oldStatus,
+          newStatus,
+          requestId
+        });
+        
+        // 动态导入pushScheduler以避免循环依赖
+        const { pushScheduler } = await import('../services/push-scheduler.service');
+        
+        // 机器人被添加到群组
+        if ((oldStatus === 'left' || oldStatus === 'kicked') && 
+            (newStatus === 'member' || newStatus === 'administrator')) {
+          
+          logger.info(`[${requestId}] Bot added to group`, {
+            chatId,
+            chatTitle: chat.title,
+            requestId
+          });
+          
+          // 添加群组到推送跟踪
+          pushScheduler.addBotGroup(chatId);
+          
+          // 可选：发送欢迎消息
+          try {
+            await ctx.reply(
+              '👋 <b>AIW3 Trading Bot 已加入群组！</b>\n\n' +
+              '🔔 群组推送将根据群主的个人推送设置进行推送\n' +
+              '⚙️ 群主可以通过私聊机器人使用 /push 命令调整推送设置\n\n' +
+              '💡 发送 /help 查看所有可用命令',
+              { parse_mode: 'HTML' }
+            );
+          } catch (welcomeError) {
+            logger.warn(`[${requestId}] Failed to send welcome message to group`, {
+              chatId,
+              error: (welcomeError as Error).message,
+              requestId
+            });
+          }
+        }
+        
+        // 机器人被移除出群组
+        else if ((oldStatus === 'member' || oldStatus === 'administrator') && 
+                 (newStatus === 'left' || newStatus === 'kicked')) {
+          
+          logger.info(`[${requestId}] Bot removed from group`, {
+            chatId,
+            chatTitle: chat.title,
+            requestId
+          });
+          
+          // 从推送跟踪中移除群组
+          pushScheduler.removeBotGroup(chatId);
+        }
+        
+      } catch (error) {
+        logger.error('Error handling group member change', {
+          error: (error as Error).message,
+          stack: (error as Error).stack,
+          requestId: ctx.requestId
+        });
+      }
+    });
+    
+    logger.debug('Group event handlers setup completed');
   }
 
   /**

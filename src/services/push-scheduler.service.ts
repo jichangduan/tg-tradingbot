@@ -23,6 +23,11 @@ export class PushSchedulerService {
     settings: PushSettings;
     lastUpdated: number;
   }>();
+  
+  // 群组推送相关 - 缓存机器人加入的群组
+  private botGroupsCache: Set<string> = new Set();
+  private groupCacheLastUpdate = 0;
+  private readonly groupCacheTTL = 5 * 60 * 1000; // 5分钟缓存
 
   /**
    * 启动定时推送调度器
@@ -135,6 +140,9 @@ export class PushSchedulerService {
         }
       }
 
+      // 执行群组推送
+      await this.executeGroupPush(executionId);
+      
       await this.updateLastPushTime();
 
       const duration = Date.now() - startTime;
@@ -525,6 +533,279 @@ export class PushSchedulerService {
       cronPattern,
       environment: process.env.NODE_ENV || 'development'
     };
+  }
+
+  // ==================== 群组推送功能 ====================
+
+  /**
+   * 执行群组推送任务
+   */
+  private async executeGroupPush(executionId: string): Promise<void> {
+    try {
+      logger.info(`[${executionId}] Starting group push execution`);
+      
+      const botGroups = await this.getBotGroups();
+      
+      if (botGroups.length === 0) {
+        logger.info(`[${executionId}] No groups found for bot`);
+        return;
+      }
+      
+      logger.info(`[${executionId}] Found ${botGroups.length} groups to process`);
+      
+      let groupSuccessCount = 0;
+      let groupFailureCount = 0;
+      
+      for (const groupId of botGroups) {
+        try {
+          // 获取群主ID
+          const ownerId = await this.getGroupOwner(groupId);
+          if (!ownerId) {
+            logger.warn(`[${executionId}] No owner found for group ${groupId}`);
+            continue;
+          }
+          
+          // 获取群主的推送设置
+          const ownerSettings = await this.getCachedUserPushSettings(ownerId);
+          if (!ownerSettings) {
+            logger.debug(`[${executionId}] No push settings for group ${groupId} owner ${ownerId}`);
+            continue;
+          }
+          
+          // 检查群主是否启用了任何推送
+          const hasAnyEnabled = ownerSettings.flash_enabled || 
+                              ownerSettings.whale_enabled || 
+                              ownerSettings.fund_enabled;
+          
+          if (!hasAnyEnabled) {
+            logger.debug(`[${executionId}] Group ${groupId} owner has all push disabled`);
+            continue;
+          }
+          
+          // 获取推送数据
+          const pushData = await pushDataService.getPushDataForUser(ownerId);
+          
+          // 发送群组推送
+          await this.sendPushToGroup(groupId, ownerSettings, pushData, executionId);
+          groupSuccessCount++;
+          
+        } catch (error) {
+          groupFailureCount++;
+          logger.error(`[${executionId}] Failed to process group ${groupId}`, {
+            error: (error as Error).message
+          });
+        }
+      }
+      
+      logger.info(`[${executionId}] Group push execution completed`, {
+        totalGroups: botGroups.length,
+        successCount: groupSuccessCount,
+        failureCount: groupFailureCount
+      });
+      
+    } catch (error) {
+      logger.error(`[${executionId}] Group push execution failed`, {
+        error: (error as Error).message
+      });
+    }
+  }
+
+  /**
+   * 获取机器人加入的群组列表
+   */
+  private async getBotGroups(): Promise<string[]> {
+    try {
+      // 检查缓存是否有效
+      const now = Date.now();
+      if (now - this.groupCacheLastUpdate < this.groupCacheTTL && this.botGroupsCache.size > 0) {
+        return Array.from(this.botGroupsCache);
+      }
+      
+      // 注意：Telegram Bot API没有直接获取所有群组的方法
+      // 这里我们需要通过其他方式维护群组列表
+      // 方案1：通过缓存记录bot被添加到的群组
+      // 方案2：在bot启动时通过getUpdates获取最近的群组消息
+      
+      // 临时方案：从Redis缓存中获取已知的群组ID
+      const groupKeys = await cacheService.getKeys('bot_group:*');
+      const groups = groupKeys.map(key => key.replace('bot_group:', ''));
+      
+      // 更新缓存
+      this.botGroupsCache.clear();
+      groups.forEach(groupId => this.botGroupsCache.add(groupId));
+      this.groupCacheLastUpdate = now;
+      
+      logger.debug('Retrieved bot groups from cache', { groupCount: groups.length });
+      return groups;
+      
+    } catch (error) {
+      logger.error('Failed to get bot groups', {
+        error: (error as Error).message
+      });
+      return Array.from(this.botGroupsCache); // 返回缓存的数据
+    }
+  }
+
+  /**
+   * 获取群组的群主ID
+   */
+  private async getGroupOwner(groupId: string): Promise<string | null> {
+    try {
+      const bot = telegramBot.getBot();
+      if (!bot) {
+        logger.error('Telegram Bot instance not available for getting group owner');
+        return null;
+      }
+      
+      // 调用Telegram API获取群组管理员
+      const administrators = await bot.telegram.getChatAdministrators(parseInt(groupId));
+      
+      // 找到群主（creator）
+      const creator = administrators.find(admin => admin.status === 'creator');
+      
+      if (creator && creator.user) {
+        return creator.user.id.toString();
+      }
+      
+      logger.warn(`No creator found for group ${groupId}`);
+      return null;
+      
+    } catch (error) {
+      logger.error(`Failed to get group owner for ${groupId}`, {
+        error: (error as Error).message
+      });
+      return null;
+    }
+  }
+
+  /**
+   * 向群组发送推送消息
+   */
+  private async sendPushToGroup(
+    groupId: string,
+    settings: PushSettings,
+    pushData: PushData | undefined,
+    executionId: string
+  ): Promise<void> {
+    const startTime = Date.now();
+    
+    try {
+      logger.debug(`[${executionId}] Starting group push to ${groupId}`);
+      
+      const bot = telegramBot.getBot();
+      if (!bot) {
+        throw new Error('Telegram Bot instance is not available');
+      }
+      
+      // 检查是否有新的推送内容
+      if (!pushData || !pushDataService.hasNewPushContent(pushData)) {
+        logger.debug(`[${executionId}] No new push content for group ${groupId}`);
+        return;
+      }
+      
+      // 根据群主设置筛选推送内容
+      const { flashNews, whaleActions, fundFlows } = pushDataService.filterPushContent(pushData, settings);
+      
+      // 应用去重逻辑（使用群组ID作为去重key）
+      const [dedupFlashNews, dedupWhaleActions, dedupFundFlows] = await Promise.all([
+        pushDeduplicator.filterDuplicates(`group_${groupId}`, flashNews, 'flash_news'),
+        pushDeduplicator.filterDuplicates(`group_${groupId}`, whaleActions, 'whale_actions'),
+        pushDeduplicator.filterDuplicates(`group_${groupId}`, fundFlows, 'fund_flows')
+      ]);
+      
+      // 格式化消息
+      const messages = pushMessageFormatterService.formatBatchMessages(dedupFlashNews, dedupWhaleActions, dedupFundFlows);
+      
+      if (messages.length === 0) {
+        logger.debug(`[${executionId}] No messages to send to group ${groupId}`);
+        return;
+      }
+      
+      // 发送所有消息到群组
+      for (let i = 0; i < messages.length; i++) {
+        const message = messages[i];
+        
+        const sendOptions: any = {
+          parse_mode: 'HTML',
+          disable_web_page_preview: true
+        };
+        
+        if (message.keyboard) {
+          sendOptions.reply_markup = { inline_keyboard: message.keyboard };
+        }
+        
+        try {
+          await bot.telegram.sendMessage(parseInt(groupId), message.content, sendOptions);
+          logger.debug(`[${executionId}] Sent message ${i + 1}/${messages.length} to group ${groupId}`);
+        } catch (sendError) {
+          logger.error(`[${executionId}] Failed to send message to group ${groupId}`, {
+            error: (sendError as Error).message,
+            messageIndex: i + 1
+          });
+          throw sendError;
+        }
+        
+        // API限制延迟
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+      
+      // 标记内容为已推送
+      await Promise.all([
+        pushDeduplicator.markBatchAsPushed(`group_${groupId}`, dedupFlashNews, 'flash_news'),
+        pushDeduplicator.markBatchAsPushed(`group_${groupId}`, dedupWhaleActions, 'whale_actions'),
+        pushDeduplicator.markBatchAsPushed(`group_${groupId}`, dedupFundFlows, 'fund_flows')
+      ]);
+      
+      const duration = Date.now() - startTime;
+      logger.info(`[${executionId}] Group push completed for ${groupId}`, {
+        messageCount: messages.length,
+        duration: `${duration}ms`
+      });
+      
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.error(`[${executionId}] Group push failed for ${groupId}`, {
+        duration: `${duration}ms`,
+        error: (error as Error).message
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * 添加群组到机器人群组列表（供外部调用）
+   */
+  public addBotGroup(groupId: string): void {
+    this.botGroupsCache.add(groupId);
+    
+    // 同时保存到Redis缓存
+    cacheService.set(`bot_group:${groupId}`, { added_at: new Date().toISOString() }, 24 * 60 * 60)
+      .catch(error => {
+        logger.warn('Failed to cache bot group', {
+          groupId,
+          error: (error as Error).message
+        });
+      });
+    
+    logger.debug('Added bot group to tracking', { groupId });
+  }
+
+  /**
+   * 从机器人群组列表移除群组（供外部调用）
+   */
+  public removeBotGroup(groupId: string): void {
+    this.botGroupsCache.delete(groupId);
+    
+    // 同时从Redis移除
+    cacheService.delete(`bot_group:${groupId}`)
+      .catch(error => {
+        logger.warn('Failed to remove bot group from cache', {
+          groupId,
+          error: (error as Error).message
+        });
+      });
+    
+    logger.debug('Removed bot group from tracking', { groupId });
   }
 }
 
