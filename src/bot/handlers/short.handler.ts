@@ -207,78 +207,57 @@ export class ShortHandler {
       try {
         const leverageNum = parseFloat(leverageStr.replace('x', ''));
         
-        if (leverageNum > 1) {
-          // 杠杆交易：检查合约账户可用保证金
-          const marginCheck = await accountService.checkAvailableMargin(
-            userId!.toString(),
-            requiredAmount,
-            leverageNum
-          );
+        // 所有杠杆倍数（包括1倍）都使用保证金交易和合约钱包
+        const marginCheck = await accountService.checkAvailableMargin(
+          userId!.toString(),
+          requiredAmount,
+          leverageNum
+        );
 
-          if (!marginCheck.sufficient) {
-            let errorMessage = '';
-            const contractAccountValue = (await accountService.getAccountBalance(userId!.toString())).nativeBalance;
-            
-            switch (marginCheck.reason) {
-              case 'margin_occupied':
-                errorMessage = `💰 <b>可用保证金不足</b>\n\n` +
-                  `合约账户总价值: <code>$${contractAccountValue.toFixed(2)}</code>\n` +
-                  `可用保证金: <code>$${marginCheck.availableMargin.toFixed(2)}</code>\n` +
-                  `所需保证金: <code>$${marginCheck.requiredMargin.toFixed(2)}</code>\n\n` +
-                  `💡 <b>原因分析:</b>\n` +
-                  `• 您的资金被现有持仓占用作保证金\n` +
-                  `• 杠杆交易需要足够的可用保证金\n\n` +
-                  `🔧 <b>解决方案:</b>\n` +
-                  `• 平仓部分持仓释放保证金\n` +
-                  `• 降低交易金额: <code>/short ${symbol.toUpperCase()} ${leverageStr} ${Math.floor(marginCheck.availableMargin * leverageNum)}</code>\n` +
-                  `• 减少杠杆倍数\n` +
-                  `• 充值更多USDC到合约账户`;
-                break;
-              case 'no_funds':
-                errorMessage = `💰 <b>合约账户无资金</b>\n\n` +
-                  `杠杆交易需要使用合约账户资金\n` +
-                  `当前合约账户余额: <code>$0</code>\n\n` +
-                  `💡 <b>解决方案:</b>\n` +
-                  `• 向钱包充值USDC\n` +
-                  `• 使用 /wallet 查看账户状态`;
-                break;
-              default:
-                errorMessage = `💰 <b>保证金不足</b>\n\n` +
-                  `所需保证金: <code>$${marginCheck.requiredMargin.toFixed(2)}</code>\n` +
-                  `可用保证金: <code>$${marginCheck.availableMargin.toFixed(2)}</code>\n\n` +
-                  `💡 <b>解决方案:</b>\n` +
-                  `• 降低交易金额或杠杆倍数\n` +
-                  `• 向合约账户充值更多USDC`;
-            }
-
-            await ctx.telegram.editMessageText(
-              ctx.chat?.id,
-              loadingMessage.message_id,
-              undefined,
-              errorMessage,
-              { parse_mode: 'HTML' }
-            );
-            return;
+        if (!marginCheck.sufficient) {
+          let errorMessage = '';
+          const contractAccountValue = (await accountService.getAccountBalance(userId!.toString())).nativeBalance;
+          
+          switch (marginCheck.reason) {
+            case 'margin_occupied':
+              errorMessage = `💰 <b>Insufficient Available Margin</b>\n\n` +
+                `Contract Account Total Value: <code>$${contractAccountValue.toFixed(2)}</code>\n` +
+                `Available Margin: <code>$${marginCheck.availableMargin.toFixed(2)}</code>\n` +
+                `Required Margin: <code>$${marginCheck.requiredMargin.toFixed(2)}</code>\n\n` +
+                `💡 <b>Cause Analysis:</b>\n` +
+                `• Your funds are occupied by existing positions as margin\n` +
+                `• Leverage trading requires sufficient available margin\n\n` +
+                `🔧 <b>Solutions:</b>\n` +
+                `• Close some positions to release margin\n` +
+                `• Reduce trading amount: <code>/short ${symbol.toUpperCase()} ${leverageStr} ${Math.floor(marginCheck.availableMargin * leverageNum)}</code>\n` +
+                `• Reduce leverage multiplier\n` +
+                `• Deposit more USDC to contract account`;
+              break;
+            case 'no_funds':
+              errorMessage = `💰 <b>Contract Account No Funds</b>\n\n` +
+                `Leverage trading requires contract account funds\n` +
+                `Current contract account balance: <code>$0</code>\n\n` +
+                `💡 <b>Solutions:</b>\n` +
+                `• Deposit USDC to wallet\n` +
+                `• Use /wallet to check account status`;
+              break;
+            default:
+              errorMessage = `💰 <b>Insufficient Margin</b>\n\n` +
+                `Required margin: <code>$${marginCheck.requiredMargin.toFixed(2)}</code>\n` +
+                `Available margin: <code>$${marginCheck.availableMargin.toFixed(2)}</code>\n\n` +
+                `💡 <b>Solutions:</b>\n` +
+                `• Reduce trading amount or leverage multiplier\n` +
+                `• Deposit more USDC to contract account`;
           }
-        } else {
-          // 现货交易：检查现货余额
-          const hasEnoughBalance = await accountService.checkSufficientBalance(
-            userId!.toString(),
-            requiredAmount,
-            'USDC',
-            1
-          );
 
-          if (!hasEnoughBalance) {
-            await ctx.telegram.editMessageText(
-              ctx.chat?.id,
-              loadingMessage.message_id,
-              undefined,
-              messageFormatter.formatTradingInsufficientFundsMessage(),
-              { parse_mode: 'HTML' }
-            );
-            return;
-          }
+          await ctx.telegram.editMessageText(
+            ctx.chat?.id,
+            loadingMessage.message_id,
+            undefined,
+            errorMessage,
+            { parse_mode: 'HTML' }
+          );
+          return;
         }
       } catch (balanceError) {
         logger.warn(`Failed to check balance for short trading`, {

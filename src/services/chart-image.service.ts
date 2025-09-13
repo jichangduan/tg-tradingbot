@@ -702,7 +702,7 @@ export class ChartImageService {
         plugins: {
           title: {
             display: true,
-            text: `总盈亏: ${pnlData.totalPnl >= 0 ? '+' : ''}$${pnlData.totalPnl.toFixed(2)}`,
+            text: `Total PNL: ${pnlData.totalPnl >= 0 ? '+' : ''}$${pnlData.totalPnl.toFixed(2)}`,
             color: pnlData.totalPnl >= 0 ? '#00ff88' : '#ff3366',
             font: {
               size: 18,
@@ -729,7 +729,7 @@ export class ChartImageService {
               },
               title: (context: any) => {
                 const timestamp = context[0].parsed.x;
-                return new Date(timestamp).toLocaleString('zh-CN', {
+                return new Date(timestamp).toLocaleString('en-US', {
                   timeZone: 'Asia/Shanghai',
                   month: '2-digit',
                   day: '2-digit',
@@ -809,7 +809,7 @@ export class ChartImageService {
           plugins: {
             title: {
               display: true,
-              text: `总价值: $${positionsData.totalValue.toFixed(2)} (${positionsData.totalChangePercentage >= 0 ? '+' : ''}${positionsData.totalChangePercentage.toFixed(2)}%)`,
+              text: `Total Value: $${positionsData.totalValue.toFixed(2)} (${positionsData.totalChangePercentage >= 0 ? '+' : ''}${positionsData.totalChangePercentage.toFixed(2)}%)`,
               color: isDark ? '#ffffff' : '#000000',
               font: {
                 size: 16,
@@ -855,7 +855,7 @@ export class ChartImageService {
         plugins: {
           title: {
             display: true,
-            text: `总价值: $${positionsData.totalValue.toFixed(2)} (${positionsData.totalChange >= 0 ? '+' : ''}$${positionsData.totalChange.toFixed(2)})`,
+            text: `Total Value: $${positionsData.totalValue.toFixed(2)} (${positionsData.totalChange >= 0 ? '+' : ''}$${positionsData.totalChange.toFixed(2)})`,
             color: positionsData.totalChange >= 0 ? '#00ff88' : '#ff3366',
             font: {
               size: 16,
@@ -1224,27 +1224,27 @@ export class ChartImageService {
 
     if (error.message.includes('404') || error.message.includes('not found')) {
       code = ApiErrorCode.TOKEN_NOT_FOUND;
-      message = `无法为 ${symbol} 生成图表，交易对可能不存在`;
+      message = `Unable to generate chart for ${symbol}, trading pair may not exist`;
       retryable = false;
     } else if (error.message.includes('timeout')) {
       code = ApiErrorCode.TIMEOUT_ERROR;
-      message = '图表生成超时，请稍后重试';
+      message = 'Chart generation timeout, please try again later';
       retryable = true;
     } else if (error.message.includes('rate limit') || error.message.includes('429')) {
       code = ApiErrorCode.RATE_LIMIT_EXCEEDED;
-      message = '图表生成请求过于频繁，请稍后重试';
+      message = 'Chart generation requests too frequent, please try again later';
       retryable = true;
     } else if (error.message.includes('network') || error.message.includes('ENOTFOUND')) {
       code = ApiErrorCode.NETWORK_ERROR;
-      message = '网络连接失败，无法生成图表';
+      message = 'Network connection failed, unable to generate chart';
       retryable = true;
     } else if (error.message.includes('server') || error.message.includes('50')) {
       code = ApiErrorCode.SERVER_ERROR;
-      message = '图表服务暂时不可用，请稍后重试';
+      message = 'Chart service temporarily unavailable, please try again later';
       retryable = true;
     } else {
       code = ApiErrorCode.UNKNOWN_ERROR;
-      message = `图表生成失败: ${error.message}`;
+      message = `Chart generation failed: ${error.message}`;
       retryable = true;
     }
 
