@@ -232,6 +232,94 @@ function createCommandWrapper(
 }
 
 /**
+ * Handle numeric input (1, 2, etc.) with helpful English responses
+ */
+function handleNumericInput(input: string): string | null {
+  const trimmed = input.trim();
+  
+  // Check if input is a simple number (1-9)
+  if (/^[1-9]$/.test(trimmed)) {
+    const number = parseInt(trimmed);
+    
+    switch (number) {
+      case 1:
+        return `
+🔢 <b>Number "1" Received</b>
+
+Looking for trading commands? Try these:
+
+<b>📈 Trading Commands:</b>
+• <code>/long BTC 1x 100</code> - Long Bitcoin with 1x leverage
+• <code>/positions</code> - View your positions
+• <code>/wallet</code> - Check wallet balance
+
+<b>📊 Market Data:</b>
+• <code>/price BTC</code> - Bitcoin price
+• <code>/markets</code> - Market overview
+
+Send <code>/help</code> for complete command list 📚
+        `.trim();
+        
+      case 2:
+        return `
+🔢 <b>Number "2" Received</b>
+
+Want to explore more features? Here are some options:
+
+<b>📉 Short Trading:</b>
+• <code>/short ETH 2x 50</code> - Short Ethereum with 2x leverage
+• <code>/close ETH</code> - Close ETH position
+
+<b>📈 Analysis Tools:</b>
+• <code>/chart BTC</code> - View BTC chart
+• <code>/pnl</code> - Check profit/loss
+
+Send <code>/help</code> for all available commands 🚀
+        `.trim();
+        
+      default:
+        return `
+🔢 <b>Number "${number}" Received</b>
+
+I'm a trading bot focused on cryptocurrency operations.
+
+<b>🎯 Quick Actions:</b>
+• <code>/positions</code> - View open positions
+• <code>/wallet</code> - Check account balance
+• <code>/markets</code> - Market data
+
+<b>📚 Need Help?</b>
+• <code>/help</code> - Complete command guide
+• <code>/start</code> - Restart bot
+
+Try using command format: <code>/command parameter</code>
+        `.trim();
+    }
+  }
+  
+  // Check for multi-digit numbers
+  if (/^\d+$/.test(trimmed)) {
+    return `
+🔢 <b>Number "${trimmed}" Received</b>
+
+I understand you sent a number, but I work with specific commands.
+
+<b>💡 Did you mean to:</b>
+• <code>/price BTC</code> - Check token price
+• <code>/long BTC 10x ${trimmed}</code> - Trade with $${trimmed}
+• <code>/positions</code> - View positions
+
+<b>📚 For help:</b>
+Send <code>/help</code> to see all available commands
+
+Use format: <code>/command token amount</code>
+    `.trim();
+  }
+  
+  return null; // Not a numeric input
+}
+
+/**
  * 注册所有命令处理器
  */
 export function registerCommands(bot: Telegraf<ExtendedContext>): void {
@@ -526,19 +614,26 @@ export function registerCommands(bot: Telegraf<ExtendedContext>): void {
         requestId: ctx.requestId
       });
 
+      // Check if input is numeric (1, 2, etc.)
+      const numericResponse = handleNumericInput(messageText);
+      if (numericResponse) {
+        await ctx.reply(numericResponse, { parse_mode: 'HTML' });
+        return;
+      }
+
       const textResponseMessage = `
-💬 <b>文本消息收到</b>
+💬 <b>Text Message Received</b>
 
-我是交易机器人，支持加密货币价格查询和交易。
+I'm a trading bot that supports cryptocurrency price queries and trading.
 
-<b>🔍 价格查询:</b>
-<code>/price BTC</code> - 查询比特币价格
+<b>🔍 Price Query:</b>
+<code>/price BTC</code> - Query Bitcoin price
 
-<b>📈 快速交易:</b>
-<code>/long</code> - 开始做多引导
-<code>/short</code> - 开始做空引导
+<b>📈 Quick Trading:</b>
+<code>/long</code> - Start long position guide
+<code>/short</code> - Start short position guide
 
-需要帮助？发送 <code>/help</code> 查看完整指南 📚
+Need help? Send <code>/help</code> to view complete guide 📚
       `.trim();
 
       await ctx.reply(textResponseMessage, { parse_mode: 'HTML' });

@@ -449,19 +449,20 @@ export class PositionsHandler {
 📊 <b>Positions Overview</b>
 
 💰 <b>Account Information:</b>
-• Account Value: $${accountValue}
-• Available Balance: $${availableBalance}
-• Position Count: 0
+• Account Value    : $${parseFloat(accountValue).toFixed(2)}
+• Available Balance: $${parseFloat(availableBalance).toFixed(2)}
+• Total PNL        : 🔘 $0.00
+• Position Count   : 0
 
 📈 <b>Current Positions:</b>
 No positions
 
-💡 <i>You can open positions with these commands:</i>
-• <code>/long BTC 10x 100</code> - Long BTC
-• <code>/short ETH 5x 50</code> - Short ETH
+💡 <b>Manage Positions:</b>
+• <code>/long BTC 10x 100</code> - Open long position
+• <code>/short ETH 5x 50</code> - Open short position  
 • <code>/markets</code> - View market data
 
-<i>🕐 Query time: ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Shanghai' })}</i>
+<i>🕐 Query time: ${new Date().toLocaleString('en-US', { timeZone: 'UTC' })}</i>
       `.trim();
     }
 
@@ -472,14 +473,18 @@ No positions
       const pnlColor = parseFloat(position.pnl) >= 0 ? '🟢' : '🔴';
       const pnlPrefix = parseFloat(position.pnl) >= 0 ? '+' : '';
       
+      // Format position size to remove unnecessary decimals
+      const positionSize = Math.abs(parseFloat(position.size));
+      const formattedSize = positionSize < 1 ? positionSize.toFixed(4) : positionSize.toFixed(2);
+      
       positionsText += `
 ${sideIcon} <b>${position.symbol} ${sideText}</b>
-• Position Size: ${Math.abs(parseFloat(position.size)).toFixed(4)} ${position.symbol}
-• Entry Price: $${parseFloat(position.entryPrice).toFixed(4)}
-• Mark Price: $${parseFloat(position.markPrice).toFixed(4)}
-• Unrealized PNL: ${pnlColor} ${pnlPrefix}$${position.pnl} (${pnlPrefix}${position.pnlPercentage}%)
-• Margin Used: $${position.marginUsed}
-${index < positions.length - 1 ? '\n━━━━━━━━━━━━━━━━━━━━\n' : ''}
+• Position Size    : ${formattedSize} ${position.symbol}
+• Entry Price      : $${parseFloat(position.entryPrice).toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
+• Mark Price       : $${parseFloat(position.markPrice).toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
+• Unrealized PNL   : ${pnlColor} ${pnlPrefix}$${Math.abs(parseFloat(position.pnl)).toFixed(2)} (${pnlPrefix}${parseFloat(position.pnlPercentage).toFixed(2)}%)
+• Margin Used      : $${parseFloat(position.marginUsed).toFixed(2)}
+${index < positions.length - 1 ? '\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' : ''}
       `.trim();
     });
 
@@ -490,20 +495,20 @@ ${index < positions.length - 1 ? '\n━━━━━━━━━━━━━━�
 📊 <b>Positions Overview</b>
 
 💰 <b>Account Information:</b>
-• Account Value: $${accountValue}
-• Available Balance: $${availableBalance}
-• Total PNL: ${totalPnlColor} ${totalPnlPrefix}$${totalPnl}
-• Position Count: ${totalPositions}
+• Account Value    : $${parseFloat(accountValue).toFixed(2)}
+• Available Balance: $${parseFloat(availableBalance).toFixed(2)}
+• Total PNL        : ${totalPnlColor} ${totalPnlPrefix}$${Math.abs(parseFloat(totalPnl)).toFixed(2)}
+• Position Count   : ${totalPositions}
 
 📈 <b>Current Positions:</b>
 ${positionsText}
 
-💡 <i>Manage Positions:</i>
+💡 <b>Manage Positions:</b>
 • <code>/close symbol</code> - Close specified position
 • <code>/price symbol</code> - Check real-time price
 • <code>/chart symbol</code> - View candlestick chart
 
-<i>🕐 Query time: ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Shanghai' })}</i>
+<i>🕐 Query time: ${new Date().toLocaleString('en-US', { timeZone: 'UTC' })}</i>
     `.trim();
   }
 

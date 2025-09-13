@@ -84,7 +84,7 @@ export class ShortHandler {
       
       await ctx.reply(message, { parse_mode: 'HTML' });
     } else {
-      // 跳到第二步：选择杠杆 (已有代币)
+      // 跳到第二步：选择leverage (已有代币)
       const state = await tradingStateService.createState(userId, action, symbol.toUpperCase());
       
       try {
@@ -203,11 +203,11 @@ export class ShortHandler {
         return;
       }
 
-      // 检查账户余额 - 考虑杠杆倍数
+      // 检查账户余额 - 考虑leverage倍数
       try {
         const leverageNum = parseFloat(leverageStr.replace('x', ''));
         
-        // 所有杠杆倍数（包括1倍）都使用保证金交易和合约钱包
+        // 所有leverage倍数（包括1倍）都使用保证金交易和合约钱包
         const marginCheck = await accountService.checkAvailableMargin(
           userId!.toString(),
           requiredAmount,
@@ -277,7 +277,7 @@ export class ShortHandler {
       logger.debug(`📤 Request data: ${JSON.stringify(tradingData)}`);
 
       // 显示订单预览而不是直接执行交易
-      // 修复：用户实际购买的代币数量（不考虑杠杆）
+      // 修复：用户实际购买的代币数量（不考虑leverage）
       const orderSize = parseFloat(amountStr) / tokenData.price;
       const liquidationPrice = this.calculateLiquidationPrice(tokenData.price, parseFloat(leverageStr.replace('x', '')), 'short');
       
@@ -344,7 +344,7 @@ export class ShortHandler {
           { parse_mode: 'HTML' }
         );
       } else if (callbackData.startsWith('short_leverage_')) {
-        // 处理杠杆选择回调
+        // 处理leverage选择回调
         await this.handleLeverageSelection(ctx, callbackData);
       }
     } catch (error) {
@@ -358,19 +358,19 @@ export class ShortHandler {
   }
 
   /**
-   * 处理杠杆选择回调
+   * 处理leverage选择回调
    */
   private async handleLeverageSelection(ctx: ExtendedContext, callbackData: string): Promise<void> {
     const userId = ctx.from?.id?.toString();
     if (!userId) {
-      await ctx.answerCbQuery('❌ 无法获取用户信息，请重试');
+      await ctx.answerCbQuery('❌ Unable to get user information，请重试');
       return;
     }
     const leverage = callbackData.split('_')[3]; // short_leverage_BTC_3x
     
     const state = await tradingStateService.getState(userId);
     if (!state || !state.symbol) {
-      await ctx.answerCbQuery('❌ 会话已过期，请重新开始');
+      await ctx.answerCbQuery('❌ Session expired, please restart');
       return;
     }
 
@@ -380,7 +380,7 @@ export class ShortHandler {
       step: 'amount'
     });
 
-    await ctx.answerCbQuery(`✅ Selected ${leverage} 杠杆`);
+    await ctx.answerCbQuery(`✅ Selected ${leverage} leverage`);
 
     // 显示金额输入提示
     // 获取可用保证金
@@ -405,7 +405,7 @@ export class ShortHandler {
     const username = ctx.from?.username || 'unknown';
 
     try {
-      await ctx.answerCbQuery('🔄 正在执行交易...');
+      await ctx.answerCbQuery('🔄 Executing trade...');
       
       // 获取用户数据和访问令牌（一次调用）
       const { userData, accessToken } = await getUserDataAndToken(userId!.toString(), {
@@ -589,7 +589,7 @@ export class ShortHandler {
   }
 
   /**
-   * 创建杠杆选择键盘
+   * 创建leverage选择键盘
    */
   public createLeverageKeyboard(symbol: string): InlineKeyboardMarkup {
     return {

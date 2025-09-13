@@ -668,6 +668,24 @@ export class ChartImageService {
   private createPnlChartJsConfig(config: QuickChartConfig, pnlData: PnlChartData): ChartJsConfig {
     const isDark = config.theme === 'dark';
     
+    // 只显示真实数据点，不生成虚拟时间坐标
+    // 将数据点转换为简单的索引格式，避免时间轴自动填充
+    const chartData = pnlData.pnlHistory.map((point, index) => ({
+      x: index,  // 使用索引而不是时间戳
+      y: point.y
+    }));
+
+    // 生成对应的时间标签
+    const timeLabels = pnlData.pnlHistory.map(point => {
+      return new Date(point.x).toLocaleString('en-US', {
+        timeZone: 'UTC',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    });
+
     // 计算Y轴范围
     const pnlValues = pnlData.pnlHistory.map(p => p.y);
     const minPnl = Math.min(...pnlValues, 0); // 确保包含0线
@@ -682,9 +700,10 @@ export class ChartImageService {
     return {
       type: 'line',
       data: {
+        labels: timeLabels,  // 使用时间标签作为X轴标签
         datasets: [{
           label: 'PNL',
-          data: pnlData.pnlHistory,
+          data: chartData,    // 使用索引化的数据
           borderColor: '#ff9500',      // 橙色线条，匹配参考图
           backgroundColor: 'rgba(255, 149, 0, 0.1)', // 半透明填充
           borderWidth: 3,
@@ -728,36 +747,38 @@ export class ChartImageService {
                 return `PNL: ${value >= 0 ? '+' : ''}$${value.toFixed(2)}`;
               },
               title: (context: any) => {
-                const timestamp = context[0].parsed.x;
-                return new Date(timestamp).toLocaleString('en-US', {
-                  timeZone: 'Asia/Shanghai',
-                  month: '2-digit',
-                  day: '2-digit',
-                  hour: '2-digit',
-                  minute: '2-digit'
-                });
+                // 使用预生成的时间标签
+                return timeLabels[context[0].dataIndex] || 'Unknown time';
               }
             }
           }
         },
         scales: {
           x: {
-            type: 'time',
-            time: {
-              unit: 'hour',
-              displayFormats: {
-                hour: 'MM-DD HH:mm'
-              }
-            },
+            type: 'linear',  // 改为线性坐标轴，只显示真实数据点
             grid: {
-              display: true,
-              color: isDark ? '#2a2e39' : '#e2e8f0'
+              color: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
+              drawBorder: false
             },
             ticks: {
-              color: isDark ? '#9ca3af' : '#6b7280',
-              font: {
-                size: 10
+              color: isDark ? '#888888' : '#666666',
+              font: { size: 10 },
+              maxTicksLimit: Math.min(8, pnlData.pnlHistory.length), // 限制标签数量
+              callback: (value: any, index: number) => {
+                // 只显示部分标签，避免拥挤
+                const dataIndex = Math.floor(value);
+                if (dataIndex >= 0 && dataIndex < timeLabels.length) {
+                  // 只显示第一个、最后一个和中间几个点的标签
+                  const shouldShow = dataIndex === 0 || 
+                                   dataIndex === timeLabels.length - 1 || 
+                                   dataIndex % Math.max(1, Math.floor(timeLabels.length / 4)) === 0;
+                  return shouldShow ? timeLabels[dataIndex] : '';
+                }
+                return '';
               }
+            },
+            title: {
+              display: false
             }
           },
           y: {
@@ -765,19 +786,19 @@ export class ChartImageService {
             min: yAxisMin,
             max: yAxisMax,
             grid: {
-              display: true,
-              color: isDark ? '#2a2e39' : '#e2e8f0',
-              drawBorder: true
+              color: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
+              drawBorder: false
             },
             ticks: {
-              color: isDark ? '#9ca3af' : '#6b7280',
-              font: {
-                size: 10
-              },
+              color: isDark ? '#888888' : '#666666',
+              font: { size: 11 },
               callback: (value: any) => {
                 const num = Number(value);
                 return `${num >= 0 ? '+' : ''}$${num.toFixed(2)}`;
               }
+            },
+            title: {
+              display: false
             }
           }
         },

@@ -292,7 +292,7 @@ export class LongHandler {
       logger.info(`🚀 [LONG ORDER] ${symbol.toUpperCase()} ${leverageStr} $${amountStr}`);
       
       // 显示订单预览而不是直接执行交易
-      // 修复：用户实际购买的代币数量（不考虑杠杆）
+      // 修复：用户实际购买的代币数量（不考虑leverage）
       const orderSize = parseFloat(amountStr) / tokenData.price;
       const liquidationPrice = this.calculateLiquidationPrice(tokenData.price, parseFloat(leverageStr.replace('x', '')), 'long');
       
@@ -358,7 +358,7 @@ export class LongHandler {
           { parse_mode: 'HTML' }
         );
       } else if (callbackData.startsWith('long_leverage_')) {
-        // 处理杠杆选择回调
+        // 处理leverage选择回调
         await this.handleLeverageSelection(ctx, callbackData);
       }
     } catch (error) {
@@ -372,19 +372,19 @@ export class LongHandler {
   }
 
   /**
-   * 处理杠杆选择回调
+   * 处理leverage选择回调
    */
   private async handleLeverageSelection(ctx: ExtendedContext, callbackData: string): Promise<void> {
     const userId = ctx.from?.id?.toString();
     if (!userId) {
-      await ctx.answerCbQuery('❌ 无法获取用户信息，请重试');
+      await ctx.answerCbQuery('❌ Unable to get user information，请重试');
       return;
     }
     const leverage = callbackData.split('_')[3]; // long_leverage_BTC_3x
     
     const state = await tradingStateService.getState(userId);
     if (!state || !state.symbol) {
-      await ctx.answerCbQuery('❌ 会话已过期，请重新开始');
+      await ctx.answerCbQuery('❌ Session expired, please restart');
       return;
     }
 
@@ -394,7 +394,7 @@ export class LongHandler {
       step: 'amount'
     });
 
-    await ctx.answerCbQuery(`✅ Selected ${leverage} 杠杆`);
+    await ctx.answerCbQuery(`✅ Selected ${leverage} leverage`);
 
     // 显示金额输入提示
     // 获取可用保证金
@@ -419,7 +419,7 @@ export class LongHandler {
     const username = ctx.from?.username || 'unknown';
 
     try {
-      await ctx.answerCbQuery('🔄 正在执行交易...');
+      await ctx.answerCbQuery('🔄 Executing trade...');
       
       // 获取用户数据和访问令牌（一次调用）
       const { userData, accessToken } = await getUserDataAndToken(userId!.toString(), {
@@ -584,7 +584,7 @@ export class LongHandler {
   }
 
   /**
-   * 创建杠杆选择键盘
+   * 创建leverage选择键盘
    */
   public createLeverageKeyboard(symbol: string): InlineKeyboardMarkup {
     return {
