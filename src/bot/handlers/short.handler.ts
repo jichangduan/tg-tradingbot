@@ -353,7 +353,7 @@ export class ShortHandler {
         callbackData,
         userId: ctx.from?.id
       });
-      await ctx.answerCbQuery('❌ 操作失败，请重试');
+      await ctx.answerCbQuery('❌ Operation failed, please retry');
     }
   }
 
@@ -380,7 +380,7 @@ export class ShortHandler {
       step: 'amount'
     });
 
-    await ctx.answerCbQuery(`✅ 已选择 ${leverage} 杠杆`);
+    await ctx.answerCbQuery(`✅ Selected ${leverage} 杠杆`);
 
     // 显示金额输入提示
     // 获取可用保证金
@@ -483,14 +483,14 @@ export class ShortHandler {
         }
         logger.info('==============================================');
         
-        // 只有确认成功才显示成功消息
-        successMessage = `✅ <b>做空开仓成功</b>\n\n` +
-          `代币: <code>${symbol.toUpperCase()}</code>\n` +
-          `杠杆: <code>${leverage}</code>\n` +
-          `金额: <code>$${amount}</code>\n\n` +
-          `🎯 <b>建议操作:</b>\n` +
-          `• 使用 /positions 查看持仓\n` +
-          `• 使用 /wallet 查看余额变化`;
+        // Only show success message when confirmed successful
+        successMessage = `✅ <b>Short Position Opened Successfully</b>\n\n` +
+          `Token: <code>${symbol.toUpperCase()}</code>\n` +
+          `Leverage: <code>${leverage}</code>\n` +
+          `Amount: <code>$${amount}</code>\n\n` +
+          `🎯 <b>Recommended Actions:</b>\n` +
+          `• Use /positions to view positions\n` +
+          `• Use /wallet to check balance changes`;
       } else {
         // 如果响应表明失败，抛出错误
         throw new Error(apiResult?.message || 'Hyperliquid API返回失败状态');
@@ -519,10 +519,10 @@ export class ShortHandler {
         fullError: error.toString()
       });
       
-      await ctx.answerCbQuery('❌ 交易执行失败');
+      await ctx.answerCbQuery('❌ Trade execution failed');
       
       // 解析API错误，提供更友好的错误信息
-      let errorMessage = '❌ <b>交易执行失败</b>\n\n';
+      let errorMessage = '❌ <b>Trade execution failed</b>\n\n';
       
       // 检查是否是余额不足错误
       if (error.response?.status === 400) {

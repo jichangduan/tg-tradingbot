@@ -392,12 +392,12 @@ export function registerCommands(bot: Telegraf<ExtendedContext>): void {
       if (state) {
         await tradingStateService.clearState(userId);
         await ctx.reply(
-          '✅ <b>交易流程已取消</b>\n\n您可以随时重新开始交易',
+          '✅ <b>Trading Process Cancelled</b>\n\nYou can restart trading anytime',
           { parse_mode: 'HTML' }
         );
       } else {
         await ctx.reply(
-          '💡 <b>当前没有进行中的交易流程</b>\n\n使用 <code>/long</code> 或 <code>/short</code> 开始交易',
+          '💡 <b>No Active Trading Process</b>\n\nUse <code>/long</code> or <code>/short</code> to start trading',
           { parse_mode: 'HTML' }
         );
       }
@@ -406,7 +406,7 @@ export function registerCommands(bot: Telegraf<ExtendedContext>): void {
         error: (error as Error).message,
         userId: parseInt(userId || '0')
       });
-      await ctx.reply('❌ 取消操作失败，请重试');
+      await ctx.reply('❌ Cancel operation failed, please retry');
     }
   });
 
@@ -421,24 +421,24 @@ export function registerCommands(bot: Telegraf<ExtendedContext>): void {
       // 这里可以检查各个服务的健康状态
       // 暂时返回简单的状态信息
       const statusMessage = `
-⚙️ <b>系统状态</b>
+⚙️ <b>System Status</b>
 
-🤖 <b>Bot状态:</b> 🟢 运行正常
-📡 <b>API服务:</b> 🟢 连接正常
-⚡ <b>缓存服务:</b> 🟢 工作正常
-💾 <b>数据更新:</b> 🟢 实时同步
+🤖 <b>Bot Status:</b> 🟢 Running Normally
+📡 <b>API Service:</b> 🟢 Connected Normally
+⚡ <b>Cache Service:</b> 🟢 Working Normally
+💾 <b>Data Update:</b> 🟢 Real-time Sync
 
-<b>⚡ 性能指标:</b>
-• 平均响应时间: &lt;2秒
-• 缓存命中率: &gt;80%
-• 系统可用性: 99.9%
+<b>⚡ Performance Metrics:</b>
+• Average Response Time: &lt;2s
+• Cache Hit Rate: &gt;80%
+• System Availability: 99.9%
 
-<b>🔄 最近更新:</b>
-• 支持更多代币类型
-• 优化响应速度
-• 增强错误处理
+<b>🔄 Recent Updates:</b>
+• Support for more token types
+• Optimized response speed
+• Enhanced error handling
 
-<i>🕐 检查时间: ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}</i>
+<i>🕐 Check Time: ${new Date().toLocaleString('en-US', { timeZone: 'UTC' })}</i>
       `.trim();
 
       await ctx.reply(statusMessage, { parse_mode: 'HTML' });
@@ -449,7 +449,7 @@ export function registerCommands(bot: Telegraf<ExtendedContext>): void {
       });
       
       await ctx.reply(
-        '❌ 无法获取系统状态\n请稍后重试',
+        '❌ Unable to get system status\nPlease try again later',
         { parse_mode: 'HTML' }
       );
     }

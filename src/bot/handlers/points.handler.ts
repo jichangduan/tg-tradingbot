@@ -25,12 +25,12 @@ export class PointsHandler {
       logger.logCommand('points', userId!, username, args);
 
       if (!userId) {
-        await ctx.reply('❌ 无法获取用户信息，请重试');
+        await ctx.reply('❌ Unable to get user information, please retry');
         return;
       }
 
-      // 显示加载状态
-      const loadingMsg = await ctx.reply('⏳ 正在查询您的积分信息...');
+      // Show loading status
+      const loadingMsg = await ctx.reply('⏳ Querying your points information...');
 
       // 调用invite服务获取积分数据（积分基于交易量计算）
       logger.info(`Points query started [points_${Date.now()}_${Math.random().toString(36).substr(2, 9)}]`, {
@@ -106,27 +106,27 @@ export class PointsHandler {
     } = inviteStats;
 
     const messageLines = [
-      '🎯 <b>您的积分详情</b>',
+      '🎯 <b>Your Points Details</b>',
       '',
-      `💎 <b>当前积分:</b> ${this.formatNumber(currentPoints)} 分`,
-      `📊 <b>总交易量:</b> $${this.formatNumber(totalTradingVolume)}`,
-      `👥 <b>邀请人数:</b> ${inviteeCount} 人`,
+      `💎 <b>Current Points:</b> ${this.formatNumber(currentPoints)} points`,
+      `📊 <b>Total Trading Volume:</b> $${this.formatNumber(totalTradingVolume)}`,
+      `👥 <b>Invitees:</b> ${inviteeCount} people`,
       '',
-      '📋 <b>积分规则</b>',
-      '• 每 $100 交易量 = 1 积分',
-      '• 通过邀请好友增加交易量来赚取更多积分',
-      '• 积分可用于平台特殊权益和奖励',
+      '📋 <b>Points Rules</b>',
+      '• Every $100 trading volume = 1 point',
+      '• Invite friends to increase trading volume and earn more points',
+      '• Points can be used for platform special benefits and rewards',
       '',
-      `🕒 <b>更新时间:</b> ${this.formatDateTime(lastUpdated)}`,
+      `🕒 <b>Update Time:</b> ${this.formatDateTime(lastUpdated)}`,
       '',
-      '💡 <b>提示:</b> 发送 /invite 查看详细邀请统计',
+      '💡 <b>Tip:</b> Send /invite to view detailed invitation statistics',
       '',
-      '🆘 <b>需要帮助？</b>',
-      '• 📱 发送 /help 查看使用指南',
-      '• 💰 发送 /wallet 查看钱包余额',
-      '• 📊 发送 /markets 查看市场行情',
+      '🆘 <b>Need Help?</b>',
+      '• 📱 Send /help to view usage guide',
+      '• 💰 Send /wallet to check wallet balance',
+      '• 📊 Send /markets to view market trends',
       '',
-      '如果问题持续存在，请联系管理员'
+      'If problems persist, please contact administrator'
     ];
 
     return messageLines.join('\n');
@@ -137,18 +137,18 @@ export class PointsHandler {
    */
   private handlePointsError(error: DetailedError): string {
     const baseMessage = [
-      '❌ <b>积分查询失败</b>',
+      '❌ <b>Points Query Failed</b>',
       '',
-      error.message || '未知错误',
+      error.message || 'Unknown error',
       '',
-      '💡 <b>建议:</b> 请重新发送 /points 命令',
+      '💡 <b>Suggestion:</b> Please resend /points command',
       '',
-      '🆘 <b>需要帮助？</b>',
-      '• 📱 发送 /help 查看使用指南',
-      '• 💰 发送 /wallet 查看钱包余额',
-      '• 📊 发送 /markets 查看市场行情',
+      '🆘 <b>Need Help?</b>',
+      '• 📱 Send /help to view usage guide',
+      '• 💰 Send /wallet to check wallet balance',
+      '• 📊 Send /markets to view market trends',
       '',
-      '如果问题持续存在，请联系管理员'
+      'If problems persist, please contact administrator'
     ];
 
     return baseMessage.join('\n');
@@ -171,16 +171,16 @@ export class PointsHandler {
    */
   private formatDateTime(date: Date): string {
     try {
-      return date.toLocaleString('zh-CN', {
+      return date.toLocaleString('en-US', {
         year: 'numeric',
         month: '2-digit',
         day: '2-digit',
         hour: '2-digit',
         minute: '2-digit',
-        timeZone: 'Asia/Shanghai'
+        timeZone: 'UTC'
       });
     } catch (error) {
-      return '刚刚';
+      return 'Just now';
     }
   }
 }
