@@ -206,7 +206,7 @@ export class PnlHandler {
     const response = await apiService.getWithAuth<PnlResponse>(
       '/api/tgbot/trading/pnl',
       userToken,
-      {},
+      { userId }, // 添加 userId 参数供 isTgBotSimpleAuth 政策使用
       { timeout: 15000 } // 增加超时时间，因为数据计算较复杂
     );
 
