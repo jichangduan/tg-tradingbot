@@ -67,42 +67,28 @@ export class PushMessageFormatterService {
   public formatFlashNewsMessage(news: FlashNewsData): string {
     if (!news || !news.title) {
       logger.warn('Invalid flash news data provided', { news });
-      return '🚨 <b>【快讯】</b>\n\n无效的快讯数据';
+      return '🚨 <b>News</b>\n\nInvalid news data';
     }
 
     try {
-      const formattedTimestamp = this.formatTimestamp(news.timestamp);
+      // 简洁的标题格式
+      let message = `🚨 <b>News</b>\n\n`;
       
-      let message = `🚨 <b>【快讯】</b>\n\n` +
-                   `<code>┌──────────────────────────────────────┐</code>\n` +
-                   `<code>│ </code>${this.escapeHtml(news.title)}<code> │</code>\n`;
+      // 添加标题内容
+      message += `${this.escapeHtml(news.title)}`;
 
-      // 如果有内容，清理HTML并添加内容行
+      // 如果有内容，清理HTML并添加内容
       if (news.content && news.content.trim()) {
         const cleanContent = this.cleanHtmlContent(news.content);
         if (cleanContent) {
-          // 将清理后的内容按行分割，每行都添加框框格式
-          const contentLines = cleanContent.split('\n');
-          for (const line of contentLines) {
-            if (line.trim()) {
-              message += `<code>│ </code>${this.escapeHtml(line)}<code> │</code>\n`;
-            } else {
-              // 空行也保持框框格式
-              message += `<code>│ </code><code> │</code>\n`;
-            }
-          }
+          message += `\n\n${this.escapeHtml(cleanContent)}`;
         }
       }
 
-      message += `<code>│ ⏰ ${formattedTimestamp} │</code>\n` +
-                 `<code>└──────────────────────────────────────┘</code>`;
-
       // 如果有相关代币符号，在消息末尾提示
       if (news.symbol) {
-        message += `\n\n💡 <i>相关代币: ${news.symbol}</i>`;
+        message += `\n\n💡 <i>Related token: ${news.symbol}</i>`;
       }
-
-      // 删除快讯消息格式化debug日志
 
       return message;
       
@@ -111,7 +97,7 @@ export class PushMessageFormatterService {
         error: (error as Error).message,
         news
       });
-      return `🚨 <b>【快讯】</b>\n\n${this.escapeHtml(news.title)}\n⏰ ${news.timestamp}`;
+      return `🚨 <b>News</b>\n\n${this.escapeHtml(news.title)}`;
     }
   }
 
@@ -362,6 +348,8 @@ export class PushMessageFormatterService {
       .replace(/&gt;/g, '>')
       .replace(/&quot;/g, '"')
       .replace(/&#39;/g, "'")
+      // 移除竖线符号（避免与边框冲突）
+      .replace(/\|/g, '')
       // 清理多余的空行：连续超过2个换行合并为2个
       .replace(/\n{3,}/g, '\n\n')
       // 清理每行首尾空白
