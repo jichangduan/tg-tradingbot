@@ -759,13 +759,15 @@ export class PushSchedulerService {
       const duration = Date.now() - startTime;
       logger.info(`[${executionId}] Group push completed for ${groupId}`, {
         messageCount: messages.length,
-        duration: `${duration}ms`
+        duration: duration,
+        durationText: `${duration}ms`
       });
       
     } catch (error) {
       const duration = Date.now() - startTime;
       logger.error(`[${executionId}] Group push failed for ${groupId}`, {
-        duration: `${duration}ms`,
+        duration: duration,
+        durationText: `${duration}ms`,
         error: (error as Error).message
       });
       throw error;
