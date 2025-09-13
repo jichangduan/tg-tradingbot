@@ -386,6 +386,17 @@ BTC, ETH, SOL, USDT, USDC, BNB, ADA, DOT, LINK, MATIC, AVAX, UNI
       message += `• <code>/price BTC</code> - Check Bitcoin price\n`;
       message += `• <code>/markets</code> - View market overview\n`;
       message += `• <code>/help</code> - View all features\n\n`;
+      
+      message += `<b>🚀 Available Commands:</b>\n`;
+      message += `• <code>/wallet</code> - View wallet balance\n`;
+      message += `• <code>/markets</code> - View all tradable perpetual tokens\n`;
+      message += `• <code>/chart</code> - View token price charts\n`;
+      message += `• <code>/price</code> - Check token prices\n`;
+      message += `• <code>/long</code> or <code>/short</code> - Open long or short positions\n`;
+      message += `• <code>/close</code> - Close positions\n`;
+      message += `• <code>/positions</code> - View current positions\n`;
+      message += `• <code>/pnl</code> - View profit and loss charts\n`;
+      message += `• <code>/push</code> - Set push notifications\n\n`;
     }
     
     message += `<i>🔐 Your wallet address and private key are securely managed by the system</i>\n`;
