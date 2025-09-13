@@ -7,13 +7,13 @@ import { handleTradingError } from '../../utils/error-handler';
 import { ExtendedContext } from '../index';
 
 /**
- * Close命令处理器
- * 处理 /close <symbol> [percentage] 命令
- * 支持全仓平仓和部分平仓
+ * Close command handler
+ * Handles /close <symbol> [percentage] command
+ * Supports full position and partial position closing
  */
 export class CloseHandler {
   /**
-   * 处理 /close 命令
+   * Handle /close command
    */
   public async handle(ctx: ExtendedContext, args: string[]): Promise<void> {
     const startTime = Date.now();
@@ -24,82 +24,82 @@ export class CloseHandler {
     try {
       logger.logCommand('close', userId!, username, args);
 
-      // 参数验证
+      // Parameter validation
       if (args.length === 0) {
         await ctx.reply(
-          '❌ <b>参数不足</b>\n\n' +
-          '正确格式:\n' +
-          '• <code>/close &lt;symbol&gt;</code> - 全仓平仓\n' +
-          '• <code>/close &lt;symbol&gt; &lt;percentage&gt;</code> - 部分平仓\n\n' +
-          '<b>示例:</b>\n' +
-          '• <code>/close BTC</code> - 平掉所有BTC仓位\n' +
-          '• <code>/close ETH 50%</code> - 平掉50%的ETH仓位\n' +
-          '• <code>/close SOL 0.5</code> - 平掉具体数量',
+          '❌ <b>Insufficient Parameters</b>\n\n' +
+          'Correct Format:\n' +
+          '• <code>/close &lt;symbol&gt;</code> - Close full position\n' +
+          '• <code>/close &lt;symbol&gt; &lt;percentage&gt;</code> - Close partial position\n\n' +
+          '<b>Examples:</b>\n' +
+          '• <code>/close BTC</code> - Close all BTC positions\n' +
+          '• <code>/close ETH 50%</code> - Close 50% of ETH position\n' +
+          '• <code>/close SOL 0.5</code> - Close specific amount',
           { parse_mode: 'HTML' }
         );
         return;
       }
 
       const symbol = args[0];
-      const closeAmount = args[1] || '100%'; // 默认全仓平仓
+      const closeAmount = args[1] || '100%'; // Default full position close
 
-      // 基础验证
+      // Basic validation
       if (!symbol) {
         await ctx.reply(
-          '❌ 请提供要平仓的代币符号\n\n' +
-          '格式: <code>/close &lt;symbol&gt; [percentage]</code>',
+          '❌ Please provide the token symbol to close\n\n' +
+          'Format: <code>/close &lt;symbol&gt; [percentage]</code>',
           { parse_mode: 'HTML' }
         );
         return;
       }
 
-      // 验证平仓数量格式
+      // Validate close amount format
       const { isValid, amount, isPercentage, errorMsg } = this.validateCloseAmount(closeAmount);
       if (!isValid) {
         await ctx.reply(
-          `❌ <b>平仓数量格式错误</b>\n\n` +
-          `输入值: <code>${closeAmount}</code>\n` +
-          `错误: ${errorMsg}\n\n` +
-          '<b>支持的格式:</b>\n' +
-          '• 百分比: <code>50%</code>, <code>100%</code>\n' +
-          '• 小数: <code>0.5</code>, <code>1.0</code>\n' +
-          '• 整数: <code>1</code>, <code>10</code>',
+          `❌ <b>Invalid Close Amount Format</b>\n\n` +
+          `Input Value: <code>${closeAmount}</code>\n` +
+          `Error: ${errorMsg}\n\n` +
+          '<b>Supported Formats:</b>\n' +
+          '• Percentage: <code>50%</code>, <code>100%</code>\n' +
+          '• Decimal: <code>0.5</code>, <code>1.0</code>\n' +
+          '• Integer: <code>1</code>, <code>10</code>',
           { parse_mode: 'HTML' }
         );
         return;
       }
 
-      // 发送处理中消息
+      // Send processing message
       const loadingMessage = await ctx.reply(
-        `🔄 <b>正在处理平仓操作...</b>\n\n` +
-        `代币: <code>${symbol.toUpperCase()}</code>\n` +
-        `平仓${isPercentage ? '比例' : '数量'}: <code>${closeAmount}</code>\n` +
-        `操作类型: ${closeAmount === '100%' ? '全仓平仓' : '部分平仓'}`,
+        `🔄 <b>Processing close position...</b>\n\n` +
+        `Symbol: <code>${symbol.toUpperCase()}</code>\n` +
+        `Close ${isPercentage ? 'Percentage' : 'Amount'}: <code>${closeAmount}</code>\n` +
+        `Order Type: ${closeAmount === '100%' ? 'Full Position Close' : 'Partial Position Close'}`,
         { parse_mode: 'HTML' }
       );
 
-      // 获取用户数据和访问令牌（一次调用）
+      // Get user data and access token (single call)
       const { userData, accessToken: initialAccessToken } = await getUserDataAndToken(userId!.toString(), {
         username,
         first_name: ctx.from?.first_name,
         last_name: ctx.from?.last_name
       });
 
-      // 准备平仓数据（移到try块外以便重试时使用）
-      // 修复：根据后端API期望格式化参数 - 添加内部userId
+      // Prepare close data (moved outside try block for retry use)
+      // Fix: Format parameters according to backend API expectations - add internal userId
       const closeData = {
-        userId: userData.userId,                              // ✅ 使用内部用户ID
+        userId: userData.userId,                              // ✅ Use internal user ID
         symbol: symbol.toUpperCase(),
-        // 如果是百分比，发送原始用户输入（已包含%）；如果是数量，发送数量字符串
+        // If percentage, send original user input (includes %); if amount, send amount string
         percentage: isPercentage ? closeAmount : amount.toString(),
         orderType: 'market'
       };
 
       try {
-        // 使用已获取的访问令牌
+        // Use already obtained access token
         const accessToken = initialAccessToken;
 
-        // 调用平仓API
+        // Call close position API
         logger.info(`Close position API call attempt [${requestId}]`, {
           userId,
           username,
@@ -117,19 +117,41 @@ export class CloseHandler {
           closeData
         );
 
-        // 编辑消息显示成功结果
+        // Edit message to show success result
         await ctx.telegram.editMessageText(
           ctx.chat?.id,
           loadingMessage.message_id,
           undefined,
-          `✅ <b>平仓操作已提交</b>\n\n` +
-          `代币: <code>${symbol.toUpperCase()}</code>\n` +
-          `平仓${isPercentage ? '比例' : '数量'}: <code>${closeAmount}</code>\n` +
-          `操作类型: ${closeAmount === '100%' ? '全仓平仓' : '部分平仓'}\n\n` +
-          `<i>平仓订单正在处理中，请稍候...</i>\n\n` +
-          `💡 使用 <code>/positions</code> 查看最新仓位状态`,
+          `✅ <b>Position Close Order Submitted Successfully</b>\n\n` +
+          `Symbol: <code>${symbol.toUpperCase()}</code>\n` +
+          `Close ${isPercentage ? 'Percentage' : 'Amount'}: <code>${closeAmount}</code>\n` +
+          `Order Type: ${closeAmount === '100%' ? 'Full Position Close' : 'Partial Position Close'}\n\n` +
+          `<i>Close order is being processed, please wait...</i>\n\n` +
+          `💡 Use <code>/positions</code> to check updated position status`,
           { parse_mode: 'HTML' }
         );
+
+        // Send additional success notification after a brief delay
+        setTimeout(async () => {
+          try {
+            await ctx.reply(
+              `🎉 <b>POSITION CLOSE COMPLETED!</b> 🎉\n\n` +
+              `✅ Your ${symbol.toUpperCase()} position has been successfully closed\n` +
+              `📊 Close amount: <code>${closeAmount}</code>\n\n` +
+              `💡 <b>Next Steps:</b>\n` +
+              `• Check <code>/wallet</code> for updated balance\n` +
+              `• View <code>/positions</code> for remaining positions\n` +
+              `• Use <code>/pnl</code> to see your trading performance`,
+              { parse_mode: 'HTML' }
+            );
+          } catch (notificationError) {
+            logger.warn('Failed to send close success notification', {
+              userId,
+              symbol,
+              error: (notificationError as Error).message
+            });
+          }
+        }, 2000); // 2 second delay to allow processing
 
         const duration = Date.now() - startTime;
         logger.info(`Close position success [${requestId}]`, {
@@ -154,9 +176,9 @@ export class CloseHandler {
         });
 
       } catch (apiError: any) {
-        // 使用新的统一错误处理系统
+        // Use new unified error handling system
         if (apiError.status === 401) {
-          // 401错误：尝试刷新Token并重试
+          // 401 error: attempt token refresh and retry
           logger.warn(`Close position 401 error, attempting token refresh [${requestId}]`, {
             userId,
             username,
@@ -171,7 +193,7 @@ export class CloseHandler {
           });
 
           try {
-            // 获取新的访问令牌
+            // Get new access token
             const newAccessToken = await getUserAccessToken(userId!.toString(), {
               username,
               first_name: ctx.from?.first_name,
@@ -185,26 +207,48 @@ export class CloseHandler {
               requestId
             });
 
-            // 用新Token重试API调用
+            // Retry API call with new token
             const retryResult = await apiService.postWithAuth(
               '/api/tgbot/trading/close',
               newAccessToken,
               closeData
             );
 
-            // 重试成功，显示成功消息
+            // Retry successful, show success message
             await ctx.telegram.editMessageText(
               ctx.chat?.id,
               loadingMessage.message_id,
               undefined,
-              `✅ <b>平仓操作已提交</b>\n\n` +
-              `代币: <code>${symbol.toUpperCase()}</code>\n` +
-              `平仓${isPercentage ? '比例' : '数量'}: <code>${closeAmount}</code>\n` +
-              `操作类型: ${closeAmount === '100%' ? '全仓平仓' : '部分平仓'}\n\n` +
-              `<i>平仓订单正在处理中，请稍候...</i>\n\n` +
-              `💡 使用 <code>/positions</code> 查看最新仓位状态`,
+              `✅ <b>Position Close Order Submitted Successfully</b>\n\n` +
+              `Symbol: <code>${symbol.toUpperCase()}</code>\n` +
+              `Close ${isPercentage ? 'Percentage' : 'Amount'}: <code>${closeAmount}</code>\n` +
+              `Order Type: ${closeAmount === '100%' ? 'Full Position Close' : 'Partial Position Close'}\n\n` +
+              `<i>Close order is being processed, please wait...</i>\n\n` +
+              `💡 Use <code>/positions</code> to check updated position status`,
               { parse_mode: 'HTML' }
             );
+
+            // Send additional success notification after a brief delay
+            setTimeout(async () => {
+              try {
+                await ctx.reply(
+                  `🎉 <b>POSITION CLOSE COMPLETED!</b> 🎉\n\n` +
+                  `✅ Your ${symbol.toUpperCase()} position has been successfully closed\n` +
+                  `📊 Close amount: <code>${closeAmount}</code>\n\n` +
+                  `💡 <b>Next Steps:</b>\n` +
+                  `• Check <code>/wallet</code> for updated balance\n` +
+                  `• View <code>/positions</code> for remaining positions\n` +
+                  `• Use <code>/pnl</code> to see your trading performance`,
+                  { parse_mode: 'HTML' }
+                );
+              } catch (notificationError) {
+                logger.warn('Failed to send close success notification (retry)', {
+                  userId,
+                  symbol,
+                  error: (notificationError as Error).message
+                });
+              }
+            }, 2000); // 2 second delay to allow processing
 
             logger.info(`Close position retry success after 401 [${requestId}]`, {
               userId,
@@ -217,9 +261,9 @@ export class CloseHandler {
               requestId
             });
 
-            return; // 成功，直接返回
+            return; // Success, return directly
           } catch (retryError: any) {
-            // 重试失败，记录详细日志
+            // Retry failed, log detailed information
             logger.error(`Close position retry failed after 401 [${requestId}]`, {
               userId,
               username,
@@ -234,7 +278,7 @@ export class CloseHandler {
               requestId
             });
             
-            // 使用统一错误处理
+            // Use unified error handling
             await handleTradingError(
               ctx, 
               retryError, 
@@ -246,7 +290,7 @@ export class CloseHandler {
             return;
           }
         } else {
-          // 其他错误，记录详细日志
+          // Other errors, log detailed information
           logger.error(`Close position API error [${requestId}]`, {
             userId,
             username,
@@ -261,7 +305,7 @@ export class CloseHandler {
             requestId
           });
           
-          // 使用统一错误处理
+          // Use unified error handling
           await handleTradingError(
             ctx, 
             apiError, 
@@ -274,7 +318,7 @@ export class CloseHandler {
       }
 
     } catch (error) {
-      // 系统异常，记录详细日志
+      // System exception, log detailed information
       logger.error(`Close position system error [${requestId}]`, {
         userId,
         username,
@@ -286,13 +330,13 @@ export class CloseHandler {
         requestId
       });
       
-      // 使用统一错误处理处理系统异常
+      // Use unified error handling for system exceptions
       await handleTradingError(ctx, error, 'close', args[0], args[1]);
     }
   }
 
   /**
-   * 验证平仓数量格式
+   * Validate close amount format
    */
   private validateCloseAmount(amountStr: string): {
     isValid: boolean;
@@ -305,13 +349,13 @@ export class CloseHandler {
         isValid: false,
         amount: 0,
         isPercentage: false,
-        errorMsg: '数量不能为空'
+        errorMsg: 'Amount cannot be empty'
       };
     }
 
     const trimmed = amountStr.trim();
 
-    // 检查百分比格式
+    // Check percentage format
     if (trimmed.endsWith('%')) {
       const percentageStr = trimmed.slice(0, -1);
       const percentage = parseFloat(percentageStr);
@@ -321,7 +365,7 @@ export class CloseHandler {
           isValid: false,
           amount: 0,
           isPercentage: true,
-          errorMsg: '百分比格式不正确'
+          errorMsg: 'Invalid percentage format'
         };
       }
       
@@ -330,7 +374,7 @@ export class CloseHandler {
           isValid: false,
           amount: 0,
           isPercentage: true,
-          errorMsg: '百分比必须在0-100%之间'
+          errorMsg: 'Percentage must be between 0-100%'
         };
       }
       
@@ -341,14 +385,14 @@ export class CloseHandler {
       };
     }
 
-    // 检查数字格式
+    // Check number format
     const amount = parseFloat(trimmed);
     if (isNaN(amount)) {
       return {
         isValid: false,
         amount: 0,
         isPercentage: false,
-        errorMsg: '数量格式不正确'
+        errorMsg: 'Invalid amount format'
       };
     }
     
@@ -357,7 +401,7 @@ export class CloseHandler {
         isValid: false,
         amount: 0,
         isPercentage: false,
-        errorMsg: '数量必须大于0'
+        errorMsg: 'Amount must be greater than 0'
       };
     }
     
@@ -366,7 +410,7 @@ export class CloseHandler {
         isValid: false,
         amount: 0,
         isPercentage: false,
-        errorMsg: '数量过大'
+        errorMsg: 'Amount too large'
       };
     }
     
@@ -378,7 +422,7 @@ export class CloseHandler {
   }
 
   /**
-   * 获取处理器统计信息
+   * Get handler statistics
    */
   public getStats(): any {
     return {
@@ -398,8 +442,8 @@ export class CloseHandler {
   }
 }
 
-// 导出单例实例
+// Export singleton instance
 export const closeHandler = new CloseHandler();
 
-// 默认导出
+// Default export
 export default closeHandler;
