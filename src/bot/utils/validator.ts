@@ -16,7 +16,7 @@ const SUPPORTED_TOKENS: SupportedTokenSymbol[] = [
   // Layer 2
   'OP', 'ARB', 'IMX', 'LRC',
   // Meme币
-  'DOGE', 'SHIB', 'PEPE', 'FLOKI',
+  'DOGE', 'SHIB', 'PEPE', 'FLOKI', 'HYPE',
   // 其他流行代币
   'APT', 'SUI', 'FTM', 'SAND', 'MANA', 'AXS'
 ];
