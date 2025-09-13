@@ -231,6 +231,68 @@ export class PushMessageFormatterService {
   }
 
   /**
+   * Extract token symbol from text content
+   * @param text Text content to analyze
+   * @returns Extracted token symbol or null
+   */
+  public extractSymbolFromText(text: string): string | null {
+    if (!text || typeof text !== 'string') {
+      return null;
+    }
+
+    // Common cryptocurrency symbols (prioritized by popularity)
+    const commonTokens = [
+      'BTC', 'ETH', 'USDT', 'BNB', 'SOL', 'XRP', 'ADA', 'AVAX', 'DOT', 'MATIC',
+      'DOGE', 'SHIB', 'TRX', 'DAI', 'ATOM', 'LTC', 'LINK', 'UNI', 'XLM', 'FTM',
+      'ALGO', 'VET', 'ICP', 'FIL', 'SAND', 'MANA', 'AAVE', 'CRV', 'GRT', 'COMP'
+    ];
+
+    // Convert to uppercase for matching
+    const upperText = text.toUpperCase();
+
+    // Strategy 1: Look for explicit mentions like "ETH", "BTC", etc.
+    for (const token of commonTokens) {
+      // Match token as standalone word (not part of another word)
+      const tokenRegex = new RegExp(`\\b${token}\\b`, 'i');
+      if (tokenRegex.test(text)) {
+        return token;
+      }
+    }
+
+    // Strategy 2: Look for $TOKEN format (e.g., $ETH, $BTC)
+    const dollarTokenMatch = upperText.match(/\$([A-Z]{2,10})\b/);
+    if (dollarTokenMatch && commonTokens.includes(dollarTokenMatch[1])) {
+      return dollarTokenMatch[1];
+    }
+
+    // Strategy 3: Look for "TOKEN position", "TOKEN long", "TOKEN whale", etc.
+    for (const token of commonTokens) {
+      const contextRegex = new RegExp(`\\b${token}\\s+(position|long|short|whale|trading|price|profit)`, 'i');
+      if (contextRegex.test(text)) {
+        return token;
+      }
+    }
+
+    // Strategy 4: Look for specific patterns in content
+    const patterns = [
+      /(\w+)\s+long\s+position/i,           // "ETH long position"
+      /(\w+)\s+whale/i,                     // "BTC whale"
+      /(\w+)\s+trading/i,                   // "SOL trading"
+      /on\s+(\w+)/i,                        // "on ETH"
+      /(\w+)\s+has\s+(achieved|realized)/i  // "ETH has achieved"
+    ];
+
+    for (const pattern of patterns) {
+      const match = text.match(pattern);
+      if (match && match[1] && commonTokens.includes(match[1].toUpperCase())) {
+        return match[1].toUpperCase();
+      }
+    }
+
+    return null;
+  }
+
+  /**
    * Create trading button keyboard
    * @param symbol Token symbol
    * @returns Inline keyboard configuration
@@ -469,7 +531,17 @@ export class PushMessageFormatterService {
         // Single flash news keeps original format
         const news = newsItems[0];
         message = this.formatFlashNewsMessage(news);
-        if (news.symbol) symbols.push(news.symbol);
+        
+        // Try to get symbol from API data first
+        if (news.symbol) {
+          symbols.push(news.symbol);
+        } else {
+          // Extract symbol from content if not provided by API
+          const extractedSymbol = this.extractSymbolFromText(news.title + ' ' + (news.content || ''));
+          if (extractedSymbol) {
+            symbols.push(extractedSymbol);
+          }
+        }
       } else {
         // Multiple flash news merged format
         message = `🚨 <b>Flash News</b> (${newsItems.length} items)\n\n`;
@@ -477,17 +549,25 @@ export class PushMessageFormatterService {
         newsItems.forEach((news, index) => {
           if (news.title) {
             message += `${index + 1}. ${this.escapeHtml(news.title)}\n`;
+            
+            // Try to get symbol from API data first
             if (news.symbol && !symbols.includes(news.symbol)) {
               symbols.push(news.symbol);
+            } else {
+              // Extract symbol from content if not provided by API
+              const extractedSymbol = this.extractSymbolFromText(news.title + ' ' + (news.content || ''));
+              if (extractedSymbol && !symbols.includes(extractedSymbol)) {
+                symbols.push(extractedSymbol);
+              }
             }
           }
         });
       }
 
-      // Create trading buttons - if there are related token symbols
+      // Create trading buttons - always provide buttons
       let keyboard: any = undefined;
       if (symbols.length > 0) {
-        // Use first symbol to create trading buttons
+        // Use extracted symbol to create trading buttons
         keyboard = this.createTradingKeyboard(symbols[0]);
         
         // If multiple symbols, show at message end
@@ -496,6 +576,10 @@ export class PushMessageFormatterService {
         } else {
           message += `\n\n💡 <i>Related token: ${symbols[0]}</i>`;
         }
+      } else {
+        // Fallback: provide BTC trading buttons if no symbol detected
+        keyboard = this.createTradingKeyboard('BTC');
+        message += `\n\n💡 <i>Market news - Trade popular tokens</i>`;
       }
 
       return {
@@ -526,12 +610,24 @@ export class PushMessageFormatterService {
     try {
       let message = '';
       let symbols: string[] = [];
+      let allActionText = ''; // Collect all action text for symbol extraction
       
       if (whaleActions.length === 1) {
         // Single whale action keeps original format
         const action = whaleActions[0];
         message = this.formatWhaleActionMessage(action);
-        if (action.symbol) symbols.push(action.symbol);
+        
+        // Try to get symbol from API data first
+        if (action.symbol) {
+          symbols.push(action.symbol);
+        } else {
+          // Extract symbol from action content if not provided by API
+          allActionText = `${action.action} ${action.amount || ''}`;
+          const extractedSymbol = this.extractSymbolFromText(allActionText);
+          if (extractedSymbol) {
+            symbols.push(extractedSymbol);
+          }
+        }
       } else {
         // Multiple whale actions merged format
         message = `🐋 <b>Whale Alert</b> (${whaleActions.length} actions)\n\n`;
@@ -545,11 +641,23 @@ export class PushMessageFormatterService {
             }
             message += '\n';
             
+            // Try to get symbol from API data first
             if (action.symbol && !symbols.includes(action.symbol)) {
               symbols.push(action.symbol);
+            } else {
+              // Collect action text for symbol extraction
+              allActionText += ` ${action.action} ${action.amount || ''}`;
             }
           }
         });
+        
+        // If no symbols from API, try to extract from all action text
+        if (symbols.length === 0) {
+          const extractedSymbol = this.extractSymbolFromText(allActionText);
+          if (extractedSymbol) {
+            symbols.push(extractedSymbol);
+          }
+        }
       }
 
       // Create trading buttons - if there are related token symbols
@@ -564,6 +672,11 @@ export class PushMessageFormatterService {
         } else {
           message += `\n💡 <i>Related token: ${symbols[0]}</i>`;
         }
+      } else {
+        // Fallback: provide generic trading buttons for whale actions
+        // Most whale actions are likely about major tokens, default to BTC
+        keyboard = this.createTradingKeyboard('BTC');
+        message += `\n💡 <i>Whale activity detected - Trade major tokens</i>`;
       }
 
       return {
@@ -633,10 +746,10 @@ export class PushMessageFormatterService {
         });
       }
 
-      // Create trading buttons - if there are related token symbols
+      // Create trading buttons - always provide buttons
       let keyboard: any = undefined;
       if (symbols.length > 0) {
-        // Use first symbol to create trading buttons
+        // Use detected symbol to create trading buttons
         keyboard = this.createTradingKeyboard(symbols[0]);
         
         // If multiple symbols, show at message end
@@ -645,6 +758,10 @@ export class PushMessageFormatterService {
         } else {
           message += `\n💡 <i>Related token: ${symbols[0]}</i>`;
         }
+      } else {
+        // Fallback: provide ETH trading buttons for fund flows
+        keyboard = this.createTradingKeyboard('ETH');
+        message += `\n💡 <i>Fund activity - Trade popular tokens</i>`;
       }
 
       return {
