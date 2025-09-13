@@ -485,7 +485,7 @@ ${sideIcon} <b>${position.symbol} ${sideText}</b>
 • Mark Price       : $${parseFloat(position.markPrice).toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
 • Unrealized PNL   : ${pnlColor} ${pnlPrefix}$${Math.abs(parseFloat(position.pnl)).toFixed(2)} (${pnlPrefix}${parseFloat(position.pnlPercentage).toFixed(2)}%)
 • Margin Used      : $${parseFloat(position.marginUsed).toFixed(2)}
-      `.trim();
+      `;
     });
 
     const totalPnlColor = parseFloat(totalPnl) >= 0 ? '🟢' : '🔴';
