@@ -206,7 +206,7 @@ export class ErrorHandler {
       : classification.isRetryable;
 
     if (shouldIncludeRetry) {
-      message += '\n\n🔄 <i>此问题可能是暂时的，请稍后重试</i>';
+      message += '\n\n🔄 <i>This issue may be temporary, please try again later</i>';
     }
 
     return message;
@@ -227,7 +227,7 @@ export class ErrorHandler {
       
       // 尝试发送简化版本
       try {
-        await ctx.reply('❌ 系统遇到错误，请稍后重试');
+        await ctx.reply('❌ System encountered an error, please try again later');
       } catch {
         // 最后的尝试也失败了，只能记录日志
         logger.error('Failed to send fallback error message', {
@@ -272,13 +272,13 @@ export class ErrorHandler {
    */
   private static async sendFallbackErrorMessage(ctx: ExtendedContext): Promise<void> {
     const fallbackMessage = 
-      '❌ <b>系统错误</b>\n\n' +
-      '很抱歉，系统遇到了意外错误。\n\n' +
-      '💡 <b>请尝试:</b>\n' +
-      '• 稍后重试\n' +
-      '• 重新启动对话 <code>/start</code>\n' +
-      '• 联系管理员获取帮助\n\n' +
-      '<i>错误已记录，技术团队会尽快处理</i>';
+      '❌ <b>System Error</b>\n\n' +
+      'Sorry, the system encountered an unexpected error.\n\n' +
+      '💡 <b>Please try:</b>\n' +
+      '• Try again later\n' +
+      '• Restart the conversation with <code>/start</code>\n' +
+      '• Contact administrator for help\n\n' +
+      '<i>Error has been logged, technical team will handle it as soon as possible</i>';
 
     try {
       await ctx.reply(fallbackMessage, { parse_mode: 'HTML' });

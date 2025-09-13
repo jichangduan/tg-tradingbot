@@ -20,94 +20,94 @@ export const ERROR_MESSAGES: Record<ErrorType, ErrorMessage> = {
   // 交易相关错误
   [ErrorType.NO_POSITIONS]: {
     icon: '📭',
-    title: '当前没有该代币的持仓',
-    description: '您的账户中没有找到该代币的任何持仓信息',
+    title: 'No position found for this token',
+    description: 'No position information found for this token in your account',
     reasons: [
-      '该代币目前没有持仓',
-      '仓位已被完全平掉',
-      '代币符号输入错误',
-      '可能在不同的钱包类型中（交易/策略）'
+      'Currently no position for this token',
+      'Position has been completely closed',
+      'Token symbol entered incorrectly',
+      'May be in different wallet type (trading/strategy)'
     ],
     suggestions: [
-      '使用 /positions 查看所有当前持仓',
-      '检查代币符号拼写（如：BTC、ETH、SOL）',
-      '确认是否使用正确的交易对名称',
-      '如最近有交易，请稍等数据同步'
+      'Use /positions to view all current positions',
+      'Check token symbol spelling (e.g.: BTC, ETH, SOL)',
+      'Confirm if using correct trading pair name',
+      'If traded recently, please wait for data sync'
     ],
     isUserFault: true
   },
 
   [ErrorType.INSUFFICIENT_FUNDS]: {
     icon: '💰',
-    title: '账户余额不足',
-    description: '您的账户余额不足以完成此次交易',
+    title: 'Insufficient account balance',
+    description: 'Your account balance is insufficient to complete this transaction',
     reasons: [
-      '账户可用余额不够',
-      '资金被其他订单占用',
-      '保证金不足'
+      'Insufficient available balance',
+      'Funds occupied by other orders',
+      'Insufficient margin'
     ],
     suggestions: [
-      '使用 /wallet 查看账户余额',
-      '减少交易数量',
-      '充值更多资金',
-      '取消其他未成交的订单'
+      'Use /wallet to check account balance',
+      'Reduce trading amount',
+      'Deposit more funds',
+      'Cancel other pending orders'
     ],
     isUserFault: true
   },
 
   [ErrorType.INSUFFICIENT_POSITION]: {
     icon: '📉',
-    title: '仓位数量不足',
-    description: '您要平仓的数量超过了当前实际持仓',
+    title: 'Insufficient position amount',
+    description: 'The amount you want to close exceeds your current actual position',
     reasons: [
-      '持仓数量小于请求平仓数量',
-      '部分仓位已被其他订单平掉',
-      '同时进行了多个平仓操作',
-      '数据同步存在延迟'
+      'Position amount is less than requested close amount',
+      'Some positions have been closed by other orders',
+      'Multiple close operations performed simultaneously',
+      'Data synchronization delay exists'
     ],
     suggestions: [
-      '使用 /positions 查看最新持仓数量',
-      '尝试使用更小的平仓比例（如 50%）',
-      '先取消其他未成交的平仓订单',
-      '等待几秒钟后重试操作'
+      'Use /positions to check latest position amount',
+      'Try using smaller close percentage (e.g. 50%)',
+      'Cancel other pending close orders first',
+      'Wait a few seconds and retry the operation'
     ],
     isUserFault: true
   },
 
   [ErrorType.INVALID_AMOUNT]: {
     icon: '🔢',
-    title: '平仓数量格式错误',
-    description: '您输入的平仓数量格式不正确或超出范围',
+    title: 'Invalid close amount format',
+    description: 'The close amount format you entered is incorrect or out of range',
     reasons: [
-      '数量格式不符合要求',
-      '百分比不在有效范围内（0-100%）',
-      '数量为负数或零',
-      '包含无效字符或特殊符号'
+      'Amount format does not meet requirements',
+      'Percentage not in valid range (0-100%)',
+      'Amount is negative or zero',
+      'Contains invalid characters or special symbols'
     ],
     suggestions: [
-      '百分比格式：30%、50%、100%',
-      '小数格式：0.5、1.0、2.5',
-      '整数格式：1、10、100',
-      '确保数值大于 0 且合理'
+      'Percentage format: 30%, 50%, 100%',
+      'Decimal format: 0.5, 1.0, 2.5',
+      'Integer format: 1, 10, 100',
+      'Ensure value is greater than 0 and reasonable'
     ],
     isUserFault: true
   },
 
   [ErrorType.TRADING_EXECUTION_FAILED]: {
     icon: '⚠️',
-    title: '平仓执行失败',
-    description: '平仓请求已提交但在执行时遇到问题',
+    title: 'Close execution failed',
+    description: 'Close request was submitted but encountered problems during execution',
     reasons: [
-      '市场流动性暂时不足',
-      '交易系统繁忙或维护中',
-      '价格波动过大导致执行困难',
-      '网络连接或API服务异常'
+      'Market liquidity temporarily insufficient',
+      'Trading system busy or under maintenance',
+      'Large price volatility causing execution difficulties',
+      'Network connection or API service anomaly'
     ],
     suggestions: [
-      '等待 10-30 秒后重试',
-      '尝试分批平仓（如先平 50%）',
-      '使用 /positions 确认当前状态',
-      '如持续失败，请联系技术支持'
+      'Wait 10-30 seconds and retry',
+      'Try partial closing (e.g. close 50% first)',
+      'Use /positions to confirm current status',
+      'If continues to fail, please contact technical support'
     ],
     isUserFault: false
   },
@@ -115,50 +115,50 @@ export const ERROR_MESSAGES: Record<ErrorType, ErrorMessage> = {
   // 格式和参数错误
   [ErrorType.FORMAT_ERROR]: {
     icon: '📝',
-    title: '命令格式错误',
-    description: '您输入的命令格式不正确',
+    title: 'Command format error',
+    description: 'The command format you entered is incorrect',
     reasons: [
-      '参数格式不符合要求',
-      '缺少必需的参数',
-      '参数顺序错误'
+      'Parameter format does not meet requirements',
+      'Missing required parameters',
+      'Incorrect parameter order'
     ],
     suggestions: [
-      '检查命令格式',
-      '参考使用示例',
-      '使用 /help 查看命令帮助'
+      'Check command format',
+      'Refer to usage examples',
+      'Use /help to view command help'
     ],
     isUserFault: true
   },
 
   [ErrorType.MISSING_PARAMS]: {
     icon: '❓',
-    title: '缺少必要参数',
-    description: '命令缺少必要的参数',
+    title: 'Missing required parameters',
+    description: 'Command is missing required parameters',
     reasons: [
-      '未提供必需的参数',
-      '参数数量不足'
+      'Required parameters not provided',
+      'Insufficient number of parameters'
     ],
     suggestions: [
-      '添加缺少的参数',
-      '参考完整的命令格式',
-      '查看命令示例'
+      'Add missing parameters',
+      'Refer to complete command format',
+      'View command examples'
     ],
     isUserFault: true
   },
 
   [ErrorType.INVALID_SYMBOL]: {
     icon: '🪙',
-    title: '代币符号无效',
-    description: '您输入的代币符号不存在或不支持',
+    title: 'Invalid token symbol',
+    description: 'The token symbol you entered does not exist or is not supported',
     reasons: [
-      '代币符号不存在',
-      '该代币暂不支持交易',
-      '符号拼写错误'
+      'Token symbol does not exist',
+      'This token does not support trading yet',
+      'Symbol spelling error'
     ],
     suggestions: [
-      '检查代币符号拼写',
-      '使用 /markets 查看支持的代币',
-      '确认代币是否已上线'
+      'Check token symbol spelling',
+      'Use /markets to view supported tokens',
+      'Confirm if token is already listed'
     ],
     isUserFault: true
   },
@@ -166,52 +166,52 @@ export const ERROR_MESSAGES: Record<ErrorType, ErrorMessage> = {
   // 认证和权限错误
   [ErrorType.AUTH_FAILED]: {
     icon: '🔐',
-    title: '身份验证失败',
-    description: '无法验证您的身份信息，请重新登录',
+    title: 'Authentication failed',
+    description: 'Unable to verify your identity information, please log in again',
     reasons: [
-      '登录会话已过期',
-      '账户认证信息无效',
-      '系统正在进行安全验证',
-      '网络传输过程中token损坏'
+      'Login session has expired',
+      'Account authentication information is invalid',
+      'System is performing security verification',
+      'Token corrupted during network transmission'
     ],
     suggestions: [
-      '发送 /start 重新初始化账户',
-      '等待几秒钟后重试操作',
-      '检查网络连接是否稳定',
-      '如问题持续，请联系技术支持'
+      'Send /start to reinitialize account',
+      'Wait a few seconds and retry operation',
+      'Check if network connection is stable',
+      'If problem persists, please contact technical support'
     ],
     isUserFault: false
   },
 
   [ErrorType.TOKEN_EXPIRED]: {
     icon: '⏰',
-    title: '会话已过期',
-    description: '您的登录会话已过期',
+    title: 'Session expired',
+    description: 'Your login session has expired',
     reasons: [
-      '长时间未操作',
-      '系统安全策略',
-      '账户状态变更'
+      'Long time without operation',
+      'System security policy',
+      'Account status change'
     ],
     suggestions: [
-      '重新启动对话 /start',
-      '重新进行身份验证'
+      'Restart conversation with /start',
+      'Re-authenticate'
     ],
     isUserFault: false
   },
 
   [ErrorType.PERMISSION_DENIED]: {
     icon: '🚫',
-    title: '权限不足',
-    description: '您的账户权限不足以执行此操作',
+    title: 'Insufficient permissions',
+    description: 'Your account permissions are insufficient to perform this operation',
     reasons: [
-      '账户等级限制',
-      '功能权限不足',
-      '风控策略限制'
+      'Account level restriction',
+      'Insufficient feature permissions',
+      'Risk control policy restriction'
     ],
     suggestions: [
-      '联系客服了解权限要求',
-      '升级账户等级',
-      '完成相关认证'
+      'Contact customer service to understand permission requirements',
+      'Upgrade account level',
+      'Complete relevant verification'
     ],
     isUserFault: false
   },
@@ -219,85 +219,85 @@ export const ERROR_MESSAGES: Record<ErrorType, ErrorMessage> = {
   // 网络和服务错误
   [ErrorType.NETWORK_ERROR]: {
     icon: '🌐',
-    title: '网络连接问题',
-    description: '无法连接到服务器',
+    title: 'Network connection problem',
+    description: 'Unable to connect to server',
     reasons: [
-      '网络连接不稳定',
-      '服务器暂时不可达',
-      'DNS解析问题'
+      'Unstable network connection',
+      'Server temporarily unreachable',
+      'DNS resolution problem'
     ],
     suggestions: [
-      '检查网络连接',
-      '稍后重试',
-      '切换网络环境'
+      'Check network connection',
+      'Try again later',
+      'Switch network environment'
     ],
     isUserFault: false
   },
 
   [ErrorType.API_ERROR]: {
     icon: '🔧',
-    title: 'API接口错误',
-    description: '后端接口返回错误',
+    title: 'API interface error',
+    description: 'Backend interface returned error',
     reasons: [
-      'API接口异常',
-      '数据处理错误',
-      '服务内部问题'
+      'API interface exception',
+      'Data processing error',
+      'Internal service problem'
     ],
     suggestions: [
-      '稍后重试',
-      '联系技术支持',
-      '检查输入参数'
+      'Try again later',
+      'Contact technical support',
+      'Check input parameters'
     ],
     isUserFault: false
   },
 
   [ErrorType.SERVER_ERROR]: {
     icon: '🔧',
-    title: '服务器内部错误',
-    description: '服务器遇到内部错误',
+    title: 'Internal server error',
+    description: 'Server encountered internal error',
     reasons: [
-      '服务器内部异常',
-      '数据库连接问题',
-      '系统资源不足'
+      'Internal server exception',
+      'Database connection problem',
+      'Insufficient system resources'
     ],
     suggestions: [
-      '稍后重试',
-      '联系技术支持',
-      '关注系统状态公告'
+      'Try again later',
+      'Contact technical support',
+      'Follow system status announcements'
     ],
     isUserFault: false
   },
 
   [ErrorType.SERVICE_UNAVAILABLE]: {
     icon: '🚧',
-    title: '服务暂时不可用',
-    description: '相关服务正在维护或升级中',
+    title: 'Service temporarily unavailable',
+    description: 'Related service is under maintenance or upgrading',
     reasons: [
-      '系统维护中',
-      '服务升级中',
-      '流量过载'
+      'System under maintenance',
+      'Service upgrading',
+      'Traffic overload'
     ],
     suggestions: [
-      '稍后重试',
-      '关注维护公告',
-      '使用其他功能'
+      'Try again later',
+      'Follow maintenance announcements',
+      'Use other features'
     ],
     isUserFault: false
   },
 
   [ErrorType.RATE_LIMIT]: {
     icon: '⏱️',
-    title: '请求频率超限',
-    description: '您的操作过于频繁',
+    title: 'Request frequency limit exceeded',
+    description: 'Your operations are too frequent',
     reasons: [
-      '短时间内请求过多',
-      '触发频率限制',
-      '防刷机制触发'
+      'Too many requests in short time',
+      'Rate limit triggered',
+      'Anti-spam mechanism triggered'
     ],
     suggestions: [
-      '稍等一会再重试',
-      '减慢操作频率',
-      '合并相似操作'
+      'Wait a moment and retry',
+      'Slow down operation frequency',
+      'Merge similar operations'
     ],
     isUserFault: true
   },
@@ -305,34 +305,34 @@ export const ERROR_MESSAGES: Record<ErrorType, ErrorMessage> = {
   // 数据和状态错误
   [ErrorType.DATA_NOT_FOUND]: {
     icon: '🔍',
-    title: '数据未找到',
-    description: '请求的数据不存在',
+    title: 'Data not found',
+    description: 'The requested data does not exist',
     reasons: [
-      '数据已被删除',
-      '查询条件错误',
-      '数据同步延迟'
+      'Data has been deleted',
+      'Query condition error',
+      'Data synchronization delay'
     ],
     suggestions: [
-      '检查查询参数',
-      '稍后重试',
-      '确认数据是否存在'
+      'Check query parameters',
+      'Try again later',
+      'Confirm if data exists'
     ],
     isUserFault: true
   },
 
   [ErrorType.INVALID_STATE]: {
     icon: '🔄',
-    title: '状态异常',
-    description: '当前状态不允许执行此操作',
+    title: 'State exception',
+    description: 'Current state does not allow this operation',
     reasons: [
-      '账户状态异常',
-      '交易状态冲突',
-      '系统状态不符'
+      'Account state exception',
+      'Trading state conflict',
+      'System state mismatch'
     ],
     suggestions: [
-      '检查账户状态',
-      '等待状态恢复',
-      '联系客服处理'
+      'Check account status',
+      'Wait for state recovery',
+      'Contact customer service'
     ],
     isUserFault: false
   },
@@ -340,17 +340,17 @@ export const ERROR_MESSAGES: Record<ErrorType, ErrorMessage> = {
   // 未知错误
   [ErrorType.UNKNOWN_ERROR]: {
     icon: '❌',
-    title: '未知错误',
-    description: '遇到了未知的系统错误',
+    title: 'Unknown error',
+    description: 'Encountered unknown system error',
     reasons: [
-      '系统遇到未预期的错误',
-      '新的错误类型',
-      '配置问题'
+      'System encountered unexpected error',
+      'New error type',
+      'Configuration problem'
     ],
     suggestions: [
-      '稍后重试',
-      '联系技术支持',
-      '提供详细的错误信息'
+      'Try again later',
+      'Contact technical support',
+      'Provide detailed error information'
     ],
     isUserFault: false
   }
@@ -377,13 +377,13 @@ export function formatErrorMessage(
   
   // 添加描述和上下文信息
   if (context?.symbol) {
-    message += `代币: <code>${context.symbol.toUpperCase()}</code>\n`;
+    message += `Token: <code>${context.symbol.toUpperCase()}</code>\n`;
   }
   if (context?.amount) {
-    message += `数量: <code>${context.amount}</code>\n`;
+    message += `Amount: <code>${context.amount}</code>\n`;
   }
   if (context?.details) {
-    message += `详情: ${context.details}\n`;
+    message += `Details: ${context.details}\n`;
   }
   
   if (context?.symbol || context?.amount || context?.details) {
@@ -394,7 +394,7 @@ export function formatErrorMessage(
 
   // 添加可能的原因
   if (template.reasons && template.reasons.length > 0) {
-    message += '🤔 <b>可能原因:</b>\n';
+    message += '🤔 <b>Possible reasons:</b>\n';
     template.reasons.forEach(reason => {
       message += `• ${reason}\n`;
     });
@@ -402,14 +402,14 @@ export function formatErrorMessage(
   }
 
   // 添加建议操作
-  message += '💡 <b>建议操作:</b>\n';
+  message += '💡 <b>Suggested actions:</b>\n';
   template.suggestions.forEach(suggestion => {
     message += `• ${suggestion}\n`;
   });
 
   // 对于非用户错误，添加技术支持信息
   if (!template.isUserFault) {
-    message += '\n<i>如果问题持续存在，请联系技术支持</i>';
+    message += '\n<i>If the problem persists, please contact technical support</i>';
   }
 
   return message;
