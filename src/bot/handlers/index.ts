@@ -336,57 +336,57 @@ export function registerCommands(bot: Telegraf<ExtendedContext>): void {
     });
 
     const helpMessage = `
-📚 <b>AIW3 TGBot 使用指南</b>
+📚 <b>AIW3 TGBot User Guide</b>
 
-<b>🔍 价格查询命令:</b>
-<code>/price &lt;代币符号&gt;</code>
-例如: <code>/price BTC</code>, <code>/price ETH</code>
+<b>🔍 Price Query Commands:</b>
+<code>/price &lt;token symbol&gt;</code>
+Examples: <code>/price BTC</code>, <code>/price ETH</code>
 
-<b>📊 市场数据命令:</b>
-<code>/markets</code> - 查看主要加密货币市场行情
-<code>/chart &lt;交易对&gt; [时间]</code> - K线图表分析
-例如: <code>/chart BTC</code>, <code>/chart ETH 1d</code>
+<b>📊 Market Data Commands:</b>
+<code>/markets</code> - View major cryptocurrency market data
+<code>/chart &lt;trading pair&gt; [timeframe]</code> - Candlestick chart analysis
+Examples: <code>/chart BTC</code>, <code>/chart ETH 1d</code>
 
-<b>📈 交易命令:</b>
-<code>/long &lt;代币&gt; &lt;杠杆&gt; &lt;金额&gt;</code> - 做多交易
-<code>/short &lt;代币&gt; &lt;杠杆&gt; &lt;金额&gt;</code> - 做空交易
-<code>/close &lt;代币&gt; [数量]</code> - 平仓操作
-<code>/positions</code> - 查看所有持仓情况
-<code>/pnl</code> - 盈亏分析报告
-例如: <code>/long BTC 10x 200</code>, <code>/short ETH 5x 100</code>, <code>/close BTC 50%</code>
+<b>📈 Trading Commands:</b>
+<code>/long &lt;token&gt; &lt;leverage&gt; &lt;amount&gt;</code> - Long position
+<code>/short &lt;token&gt; &lt;leverage&gt; &lt;amount&gt;</code> - Short position
+<code>/close &lt;token&gt; [quantity]</code> - Close position
+<code>/positions</code> - View all open positions
+<code>/pnl</code> - Profit & Loss analysis report
+Examples: <code>/long BTC 10x 200</code>, <code>/short ETH 5x 100</code>, <code>/close BTC 50%</code>
 
-<b>💰 账户管理:</b>
-<code>/wallet</code> - 查看钱包余额
-<code>/invite</code> - 查看邀请统计和积分
-<code>/points</code> - 查看您赚取的积分
+<b>💰 Account Management:</b>
+<code>/wallet</code> - View wallet balance
+<code>/invite</code> - View invitation stats and points
+<code>/points</code> - View your earned points
 
-<b>📢 推送设置:</b>
-<code>/push</code> - 管理推送通知设置
+<b>📢 Push Notifications:</b>
+<code>/push</code> - Manage push notification settings
 
-<b>💡 其他命令:</b>
-<code>/start</code> - 重新开始
-<code>/help</code> - 显示此帮助信息
-<code>/status</code> - 查看系统状态
+<b>💡 Other Commands:</b>
+<code>/start</code> - Restart bot
+<code>/help</code> - Show this help information
+<code>/status</code> - View system status
 
-<b>🪙 支持的代币:</b>
-<b>主流币:</b> BTC, ETH, SOL, USDT, USDC, BNB, XRP, ADA
+<b>🪙 Supported Tokens:</b>
+<b>Major Coins:</b> BTC, ETH, SOL, USDT, USDC, BNB, XRP, ADA
 <b>DeFi:</b> UNI, LINK, AAVE, COMP, SUSHI, CRV
 <b>Layer 1:</b> DOT, AVAX, MATIC, ATOM, NEAR, ALGO
-<b>其他:</b> DOGE, SHIB, PEPE, APT, SUI 等
+<b>Others:</b> DOGE, SHIB, PEPE, APT, SUI, etc.
 
-<b>✨ 功能特点:</b>
-• 🚀 毫秒级响应速度
-• 📊 详细的价格分析
-• 💹 24小时涨跌趋势
-• ⚡ 智能缓存系统
-• 🛡️ 数据安全可靠
+<b>✨ Key Features:</b>
+• 🚀 Millisecond-level response speed
+• 📊 Detailed price analysis
+• 💹 24-hour price trends
+• ⚡ Smart caching system
+• 🛡️ Secure and reliable data
 
-<b>💬 使用提示:</b>
-• 代币符号不区分大小写
-• 一次查询一个代币获得最佳体验
-• 数据每5分钟自动更新
+<b>💬 Usage Tips:</b>
+• Token symbols are case-insensitive
+• Query one token at a time for best experience
+• Data updates automatically every 5 minutes
 
-需要帮助？联系管理员 👨‍💻
+Need help? Contact administrator 👨‍💻
     `.trim();
 
     await ctx.reply(helpMessage, { parse_mode: 'HTML' });
@@ -404,7 +404,7 @@ export function registerCommands(bot: Telegraf<ExtendedContext>): void {
     createCommandWrapper('chart', chartHandler.handle.bind(chartHandler))
   );
 
-  // /markets 命令 - 市场行情
+  // /markets command - Market data
   bot.command(
     'markets', 
     createCommandWrapper('markets', marketsHandler.handle.bind(marketsHandler))
@@ -498,7 +498,7 @@ export function registerCommands(bot: Telegraf<ExtendedContext>): void {
     }
   });
 
-  // /status 命令 - 系统状态
+  // /status command - System status
   bot.command('status', async (ctx) => {
     logger.info('Status command received', {
       userId: ctx.from?.id,
@@ -571,38 +571,38 @@ export function registerCommands(bot: Telegraf<ExtendedContext>): void {
       });
 
       const unknownCommandMessage = `
-❓ <b>未知命令: ${command}</b>
+❓ <b>Unknown command: ${command}</b>
 
-我不认识这个命令。试试这些可用的命令:
+I don't recognize this command. Try these available commands:
 
-<b>🔍 价格查询:</b>
-<code>/price BTC</code> - 查询比特币价格
-<code>/chart BTC</code> - K线图表分析
-<code>/markets</code> - 查看市场行情
+<b>🔍 Price Queries:</b>
+<code>/price BTC</code> - Query Bitcoin price
+<code>/chart BTC</code> - Candlestick chart analysis
+<code>/markets</code> - View market data
 
-<b>📈 交易操作:</b>
-<code>/long BTC 10x 200</code> - 做多交易
-<code>/short ETH 5x 100</code> - 做空交易
-<code>/close BTC 50%</code> - 平仓操作
-<code>/positions</code> - 查看持仓情况
-<code>/pnl</code> - 盈亏分析报告
+<b>📈 Trading Operations:</b>
+<code>/long BTC 10x 200</code> - Long position
+<code>/short ETH 5x 100</code> - Short position
+<code>/close BTC 50%</code> - Close position
+<code>/positions</code> - View positions
+<code>/pnl</code> - Profit & Loss analysis
 
-<b>💰 账户管理:</b>
-<code>/wallet</code> - 查看钱包余额
-<code>/invite</code> - 查看邀请统计
-<code>/points</code> - 查看积分详情
+<b>💰 Account Management:</b>
+<code>/wallet</code> - View wallet balance
+<code>/invite</code> - View invitation stats
+<code>/points</code> - View points details
 
-<b>📢 推送设置:</b>
-<code>/push</code> - 管理推送通知设置
+<b>📢 Push Settings:</b>
+<code>/push</code> - Manage push notifications
 
-<b>📚 帮助信息:</b>
-<code>/help</code> - 查看完整帮助
-<code>/start</code> - 重新开始
+<b>📚 Help Information:</b>
+<code>/help</code> - View complete help
+<code>/start</code> - Restart bot
 
-<b>⚙️ 系统信息:</b>
-<code>/status</code> - 查看系统状态
+<b>⚙️ System Information:</b>
+<code>/status</code> - View system status
 
-💡 提示: 发送 <code>/help</code> 查看所有可用命令
+💡 Tip: Send <code>/help</code> to view all available commands
       `.trim();
 
       await ctx.reply(unknownCommandMessage, { parse_mode: 'HTML' });
@@ -736,22 +736,22 @@ Need help? Send <code>/help</code> to view complete guide 📚
  */
 export function getRegisteredCommands(): Array<{ command: string; description: string }> {
   return [
-    { command: '/start', description: '开始使用Bot - 用户初始化' },
-    { command: '/help', description: '显示帮助信息' },
-    { command: '/price <symbol>', description: '查询代币价格' },
-    { command: '/chart <symbol> [timeframe]', description: 'K线图表分析' },
-    { command: '/long <symbol> <leverage> <amount>', description: '做多交易' },
-    { command: '/short <symbol> <leverage> <amount>', description: '做空交易' },
-    { command: '/close <symbol> [amount]', description: '平仓操作' },
-    { command: '/positions', description: '查看所有持仓情况' },
-    // { command: '/orders', description: '查看所有挂单情况' }, // Temporarily disabled
-    { command: '/pnl', description: '盈亏分析报告' },
-    { command: '/markets', description: '查看市场行情' },
-    { command: '/wallet', description: '查看钱包余额' },
-    { command: '/invite', description: '查看邀请统计和积分' },
-    { command: '/points', description: '查看您赚取的积分' },
-    { command: '/push', description: '管理推送通知设置' },
-    { command: '/status', description: '查看系统状态' }
+    { command: '/start', description: 'Start using Bot - User initialization' },
+    { command: '/help', description: 'Show help information' },
+    { command: '/price <symbol>', description: 'Query token price' },
+    { command: '/chart <symbol> [timeframe]', description: 'Candlestick chart analysis' },
+    { command: '/long <symbol> <leverage> <amount>', description: 'Long position trading' },
+    { command: '/short <symbol> <leverage> <amount>', description: 'Short position trading' },
+    { command: '/close <symbol> [amount]', description: 'Close position' },
+    { command: '/positions', description: 'View all open positions' },
+    // { command: '/orders', description: 'View all pending orders' }, // Temporarily disabled
+    { command: '/pnl', description: 'Profit & Loss analysis report' },
+    { command: '/markets', description: 'View market data' },
+    { command: '/wallet', description: 'View wallet balance' },
+    { command: '/invite', description: 'View invitation stats and points' },
+    { command: '/points', description: 'View your earned points' },
+    { command: '/push', description: 'Manage push notification settings' },
+    { command: '/status', description: 'View system status' }
   ];
 }
 
@@ -761,19 +761,19 @@ export function getRegisteredCommands(): Array<{ command: string; description: s
 export async function setBotCommands(bot: Telegraf<ExtendedContext>): Promise<void> {
   try {
     await bot.telegram.setMyCommands([
-      { command: 'start', description: '🚀 开始使用' },
-      { command: 'help', description: '📚 帮助信息' },
-      { command: 'price', description: '💰 查询价格' },
-      { command: 'chart', description: '📊 K线图表' },
-      { command: 'positions', description: '📊 查看持仓' },
-      // { command: 'orders', description: '📋 查看挂单' }, // Temporarily disabled
-      { command: 'pnl', description: '📈 盈亏分析' },
-      { command: 'markets', description: '📈 市场行情' },
-      { command: 'wallet', description: '💰 钱包余额' },
-      { command: 'invite', description: '🎁 邀请统计' },
-      { command: 'points', description: '🎯 积分详情' },
-      { command: 'push', description: '📢 推送设置' },
-      { command: 'status', description: '⚙️ 系统状态' }
+      { command: 'start', description: '🚀 Start Bot' },
+      { command: 'help', description: '📚 Help Guide' },
+      { command: 'price', description: '💰 Price Query' },
+      { command: 'chart', description: '📊 Chart Analysis' },
+      { command: 'positions', description: '📊 View Positions' },
+      // { command: 'orders', description: '📋 View Orders' }, // Temporarily disabled
+      { command: 'pnl', description: '📈 P&L Analysis' },
+      { command: 'markets', description: '📈 Market Data' },
+      { command: 'wallet', description: '💰 Wallet Balance' },
+      { command: 'invite', description: '🎁 Invitation Stats' },
+      { command: 'points', description: '🎯 Points Details' },
+      { command: 'push', description: '📢 Push Settings' },
+      { command: 'status', description: '⚙️ System Status' }
     ]);
     
     logger.info('✅ Bot commands menu set successfully');

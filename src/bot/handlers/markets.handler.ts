@@ -4,7 +4,7 @@ import { apiService } from '../../services/api.service';
 import { messageFormatter } from '../utils/message.formatter';
 
 /**
- * 市场数据接口响应类型
+ * Market data interface response types
  */
 interface MarketData {
   name: string;
@@ -19,8 +19,8 @@ interface MarketDataResponse {
 }
 
 /**
- * 市场数据命令处理器
- * 处理 /markets 命令，显示主要加密货币的市场行情
+ * Market data command handler
+ * Handles /markets command, displays major cryptocurrency market data
  */
 export class MarketsHandler {
 
@@ -28,7 +28,7 @@ export class MarketsHandler {
   }
 
   /**
-   * 处理/markets命令
+   * Handle /markets command
    */
   public async handle(ctx: Context, args: string[]): Promise<void> {
     const userId = ctx.from?.id;
@@ -41,16 +41,16 @@ export class MarketsHandler {
     });
 
     try {
-      // 发送加载中消息
-      const loadingMessage = await ctx.reply('🔍 正在获取市场数据...');
+      // Send loading message
+      const loadingMessage = await ctx.reply('🔍 Fetching market data...');
       
-      // 获取市场数据
+      // Get market data
       const marketData = await this.fetchMarketData();
       
-      // 格式化市场数据消息
+      // Format market data message
       const formattedMessage = this.formatMarketMessage(marketData);
       
-      // 编辑消息显示结果
+      // Edit message to show results
       await ctx.telegram.editMessageText(
         ctx.chat!.id,
         loadingMessage.message_id,
@@ -71,17 +71,17 @@ export class MarketsHandler {
         error: (error as Error).message
       });
 
-      // 发送友好的错误消息
+      // Send user-friendly error message
       await ctx.reply(
-        '❌ 查询失败\n\n' +
-        '获取市场数据时出现错误，请稍后重试。',
+        '❌ Query Failed\n\n' +
+        'Error occurred while fetching market data, please try again later.',
         { parse_mode: 'HTML' }
       );
     }
   }
 
   /**
-   * 从API获取市场数据
+   * Fetch market data from API
    */
   private async fetchMarketData(): Promise<MarketData[]> {
     try {
@@ -91,12 +91,12 @@ export class MarketsHandler {
         '/api/home/getLargeMarketData'
       );
 
-      // 验证响应格式
+      // Validate response format
       if (!response || response.code !== 200 || !Array.isArray(response.data)) {
         throw new Error(`Invalid API response format: ${JSON.stringify(response).substring(0, 200)}`);
       }
 
-      // 验证数据完整性
+      // Validate data integrity
       const validData = response.data.filter(item => 
         item && 
         typeof item.name === 'string' && 
@@ -120,14 +120,14 @@ export class MarketsHandler {
   }
 
   /**
-   * 格式化市场数据为Telegram消息
+   * Format market data as Telegram message
    */
   private formatMarketMessage(marketData: MarketData[]): string {
     try {
-      // 消息头
-      let message = '🏪 *主要加密货币市场行情*\n\n';
+      // Message header
+      let message = '🏪 *Major Cryptocurrency Market Data*\n\n';
       
-      // 添加每个币种的信息
+      // Add information for each coin
       marketData.forEach((coin, index) => {
         const changeEmoji = this.getChangeEmoji(coin.change);
         const changeText = this.formatChangeText(coin.change);
@@ -138,15 +138,15 @@ export class MarketsHandler {
         message += `   ${changeEmoji} ${changeText}\n\n`;
       });
 
-      // 添加更新时间
-      const updateTime = new Date().toLocaleString('zh-CN', {
-        timeZone: 'Asia/Shanghai',
+      // Add update time
+      const updateTime = new Date().toLocaleString('en-US', {
+        timeZone: 'UTC',
         hour12: false
       });
-      message += `\n⏰ 更新时间: ${updateTime}`;
+      message += `\n⏰ Updated: ${updateTime} UTC`;
       
-      // 添加使用提示
-      message += '\n\n💡 使用 `/price <币种>` 查看详细价格信息';
+      // Add usage tip
+      message += '\n\n💡 Use `/price <token>` to view detailed price information';
 
       return message;
 
@@ -155,12 +155,12 @@ export class MarketsHandler {
         error: (error as Error).message,
         dataCount: marketData.length
       });
-      throw new Error('消息格式化失败');
+      throw new Error('Message formatting failed');
     }
   }
 
   /**
-   * 根据涨跌幅获取表情符号
+   * Get emoji based on price change
    */
   private getChangeEmoji(change: number): string {
     if (change > 0) return '📈';
@@ -169,7 +169,7 @@ export class MarketsHandler {
   }
 
   /**
-   * 格式化涨跌幅文本
+   * Format price change text
    */
   private formatChangeText(change: number): string {
     const sign = change >= 0 ? '+' : '';
@@ -177,7 +177,7 @@ export class MarketsHandler {
   }
 
   /**
-   * 格式化价格显示
+   * Format price display
    */
   private formatPrice(price: number): string {
     if (price >= 1000) {
@@ -195,7 +195,7 @@ export class MarketsHandler {
   }
 
   /**
-   * 健康检查 - 测试市场数据接口是否正常
+   * Health check - test if market data API is working properly
    */
   public async healthCheck(): Promise<boolean> {
     try {
@@ -210,8 +210,8 @@ export class MarketsHandler {
   }
 }
 
-// 导出单例实例
+// Export singleton instance
 export const marketsHandler = new MarketsHandler();
 
-// 默认导出
+// Default export
 export default marketsHandler;
