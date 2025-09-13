@@ -5,7 +5,6 @@ import { cacheService } from '../../services/cache.service';
 import { MessageFormatter } from '../utils/message.formatter';
 import { Validator } from '../utils/validator';
 import { ExtendedContext } from '../index';
-import { getUserAccessToken } from '../../utils/auth';
 import { chartImageService, PnlChartData, PnlDataPoint } from '../../services/chart-image.service';
 
 /**
@@ -196,17 +195,31 @@ export class PnlHandler {
    * 从API获取PNL数据
    */
   private async fetchPnlFromAPI(userId: number, ctx?: ExtendedContext): Promise<PnlResponse> {
-    // 获取用户的access token，支持fallback重新认证
-    const userToken = await this.getUserAccessToken(userId, ctx);
-    
-    if (!userToken) {
-      throw new Error('User not logged in, please use /start command to login first');
-    }
+    // 获取用户完整数据和access token
+    const { getUserDataAndToken } = await import('../../utils/auth');
+    const { userData, accessToken } = await getUserDataAndToken(userId.toString(), {
+      username: ctx?.from?.username,
+      first_name: ctx?.from?.first_name,
+      last_name: ctx?.from?.last_name
+    });
+
+    // 使用内部用户ID调用API
+    const pnlParams = {
+      userId: userData.userId  // 使用内部用户ID而不是Telegram ID
+    };
+
+    logger.info('🚀 PNL API Call:', {
+      endpoint: '/api/tgbot/trading/pnl',
+      telegramId: userId,
+      internalUserId: userData.userId,
+      internalUserIdType: typeof userData.userId,
+      params: pnlParams
+    });
 
     const response = await apiService.getWithAuth<PnlResponse>(
       '/api/tgbot/trading/pnl',
-      userToken,
-      { userId }, // 添加 userId 参数供 isTgBotSimpleAuth 政策使用
+      accessToken,
+      pnlParams,
       { timeout: 15000 } // 增加超时时间，因为数据计算较复杂
     );
 
@@ -408,59 +421,6 @@ export class PnlHandler {
     }
   }
 
-  /**
-   * 获取用户的访问令牌
-   * 支持从缓存获取，如果没有则尝试重新认证并缓存
-   */
-  private async getUserAccessToken(userId: number, ctx?: ExtendedContext): Promise<string | null> {
-    try {
-      // 方案1: 从缓存中获取用户token
-      const tokenKey = `user:token:${userId}`;
-      const result = await cacheService.get<string>(tokenKey);
-      
-      if (result.success && result.data) {
-        logger.debug('AccessToken found in cache', { userId, tokenKey });
-        return result.data;
-      }
-
-      // 方案2: 如果缓存中没有token，尝试通过用户信息重新获取
-      if (ctx && ctx.from) {
-        logger.info('AccessToken not in cache, attempting to re-authenticate', { userId });
-        
-        const userInfo = {
-          username: ctx.from.username,
-          first_name: ctx.from.first_name,
-          last_name: ctx.from.last_name
-        };
-
-        try {
-          const freshToken = await getUserAccessToken(userId.toString(), userInfo);
-          
-          // 将新获取的token缓存起来
-          await this.cacheUserAccessToken(userId, freshToken);
-          
-          logger.info('AccessToken re-authenticated and cached successfully', { userId });
-          return freshToken;
-        } catch (authError) {
-          logger.warn('Failed to re-authenticate user', {
-            userId,
-            error: (authError as Error).message
-          });
-        }
-      }
-
-      // 方案3: 如果所有方法都失败，返回null
-      logger.warn('No access token available for user', { userId });
-      return null;
-
-    } catch (error) {
-      logger.error('Failed to get user access token', { 
-        error: (error as Error).message, 
-        userId 
-      });
-      return null;
-    }
-  }
 
   /**
    * 准备PNL图表数据（使用真实已实现PnL）
@@ -587,36 +547,6 @@ export class PnlHandler {
     };
   }
 
-  /**
-   * 缓存用户的accessToken
-   */
-  private async cacheUserAccessToken(userId: number, accessToken: string): Promise<void> {
-    try {
-      const tokenKey = `user:token:${userId}`;
-      const tokenTTL = 24 * 60 * 60; // 24小时过期
-      
-      const result = await cacheService.set(tokenKey, accessToken, tokenTTL);
-      
-      if (result.success) {
-        logger.debug('AccessToken cached in pnl handler', {
-          userId,
-          tokenKey,
-          expiresIn: tokenTTL
-        });
-      } else {
-        logger.warn('Failed to cache accessToken in pnl handler', {
-          userId,
-          tokenKey,
-          error: result.error
-        });
-      }
-    } catch (error) {
-      logger.error('Error caching accessToken in pnl handler', {
-        userId,
-        error: (error as Error).message
-      });
-    }
-  }
 }
 
 // 导出处理器实例
