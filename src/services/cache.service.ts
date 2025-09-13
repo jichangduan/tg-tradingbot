@@ -22,6 +22,9 @@ export class CacheService {
   private readonly maxReconnectAttempts: number = 5;
   private readonly reconnectDelay: number = 1000;
   private readonly redisEnabled: boolean;
+  
+  // 内存fallback缓存，用于Redis不可用时的备用存储
+  private memoryCache = new Map<string, {value: string, expiry: number}>();
 
   constructor() {
     // Only create Redis client if Redis configuration is provided
@@ -127,36 +130,38 @@ export class CacheService {
    */
   public async set<T>(key: string, value: T, ttlSeconds?: number): Promise<CacheResult<boolean>> {
     try {
-      if (!this.isReady()) {
-        logger.warn('Redis not ready, skipping cache set', { key });
-        return { success: false, error: 'Redis not connected' };
-      }
-
       const serializedValue = JSON.stringify(value);
       
-      if (ttlSeconds && ttlSeconds > 0) {
-        await this.client!.setEx(key, ttlSeconds, serializedValue);
-      } else {
-        await this.client!.set(key, serializedValue);
+      // 优先尝试Redis存储
+      if (this.isReady()) {
+        try {
+          if (ttlSeconds && ttlSeconds > 0) {
+            await this.client!.setEx(key, ttlSeconds, serializedValue);
+          } else {
+            await this.client!.set(key, serializedValue);
+          }
+          logger.logCache('set', key, ttlSeconds);
+          return { success: true, data: true };
+        } catch (redisError) {
+          const errorMessage = (redisError as Error).message;
+          
+          // Redis写入失败，降级到内存存储
+          logger.warn(`Redis set failed, falling back to memory cache for key: ${key}`, { 
+            error: errorMessage 
+          });
+        }
       }
-
-      logger.logCache('set', key, ttlSeconds);
+      
+      // Redis不可用或失败时，使用内存存储
+      const expiry = ttlSeconds ? Date.now() + (ttlSeconds * 1000) : 0;
+      this.memoryCache.set(key, { value: serializedValue, expiry });
+      
+      logger.debug(`Fallback memory cache set for key: ${key}`, { ttlSeconds });
       return { success: true, data: true };
 
     } catch (error) {
       const errorMessage = (error as Error).message;
-      
-      // 特殊处理Redis配置问题（MISCONF错误）
-      if (errorMessage.includes('MISCONF') || errorMessage.includes('stop-writes-on-bgsave-error')) {
-        logger.warn(`🔧 Redis configuration issue detected for key: ${key}`, { 
-          error: errorMessage,
-          suggestion: 'Redis RDB save failed, but application continues normally',
-          impact: 'Cache disabled, core functionality unaffected'
-        });
-        return { success: false, error: 'Redis config issue - cache temporarily disabled' };
-      }
-      
-      logger.error(`Cache set failed for key: ${key}`, { error: errorMessage });
+      logger.error(`Cache set completely failed for key: ${key}`, { error: errorMessage });
       return { success: false, error: errorMessage };
     }
   }
@@ -166,25 +171,43 @@ export class CacheService {
    */
   public async get<T>(key: string): Promise<CacheResult<T>> {
     try {
-      if (!this.isReady()) {
-        logger.logCache('miss', key);
-        return { success: false, error: 'Redis not connected' };
+      // 优先尝试从Redis获取
+      if (this.isReady()) {
+        try {
+          const value = await this.client!.get(key);
+          if (value !== null) {
+            const parsedValue = JSON.parse(value) as T;
+            logger.logCache('hit', key);
+            return { success: true, data: parsedValue };
+          }
+        } catch (redisError) {
+          logger.warn(`Redis get failed, trying memory cache for key: ${key}`, { 
+            error: (redisError as Error).message 
+          });
+        }
       }
-
-      const value = await this.client!.get(key);
       
-      if (value === null) {
-        logger.logCache('miss', key);
-        return { success: false };
+      // Redis不可用或失败时，尝试从内存缓存获取
+      const memoryItem = this.memoryCache.get(key);
+      if (memoryItem) {
+        // 检查是否过期
+        if (memoryItem.expiry > 0 && Date.now() > memoryItem.expiry) {
+          this.memoryCache.delete(key);
+          logger.logCache('miss', key);
+          return { success: false };
+        }
+        
+        const parsedValue = JSON.parse(memoryItem.value) as T;
+        logger.debug(`Fallback memory cache hit for key: ${key}`);
+        return { success: true, data: parsedValue };
       }
 
-      const parsedValue = JSON.parse(value) as T;
-      logger.logCache('hit', key);
-      return { success: true, data: parsedValue };
+      logger.logCache('miss', key);
+      return { success: false };
 
     } catch (error) {
       const errorMessage = (error as Error).message;
-      logger.error(`Cache get failed for key: ${key}`, { error: errorMessage });
+      logger.error(`Cache get completely failed for key: ${key}`, { error: errorMessage });
       return { success: false, error: errorMessage };
     }
   }
@@ -194,28 +217,29 @@ export class CacheService {
    */
   public async delete(key: string): Promise<CacheResult<boolean>> {
     try {
-      if (!this.isReady()) {
-        logger.warn('Redis not ready, skipping cache delete', { key });
-        return { success: false, error: 'Redis not connected' };
+      let redisDeleted = false;
+      
+      // 尝试从Redis删除
+      if (this.isReady()) {
+        try {
+          const result = await this.client!.del(key);
+          redisDeleted = result > 0;
+        } catch (redisError) {
+          logger.warn(`Redis delete failed, will delete from memory cache for key: ${key}`, { 
+            error: (redisError as Error).message 
+          });
+        }
       }
-
-      const result = await this.client!.del(key);
+      
+      // 同时从内存缓存删除
+      const memoryDeleted = this.memoryCache.delete(key);
+      
       logger.logCache('delete', key);
-      return { success: true, data: result > 0 };
+      return { success: true, data: redisDeleted || memoryDeleted };
 
     } catch (error) {
       const errorMessage = (error as Error).message;
-      
-      // 特殊处理Redis配置问题（MISCONF错误）
-      if (errorMessage.includes('MISCONF') || errorMessage.includes('stop-writes-on-bgsave-error')) {
-        logger.warn(`🔧 Redis configuration issue for delete key: ${key}`, { 
-          error: errorMessage,
-          impact: 'Cache delete skipped, operation continues'
-        });
-        return { success: false, error: 'Redis config issue - delete skipped' };
-      }
-      
-      logger.error(`Cache delete failed for key: ${key}`, { error: errorMessage });
+      logger.error(`Cache delete completely failed for key: ${key}`, { error: errorMessage });
       return { success: false, error: errorMessage };
     }
   }
