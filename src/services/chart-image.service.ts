@@ -590,7 +590,12 @@ export class ChartImageService {
             type: 'time',
             time: {
               unit: this.getTimeUnit(config.timeFrame || '1h'),
-              displayFormats: this.getTimeDisplayFormats(config.timeFrame || '1h')
+              displayFormats: this.getTimeDisplayFormats(config.timeFrame || '1h'),
+              // 对1d图表强制使用特定配置确保只显示日/月
+              ...(config.timeFrame === '1d' && {
+                tooltipFormat: 'DD/MM',
+                parser: 'DD/MM'
+              })
               // 移除 stepSize，让Chart.js根据数据点显示时间
             },
             grid: {
@@ -1060,15 +1065,15 @@ export class ChartImageService {
       
       case '1d':
         return {
-          millisecond: 'HH:mm:ss',
-          second: 'HH:mm:ss',
-          minute: 'HH:mm',
+          millisecond: 'DD/MM',
+          second: 'DD/MM',
+          minute: 'DD/MM',
           hour: 'DD/MM',             // 1d图显示: 23/8, 24/8, 25/8
           day: 'DD/MM',              // 日线图显示日/月格式
           week: 'DD/MM',
           month: 'DD/MM',
           quarter: 'DD/MM',
-          year: 'DD/MM'              // 1d图统一显示日/月格式
+          year: 'DD/MM'              // 1d图统一显示日/月格式，强制所有时间级别使用相同格式
         };
       
       default:

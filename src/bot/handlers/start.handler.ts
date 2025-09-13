@@ -373,7 +373,6 @@ Initializing your account and processing invitation rewards...
 • 💼 Wallet management - <code>/wallet</code> | <code>/positions</code>
 • 📊 Market data - <code>/markets</code>
 • 📈 Chart analysis - <code>/chart BTC</code>
-• 💹 Order management - <code>/orders</code>
 
 <b>⚠️ Important Notes:</b>
 • This is <b>AIW3 Trading Bot</b>, not a management tool
