@@ -1,5 +1,5 @@
 import * as cron from 'node-cron';
-import { PushSettings, PushData } from './push.service';
+import { PushSettings, PushData, pushService } from './push.service';
 import { pushMessageFormatterService } from './push-message-formatter.service';
 import { pushDataService } from './push-data.service';
 import { cacheService } from './cache.service';
@@ -7,6 +7,7 @@ import { logger } from '../utils/logger';
 import { PushLogger } from '../utils/push-logger';
 import { pushDeduplicator } from '../utils/push-deduplicator';
 import { telegramBot } from '../bot';
+import { getUserAccessToken } from '../utils/auth';
 
 /**
  * 推送调度服务
@@ -538,69 +539,120 @@ export class PushSchedulerService {
   // ==================== 群组推送功能 ====================
 
   /**
-   * 执行群组推送任务
+   * 获取用户绑定的群组 (与测试推送使用相同逻辑)
+   */
+  private async getUserBoundGroups(userId: string): Promise<string[]> {
+    try {
+      logger.debug(`🔍 [GROUP_UNIFY] Getting bound groups for user ${userId}`);
+      
+      const accessToken = await getUserAccessToken(userId, {
+        username: undefined,
+        first_name: undefined,
+        last_name: undefined
+      });
+
+      const response = await pushService.getUserPushSettings(userId, accessToken);
+      const managedGroups = response.data.user_settings.managed_groups || [];
+      const groupIds = managedGroups.map(group => group.group_id).filter(id => id);
+      
+      logger.debug(`✅ [GROUP_UNIFY] Found ${groupIds.length} bound groups for user ${userId}`, {
+        userId: parseInt(userId),
+        groupCount: groupIds.length,
+        groupIds: groupIds,
+        dataSource: 'api_managed_groups'
+      });
+      
+      return groupIds;
+    } catch (error) {
+      logger.warn(`❌ [GROUP_UNIFY] Failed to get bound groups for user ${userId}`, {
+        userId: parseInt(userId),
+        error: error instanceof Error ? error.message : String(error)
+      });
+      return [];
+    }
+  }
+
+  /**
+   * 执行群组推送任务 (基于用户的managed_groups)
    */
   private async executeGroupPush(executionId: string): Promise<void> {
     try {
-      logger.info(`[${executionId}] Starting group push execution`);
+      logger.info(`🚀 [${executionId}] Starting unified group push execution`);
       
-      const botGroups = await this.getBotGroups();
+      // 获取所有启用推送的用户
+      const enabledUsers = await this.getEnabledPushUsers();
       
-      if (botGroups.length === 0) {
-        logger.info(`[${executionId}] No groups found for bot`);
+      if (enabledUsers.length === 0) {
+        logger.info(`[${executionId}] No users with push enabled`);
         return;
       }
       
-      logger.info(`[${executionId}] Found ${botGroups.length} groups to process`);
-      
+      let totalGroupsProcessed = 0;
       let groupSuccessCount = 0;
       let groupFailureCount = 0;
+      const processedGroups = new Set<string>(); // 防止重复推送
       
-      for (const groupId of botGroups) {
+      logger.info(`📊 [${executionId}] Processing ${enabledUsers.length} enabled users for group push`);
+      
+      for (const user of enabledUsers) {
         try {
-          // 获取群主ID
-          const ownerId = await this.getGroupOwner(groupId);
-          if (!ownerId) {
-            logger.warn(`[${executionId}] No owner found for group ${groupId}`);
+          // 获取用户绑定的群组 (使用与测试推送相同的逻辑)
+          const userBoundGroups = await this.getUserBoundGroups(user.userId);
+          
+          if (userBoundGroups.length === 0) {
+            logger.debug(`[${executionId}] No bound groups for user ${user.userId}`);
             continue;
           }
           
-          // 获取群主的推送设置
-          const ownerSettings = await this.getCachedUserPushSettings(ownerId);
-          if (!ownerSettings) {
-            logger.debug(`[${executionId}] No push settings for group ${groupId} owner ${ownerId}`);
-            continue;
+          logger.info(`🎯 [${executionId}] User ${user.userId} has ${userBoundGroups.length} bound groups`);
+          
+          // 获取用户的推送数据
+          const pushData = await pushDataService.getPushDataForUser(user.userId);
+          
+          // 遍历用户绑定的每个群组
+          for (const groupId of userBoundGroups) {
+            // 避免重复推送 (如果多个用户绑定了同一个群组)
+            if (processedGroups.has(groupId)) {
+              logger.debug(`[${executionId}] Skipping already processed group ${groupId}`);
+              continue;
+            }
+            
+            try {
+              totalGroupsProcessed++;
+              processedGroups.add(groupId);
+              
+              logger.info(`📤 [${executionId}] Sending to group ${groupId} (bound by user ${user.userId})`);
+              
+              // 发送群组推送 (使用绑定用户的设置和数据)
+              await this.sendPushToGroup(groupId, user.settings, pushData, executionId);
+              groupSuccessCount++;
+              
+            } catch (error) {
+              groupFailureCount++;
+              logger.error(`[${executionId}] Failed to send to group ${groupId}`, {
+                groupId,
+                userId: parseInt(user.userId),
+                error: error instanceof Error ? error.message : String(error)
+              });
+            }
           }
-          
-          // 检查群主是否启用了任何推送
-          const hasAnyEnabled = ownerSettings.flash_enabled || 
-                              ownerSettings.whale_enabled || 
-                              ownerSettings.fund_enabled;
-          
-          if (!hasAnyEnabled) {
-            logger.debug(`[${executionId}] Group ${groupId} owner has all push disabled`);
-            continue;
-          }
-          
-          // 获取推送数据
-          const pushData = await pushDataService.getPushDataForUser(ownerId);
-          
-          // 发送群组推送
-          await this.sendPushToGroup(groupId, ownerSettings, pushData, executionId);
-          groupSuccessCount++;
           
         } catch (error) {
-          groupFailureCount++;
-          logger.error(`[${executionId}] Failed to process group ${groupId}`, {
-            error: (error as Error).message
+          logger.error(`[${executionId}] Failed to process user ${user.userId} groups`, {
+            userId: parseInt(user.userId),
+            error: error instanceof Error ? error.message : String(error)
           });
         }
       }
       
-      logger.info(`[${executionId}] Group push execution completed`, {
-        totalGroups: botGroups.length,
+      logger.info(`✅ [${executionId}] Unified group push execution completed`, {
+        enabledUsers: enabledUsers.length,
+        totalGroupsProcessed: totalGroupsProcessed,
+        uniqueGroupsReached: processedGroups.size,
         successCount: groupSuccessCount,
-        failureCount: groupFailureCount
+        failureCount: groupFailureCount,
+        successRate: totalGroupsProcessed > 0 ? Math.round((groupSuccessCount / totalGroupsProcessed) * 100) : 0,
+        dataSource: 'user_managed_groups'
       });
       
     } catch (error) {
@@ -611,39 +663,13 @@ export class PushSchedulerService {
   }
 
   /**
-   * 获取机器人加入的群组列表
+   * @deprecated 不再使用基于Redis缓存的群组管理
+   * 现在使用用户API中的managed_groups来统一群组数据源
+   * 使用getUserBoundGroups()方法替代
    */
   private async getBotGroups(): Promise<string[]> {
-    try {
-      // 检查缓存是否有效
-      const now = Date.now();
-      if (now - this.groupCacheLastUpdate < this.groupCacheTTL && this.botGroupsCache.size > 0) {
-        return Array.from(this.botGroupsCache);
-      }
-      
-      // 注意：Telegram Bot API没有直接获取所有群组的方法
-      // 这里我们需要通过其他方式维护群组列表
-      // 方案1：通过缓存记录bot被添加到的群组
-      // 方案2：在bot启动时通过getUpdates获取最近的群组消息
-      
-      // 临时方案：从Redis缓存中获取已知的群组ID
-      const groupKeys = await cacheService.getKeys('bot_group:*');
-      const groups = groupKeys.map(key => key.replace('bot_group:', ''));
-      
-      // 更新缓存
-      this.botGroupsCache.clear();
-      groups.forEach(groupId => this.botGroupsCache.add(groupId));
-      this.groupCacheLastUpdate = now;
-      
-      logger.debug('Retrieved bot groups from cache', { groupCount: groups.length });
-      return groups;
-      
-    } catch (error) {
-      logger.error('Failed to get bot groups', {
-        error: (error as Error).message
-      });
-      return Array.from(this.botGroupsCache); // 返回缓存的数据
-    }
+    logger.warn('🚨 [DEPRECATED] getBotGroups() is deprecated, use getUserBoundGroups() instead');
+    return [];
   }
 
   /**
@@ -775,39 +801,19 @@ export class PushSchedulerService {
   }
 
   /**
-   * 添加群组到机器人群组列表（供外部调用）
+   * @deprecated 不再使用Redis缓存管理群组
+   * 群组数据现在通过用户API的managed_groups统一管理
    */
   public addBotGroup(groupId: string): void {
-    this.botGroupsCache.add(groupId);
-    
-    // 同时保存到Redis缓存
-    cacheService.set(`bot_group:${groupId}`, { added_at: new Date().toISOString() }, 24 * 60 * 60)
-      .catch(error => {
-        logger.warn('Failed to cache bot group', {
-          groupId,
-          error: (error as Error).message
-        });
-      });
-    
-    logger.debug('Added bot group to tracking', { groupId });
+    logger.warn('🚨 [DEPRECATED] addBotGroup() is deprecated, groups are managed via user API managed_groups');
   }
 
   /**
-   * 从机器人群组列表移除群组（供外部调用）
+   * @deprecated 不再使用Redis缓存管理群组  
+   * 群组数据现在通过用户API的managed_groups统一管理
    */
   public removeBotGroup(groupId: string): void {
-    this.botGroupsCache.delete(groupId);
-    
-    // 同时从Redis移除
-    cacheService.delete(`bot_group:${groupId}`)
-      .catch(error => {
-        logger.warn('Failed to remove bot group from cache', {
-          groupId,
-          error: (error as Error).message
-        });
-      });
-    
-    logger.debug('Removed bot group from tracking', { groupId });
+    logger.warn('🚨 [DEPRECATED] removeBotGroup() is deprecated, groups are managed via user API managed_groups');
   }
 }
 
