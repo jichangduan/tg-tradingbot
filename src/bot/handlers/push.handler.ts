@@ -13,8 +13,63 @@ import { shortHandler } from './short.handler';
 /**
  * Push command handler
  * Handles /push command, manages user's push settings (flash news, whale movements, fund flows)
+ * 
+ * Features:
+ * - Personal push settings management (private chat)
+ * - Group push binding/unbinding (group chat)
+ * - Group creator verification and permission control
+ * - Comprehensive error handling and user feedback
  */
 export class PushHandler {
+  /**
+   * Log group push operation with detailed context
+   */
+  private logGroupPushOperation(
+    operation: 'bind_request' | 'unbind_request' | 'creator_check' | 'api_call' | 'success' | 'error',
+    requestId: string,
+    context: {
+      userId?: string | number;
+      groupId?: string | number;
+      groupName?: string;
+      error?: string;
+      duration?: number;
+      isCreator?: boolean;
+      [key: string]: any;
+    }
+  ): void {
+    const logData = {
+      operation,
+      requestId,
+      timestamp: new Date().toISOString(),
+      userId: typeof context.userId === 'string' ? parseInt(context.userId) : context.userId,
+      groupId: typeof context.groupId === 'string' ? context.groupId : context.groupId?.toString(),
+      groupName: context.groupName,
+      error: context.error,
+      duration: context.duration,
+      isCreator: context.isCreator
+    };
+
+    switch (operation) {
+      case 'bind_request':
+      case 'unbind_request':
+        logger.info(`🔗 Group push ${operation.replace('_request', '')} initiated`, logData);
+        break;
+      case 'creator_check':
+        logger.info(`👑 Group creator verification: ${context.isCreator ? 'PASSED' : 'FAILED'}`, logData);
+        break;
+      case 'api_call':
+        logger.info(`📡 API call for group push operation`, logData);
+        break;
+      case 'success':
+        logger.info(`✅ Group push operation completed successfully`, logData);
+        break;
+      case 'error':
+        logger.error(`❌ Group push operation failed`, logData);
+        break;
+      default:
+        logger.debug(`Group push operation: ${operation}`, logData);
+    }
+  }
   /**
    * Handle /push command
    * @param ctx Telegram context
@@ -25,17 +80,27 @@ export class PushHandler {
     const userId = ctx.from?.id;
     const username = ctx.from?.username || 'unknown';
     const requestId = ctx.requestId || 'unknown';
+    const chatType = ctx.chat?.type;
+    const chatId = ctx.chat?.id;
 
     try {
       logger.logCommand('push', userId!, username, args);
 
-      // Show push settings interface
-      await this.showPushSettings(ctx);
+      // 检查是否在群组中执行
+      if (chatType === 'group' || chatType === 'supergroup') {
+        // 群组环境 - 处理群组推送绑定
+        await this.handleGroupPushCommand(ctx, args);
+      } else {
+        // 私聊环境 - 显示个人推送设置
+        await this.showPushSettings(ctx);
+      }
 
       const duration = Date.now() - startTime;
       logger.info(`Push command completed [${requestId}] - ${duration}ms`, {
         userId,
         username,
+        chatType,
+        chatId,
         duration,
         requestId
       });
@@ -46,10 +111,264 @@ export class PushHandler {
         error: (error as Error).message,
         userId,
         username,
+        chatType,
+        chatId,
         requestId
       });
 
       await this.handleError(ctx, error as Error);
+    }
+  }
+
+  /**
+   * Handle group push command
+   */
+  private async handleGroupPushCommand(ctx: ExtendedContext, args: string[]): Promise<void> {
+    const userId = ctx.from?.id;
+    const chatId = ctx.chat?.id;
+    const chatTitle = (ctx.chat && 'title' in ctx.chat) ? ctx.chat.title || '未命名群组' : '未命名群组';
+    const requestId = ctx.requestId || 'unknown';
+
+    if (!userId || !chatId) {
+      await ctx.reply('❌ 无法获取用户或群组信息');
+      return;
+    }
+
+    try {
+      // 记录群组推送命令接收
+      this.logGroupPushOperation('bind_request', requestId, {
+        userId,
+        groupId: chatId,
+        groupName: chatTitle,
+        args: args.join(' ')
+      });
+
+      // 验证用户是否为群主
+      const isCreator = await this.verifyGroupCreator(ctx, userId, chatId);
+      
+      // 记录权限验证结果
+      this.logGroupPushOperation('creator_check', requestId, {
+        userId,
+        groupId: chatId,
+        groupName: chatTitle,
+        isCreator
+      });
+
+      if (!isCreator) {
+        await ctx.reply(
+          '⚠️ <b>权限不足</b>\n\n' +
+          '只有群主可以设置群组推送功能\n\n' +
+          '💡 如果您是群主，请确认机器人具有读取群组成员权限',
+          { parse_mode: 'HTML' }
+        );
+        return;
+      }
+
+      // 解析命令参数 - 支持 bind/unbind 操作
+      const action = args[0]?.toLowerCase();
+      
+      if (action === 'unbind') {
+        // 记录解绑请求
+        this.logGroupPushOperation('unbind_request', requestId, {
+          userId,
+          groupId: chatId,
+          groupName: chatTitle
+        });
+        
+        // 解绑群组推送
+        await this.unbindGroupPush(ctx, userId.toString(), chatId.toString());
+      } else {
+        // 默认为绑定操作（bind 或无参数）
+        await this.bindGroupPush(ctx, userId.toString(), chatId.toString(), chatTitle);
+      }
+
+    } catch (error) {
+      // 记录错误
+      this.logGroupPushOperation('error', requestId, {
+        userId,
+        groupId: chatId,
+        groupName: chatTitle,
+        error: (error as Error).message
+      });
+
+      await ctx.reply(
+        '❌ 群组推送设置失败\n\n' +
+        '请稍后重试，如果问题持续存在，请联系管理员',
+        { parse_mode: 'HTML' }
+      );
+    }
+  }
+
+  /**
+   * Verify if user is group creator
+   */
+  private async verifyGroupCreator(ctx: ExtendedContext, userId: number, chatId: number): Promise<boolean> {
+    const requestId = ctx.requestId || 'unknown';
+
+    try {
+      logger.debug(`Verifying group creator [${requestId}]`, { userId, chatId, requestId });
+
+      // 获取群组管理员列表
+      const administrators = await ctx.telegram.getChatAdministrators(chatId);
+      
+      // 检查用户是否为群组创建者
+      const isCreator = administrators.some(admin =>
+        admin.status === 'creator' && admin.user.id === userId
+      );
+
+      logger.debug(`Group creator verification result [${requestId}]`, {
+        userId,
+        chatId,
+        isCreator,
+        totalAdmins: administrators.length,
+        requestId
+      });
+
+      return isCreator;
+
+    } catch (error) {
+      logger.error(`Failed to verify group creator [${requestId}]`, {
+        userId,
+        chatId,
+        error: (error as Error).message,
+        requestId
+      });
+
+      // 权限验证失败时，为安全起见返回 false
+      return false;
+    }
+  }
+
+  /**
+   * Bind group push
+   */
+  private async bindGroupPush(ctx: ExtendedContext, userId: string, groupId: string, groupName: string): Promise<void> {
+    const requestId = ctx.requestId || 'unknown';
+
+    try {
+      // 记录开始绑定
+      this.logGroupPushOperation('api_call', requestId, {
+        userId,
+        groupId,
+        groupName,
+        action: 'bind'
+      });
+
+      // 获取用户访问令牌
+      const accessToken = await getUserAccessToken(userId, {
+        username: ctx.from?.username,
+        first_name: ctx.from?.first_name,
+        last_name: ctx.from?.last_name
+      });
+
+      // 调用推送服务绑定群组
+      await pushService.bindGroupPush(userId, accessToken, groupId, groupName);
+
+      // 发送成功消息
+      await ctx.reply(
+        '✅ <b>群组推送绑定成功</b>\n\n' +
+        `📢 群组：<code>${groupName}</code>\n` +
+        `👤 群主：@${ctx.from?.username || ctx.from?.first_name || '未知'}\n\n` +
+        '🔔 后续推送将根据群主的个人推送设置发送到本群\n' +
+        '⚙️ 群主可通过私聊机器人使用 /push 命令调整推送设置\n\n' +
+        '💡 使用 <code>/push unbind</code> 可以解除群组推送绑定',
+        { parse_mode: 'HTML' }
+      );
+
+      // 记录成功绑定
+      this.logGroupPushOperation('success', requestId, {
+        userId,
+        groupId,
+        groupName,
+        action: 'bind'
+      });
+
+    } catch (error) {
+      // 记录绑定失败
+      this.logGroupPushOperation('error', requestId, {
+        userId,
+        groupId,
+        groupName,
+        action: 'bind',
+        error: (error as Error).message
+      });
+
+      // 根据错误类型提供不同提示
+      let errorMessage = '❌ 群组推送绑定失败\n\n';
+      
+      if ((error as Error).message.includes('token')) {
+        errorMessage += '🔐 用户认证失败，请先私聊机器人发送 /start 进行初始化\n\n';
+      } else if ((error as Error).message.includes('403')) {
+        errorMessage += '🚫 权限不足，请确认您已完成用户初始化\n\n';
+      } else {
+        errorMessage += '⚠️ 系统暂时繁忙，请稍后重试\n\n';
+      }
+      
+      errorMessage += '💡 如需帮助，请联系管理员';
+
+      await ctx.reply(errorMessage, { parse_mode: 'HTML' });
+    }
+  }
+
+  /**
+   * Unbind group push
+   */
+  private async unbindGroupPush(ctx: ExtendedContext, userId: string, groupId: string): Promise<void> {
+    const requestId = ctx.requestId || 'unknown';
+    const groupName = (ctx.chat && 'title' in ctx.chat) ? ctx.chat.title || '未知群组' : '未知群组';
+
+    try {
+      // 记录开始解绑
+      this.logGroupPushOperation('api_call', requestId, {
+        userId,
+        groupId,
+        groupName,
+        action: 'unbind'
+      });
+
+      // 获取用户访问令牌
+      const accessToken = await getUserAccessToken(userId, {
+        username: ctx.from?.username,
+        first_name: ctx.from?.first_name,
+        last_name: ctx.from?.last_name
+      });
+
+      // 调用推送服务解绑群组
+      await pushService.unbindGroupPush(userId, accessToken, groupId);
+
+      // 发送成功消息
+      await ctx.reply(
+        '✅ <b>群组推送解绑成功</b>\n\n' +
+        `📢 群组：<code>${groupName}</code>\n` +
+        `👤 群主：@${ctx.from?.username || ctx.from?.first_name || '未知'}\n\n` +
+        '🔕 本群将不再接收推送通知\n\n' +
+        '💡 使用 <code>/push</code> 可以重新绑定群组推送',
+        { parse_mode: 'HTML' }
+      );
+
+      // 记录成功解绑
+      this.logGroupPushOperation('success', requestId, {
+        userId,
+        groupId,
+        groupName,
+        action: 'unbind'
+      });
+
+    } catch (error) {
+      // 记录解绑失败
+      this.logGroupPushOperation('error', requestId, {
+        userId,
+        groupId,
+        groupName,
+        action: 'unbind',
+        error: (error as Error).message
+      });
+
+      await ctx.reply(
+        '❌ 群组推送解绑失败\n\n' +
+        '请稍后重试，如果问题持续存在，请联系管理员',
+        { parse_mode: 'HTML' }
+      );
     }
   }
 

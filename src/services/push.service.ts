@@ -82,6 +82,15 @@ export interface PushSettingsUpdateRequest {
 }
 
 /**
+ * 群组推送绑定请求
+ */
+export interface GroupPushBindRequest {
+  group_action: 'bind' | 'unbind';
+  group_id: string;
+  group_name?: string;
+}
+
+/**
  * 推送服务类
  * 负责推送设置的管理和推送数据的获取
  */
@@ -298,6 +307,151 @@ export class PushService {
     const cacheKey = `${this.cacheKeyPrefix}:${userId}`;
     await cacheService.delete(cacheKey);
     logger.debug('Cleared push settings cache', { userId: parseInt(userId || '0') });
+  }
+
+  /**
+   * 绑定群组推送
+   */
+  public async bindGroupPush(
+    userId: string,
+    accessToken: string,
+    groupId: string,
+    groupName?: string
+  ): Promise<PushSettingsResponse> {
+    const startTime = Date.now();
+
+    try {
+      logger.info('Binding group push', {
+        userId: parseInt(userId || '0'),
+        groupId,
+        groupName
+      });
+
+      const requestData: GroupPushBindRequest = {
+        group_action: 'bind',
+        group_id: groupId,
+        group_name: groupName
+      };
+
+      // 调用后端API绑定群组
+      const response = await apiService.postWithAuth<PushSettingsResponse>(
+        '/api/user/push-settings',
+        accessToken,
+        requestData,
+        {
+          timeout: 10000,
+          retry: 1
+        }
+      );
+
+      // 验证响应格式
+      if (!response.data?.user_settings) {
+        throw new ApiError('Invalid API response format', 500, 'INVALID_RESPONSE');
+      }
+
+      const duration = Date.now() - startTime;
+      logger.info('Group push bound successfully', {
+        userId: parseInt(userId || '0'),
+        groupId,
+        groupName,
+        duration
+      });
+
+      return response;
+
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.error('Failed to bind group push', {
+        userId: parseInt(userId || '0'),
+        groupId,
+        groupName,
+        duration,
+        error: (error as Error).message
+      });
+
+      // 如果是API错误，重新抛出
+      if (error instanceof ApiError) {
+        throw error;
+      }
+
+      // 其他错误转换为API错误
+      throw new ApiError(
+        '绑定群组推送失败，请稍后重试',
+        500,
+        'BIND_GROUP_ERROR',
+        error
+      );
+    }
+  }
+
+  /**
+   * 解绑群组推送
+   */
+  public async unbindGroupPush(
+    userId: string,
+    accessToken: string,
+    groupId: string
+  ): Promise<PushSettingsResponse> {
+    const startTime = Date.now();
+
+    try {
+      logger.info('Unbinding group push', {
+        userId: parseInt(userId || '0'),
+        groupId
+      });
+
+      const requestData: GroupPushBindRequest = {
+        group_action: 'unbind',
+        group_id: groupId
+      };
+
+      // 调用后端API解绑群组
+      const response = await apiService.postWithAuth<PushSettingsResponse>(
+        '/api/user/push-settings',
+        accessToken,
+        requestData,
+        {
+          timeout: 10000,
+          retry: 1
+        }
+      );
+
+      // 验证响应格式
+      if (!response.data?.user_settings) {
+        throw new ApiError('Invalid API response format', 500, 'INVALID_RESPONSE');
+      }
+
+      const duration = Date.now() - startTime;
+      logger.info('Group push unbound successfully', {
+        userId: parseInt(userId || '0'),
+        groupId,
+        duration
+      });
+
+      return response;
+
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.error('Failed to unbind group push', {
+        userId: parseInt(userId || '0'),
+        groupId,
+        duration,
+        error: (error as Error).message
+      });
+
+      // 如果是API错误，重新抛出
+      if (error instanceof ApiError) {
+        throw error;
+      }
+
+      // 其他错误转换为API错误
+      throw new ApiError(
+        '解绑群组推送失败，请稍后重试',
+        500,
+        'UNBIND_GROUP_ERROR',
+        error
+      );
+    }
   }
 
   /**
