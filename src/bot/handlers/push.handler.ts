@@ -517,6 +517,12 @@ export class PushHandler {
     const requestId = ctx.requestId || 'unknown';
 
     try {
+      // 生成测试消息
+      const testMessage = this.generateTestPushMessage(type);
+      
+      // 先获取绑定的群组以便日志记录
+      const boundGroups = await this.getBoundGroups(userId);
+      
       // 记录测试推送开始
       this.logGroupPushOperation('test_push_initiated', requestId, {
         userId,
@@ -525,9 +531,6 @@ export class PushHandler {
         privateChat: true,
         groupCount: boundGroups.length
       });
-
-      // 生成测试消息
-      const testMessage = this.generateTestPushMessage(type);
       
       // 1. 发送到私聊（当前对话）
       await ctx.reply(testMessage.content, { parse_mode: 'HTML' });
@@ -541,7 +544,6 @@ export class PushHandler {
         privateMessageSent: true
       });
 
-      const boundGroups = await this.getBoundGroups(userId);
       let groupResults = { success: 0, failed: 0, errors: [] as string[] };
       
       logger.info('📊 [PUSH_PREP] Group binding check completed', {
@@ -635,7 +637,7 @@ export class PushHandler {
         userId,
         pushType: type,
         privateChat: true,
-        groupCount: boundGroups?.length || 0,
+        groupCount: 0, // 错误情况下群组数量未知
         error: (error as Error).message
       });
 
@@ -790,7 +792,7 @@ export class PushHandler {
         logger.info('✅ [GROUP_FETCH] Successfully retrieved bound groups', {
           userId: parseInt(userId),
           groupCount: groupIds.length,
-          duration: `${duration}ms`,
+          duration: duration,
           groups: managedGroups.map(g => ({ 
             id: g.group_id, 
             name: g.group_name,
@@ -803,7 +805,7 @@ export class PushHandler {
       } else {
         logger.info('⚪ [GROUP_FETCH] No bound groups found for user', {
           userId: parseInt(userId),
-          duration: `${duration}ms`,
+          duration: duration,
           requestId,
           reason: 'managed_groups_empty_or_missing',
           apiResponseReceived: !!response.data.user_settings
@@ -816,9 +818,9 @@ export class PushHandler {
       const duration = Date.now() - startTime;
       logger.error('❌ [GROUP_FETCH] Failed to retrieve bound groups', {
         userId: parseInt(userId),
-        duration: `${duration}ms`,
-        error: (error as Error).message,
-        errorType: error.constructor.name,
+        duration: duration,
+        error: error instanceof Error ? error.message : String(error),
+        errorType: error instanceof Error ? error.constructor.name : typeof error,
         requestId,
         fallback: 'returning_empty_array'
       });
@@ -895,7 +897,7 @@ export class PushHandler {
         });
 
         // Send message to group
-        const telegramResponse = await bot.telegram.sendMessage(groupId, groupMessage, { 
+        const telegramResponse = await bot.telegram.sendMessage(parseInt(groupId), groupMessage, { 
           parse_mode: 'HTML' 
         });
 
@@ -906,7 +908,7 @@ export class PushHandler {
           groupId,
           requestId,
           sequence: `${i + 1}/${groupIds.length}`,
-          duration: `${groupDuration}ms`,
+          duration: groupDuration,
           messageId: telegramResponse.message_id,
           deliveryStatus: 'success',
           telegramResponse: {
@@ -928,7 +930,7 @@ export class PushHandler {
       } catch (error) {
         const groupDuration = Date.now() - groupStartTime;
         results.failed++;
-        const errorMessage = (error as Error).message;
+        const errorMessage = error instanceof Error ? error.message : String(error);
         results.errors.push(`Group ${groupId}: ${errorMessage}`);
         
         logger.error(`❌ [TG_SEND] Failed to deliver message to group`, {
@@ -936,10 +938,10 @@ export class PushHandler {
           error: errorMessage,
           requestId,
           sequence: `${i + 1}/${groupIds.length}`,
-          duration: `${groupDuration}ms`,
+          duration: groupDuration,
           deliveryStatus: 'failed',
-          errorType: error.constructor.name,
-          errorStack: (error as Error).stack?.split('\n').slice(0, 3).join('\n'),
+          errorType: error instanceof Error ? error.constructor.name : typeof error,
+          errorStack: error instanceof Error ? error.stack?.split('\n').slice(0, 3).join('\n') : undefined,
           telegramErrorDetails: {
             message: errorMessage,
             possibleCauses: [
