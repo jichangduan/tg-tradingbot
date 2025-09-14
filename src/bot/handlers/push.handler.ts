@@ -111,13 +111,33 @@ export class PushHandler {
         logger.error(`❌ Group push operation failed`, logData);
         break;
       case 'test_push_initiated':
-        logger.info(`🧪 Test push message initiated for ${context.pushType}`, logData);
+        logger.info(`🧪 [TEST_PUSH] Test push initiated for ${context.pushType}`, {
+          ...logData,
+          pushType: context.pushType,
+          privateChat: context.privateChat,
+          groupCount: context.groupCount || 0,
+          actionType: 'test_push_start'
+        });
         break;
       case 'test_push_sent':
-        logger.info(`🧪✅ Test push message sent successfully`, logData);
+        logger.info(`🧪✅ [TEST_PUSH] Test push completed successfully`, {
+          ...logData,
+          pushType: context.pushType,
+          privateChat: context.privateChat,
+          groupCount: context.groupCount || 0,
+          successRate: context.success ? '100%' : 'partial',
+          actionType: 'test_push_complete'
+        });
         break;
       case 'test_push_error':
-        logger.error(`🧪❌ Test push message failed`, logData);
+        logger.error(`🧪❌ [TEST_PUSH] Test push failed`, {
+          ...logData,
+          pushType: context.pushType,
+          privateChat: context.privateChat,
+          groupCount: context.groupCount || 0,
+          errorCategory: 'test_push_failure',
+          actionType: 'test_push_error'
+        });
         break;
       default:
         logger.debug(`Group push operation: ${operation}`, logData);
@@ -501,7 +521,9 @@ export class PushHandler {
       this.logGroupPushOperation('test_push_initiated', requestId, {
         userId,
         pushType: type,
-        action: 'send_test_message'
+        action: 'send_test_message',
+        privateChat: true,
+        groupCount: boundGroups.length
       });
 
       // 生成测试消息
@@ -511,17 +533,82 @@ export class PushHandler {
       await ctx.reply(testMessage.content, { parse_mode: 'HTML' });
 
       // 2. 检查是否有绑定的群组并发送
+      logger.info('🎯 [PUSH_PREP] Starting group push preparation', {
+        userId: parseInt(userId),
+        requestId,
+        testMessageGenerated: !!testMessage,
+        testMessageLength: testMessage?.content?.length || 0,
+        privateMessageSent: true
+      });
+
       const boundGroups = await this.getBoundGroups(userId);
       let groupResults = { success: 0, failed: 0, errors: [] as string[] };
       
+      logger.info('📊 [PUSH_PREP] Group binding check completed', {
+        userId: parseInt(userId),
+        requestId,
+        boundGroupsCount: boundGroups.length,
+        boundGroups: boundGroups,
+        willSendToGroups: boundGroups.length > 0
+      });
+      
       if (boundGroups.length > 0) {
-        logger.info(`Sending test message to ${boundGroups.length} bound groups`, {
+        logger.info(`🚀 [PUSH_PREP] Initiating group push to ${boundGroups.length} bound groups`, {
           userId: parseInt(userId),
           groupCount: boundGroups.length,
-          requestId
+          requestId,
+          targetGroups: boundGroups,
+          messageContent: testMessage.content.substring(0, 100) + '...'
         });
         
         groupResults = await this.sendToGroups(boundGroups, testMessage, requestId);
+        
+        logger.info('📈 [PUSH_PREP] Group push execution completed', {
+          userId: parseInt(userId),
+          requestId,
+          totalGroups: boundGroups.length,
+          successfulSends: groupResults.success,
+          failedSends: groupResults.failed,
+          errors: groupResults.errors
+        });
+
+        // 诊断日志：Telegram发送阶段
+        this.logComprehensiveDiagnosis('telegram_send', {
+          userId,
+          requestId,
+          success: groupResults.success > 0,
+          details: {
+            totalAttempts: boundGroups.length,
+            successfulDeliveries: groupResults.success,
+            failedDeliveries: groupResults.failed,
+            successRate: boundGroups.length > 0 ? Math.round((groupResults.success / boundGroups.length) * 100) : 0,
+            errors: groupResults.errors,
+            privateMessageSent: true,
+            groupMessagesSent: groupResults.success > 0
+          },
+          error: groupResults.failed > 0 ? groupResults.errors.join('; ') : undefined
+        });
+      } else {
+        logger.warn('⚠️ [PUSH_PREP] No bound groups found - skipping group push', {
+          userId: parseInt(userId),
+          requestId,
+          reason: 'no_bound_groups',
+          onlyPrivateMessageSent: true
+        });
+
+        // 诊断日志：推送准备阶段（无群组情况）
+        this.logComprehensiveDiagnosis('push_preparation', {
+          userId,
+          requestId,
+          success: false, // 从功能角度看，没有群组意味着群组推送失败
+          details: {
+            boundGroupsCount: 0,
+            privateMessageSent: true,
+            groupMessagesSent: false,
+            reason: 'no_bound_groups_available'
+          },
+          error: 'No bound groups found for user'
+        });
       }
 
       // 记录测试推送成功
@@ -532,7 +619,7 @@ export class PushHandler {
         groupCount: boundGroups.length,
         groupSuccess: groupResults.success,
         groupFailed: groupResults.failed,
-        success: true
+        success: groupResults.success > 0 && groupResults.failed === 0
       });
 
       logger.info(`Test push message sent successfully [${requestId}]`, {
@@ -547,6 +634,8 @@ export class PushHandler {
       this.logGroupPushOperation('test_push_error', requestId, {
         userId,
         pushType: type,
+        privateChat: true,
+        groupCount: boundGroups?.length || 0,
         error: (error as Error).message
       });
 
@@ -575,24 +664,163 @@ export class PushHandler {
   }
 
   /**
-   * Get bound groups for a user (placeholder implementation)
+   * Diagnostic method to log comprehensive analysis
+   */
+  private logComprehensiveDiagnosis(
+    stage: 'api_response' | 'data_extraction' | 'push_preparation' | 'telegram_send',
+    context: {
+      userId: string;
+      requestId: string;
+      success: boolean;
+      details: any;
+      error?: string;
+    }
+  ): void {
+    const logData = {
+      stage,
+      timestamp: new Date().toISOString(),
+      userId: parseInt(context.userId),
+      requestId: context.requestId,
+      success: context.success,
+      details: context.details,
+      error: context.error
+    };
+
+    const stageEmojis = {
+      api_response: '🌐',
+      data_extraction: '📊', 
+      push_preparation: '🎯',
+      telegram_send: '📤'
+    };
+
+    if (context.success) {
+      logger.info(`${stageEmojis[stage]} [DIAGNOSIS] ${stage.toUpperCase()} stage completed successfully`, logData);
+    } else {
+      logger.error(`${stageEmojis[stage]} [DIAGNOSIS] ${stage.toUpperCase()} stage failed`, logData);
+    }
+  }
+
+  /**
+   * Get bound groups for a user
    */
   private async getBoundGroups(userId: string): Promise<string[]> {
-    // TODO: This should call an API to get bound groups for the user
-    // For now, return empty array as we don't have the backend implementation yet
+    const requestId = 'getBoundGroups_' + Date.now();
+    const startTime = Date.now();
     
     try {
-      // Placeholder: In future this would call something like:
-      // const response = await apiService.getWithAuth('/api/user/bound-groups', accessToken, {userId});
-      // return response.data.groups.map(g => g.groupId);
+      logger.info('🔍 [GROUP_FETCH] Starting to fetch bound groups for user', { 
+        userId: parseInt(userId),
+        requestId,
+        timestamp: new Date().toISOString()
+      });
+
+      // Get access token for API call
+      const accessToken = await getUserAccessToken(userId, {
+        username: undefined,
+        first_name: undefined,
+        last_name: undefined
+      });
+
+      // Get user push settings which includes managed_groups
+      const response = await pushService.getUserPushSettings(userId, accessToken);
       
-      logger.debug('Getting bound groups for user', { userId: parseInt(userId) });
-      return []; // Return empty array for now
+      // 详细记录API响应数据结构
+      logger.info('📊 [DATA_EXTRACT] API response structure analysis', {
+        userId: parseInt(userId),
+        requestId,
+        responseValid: !!response,
+        dataValid: !!response.data,
+        userSettingsValid: !!response.data?.user_settings,
+        managedGroupsField: response.data?.user_settings?.managed_groups !== undefined ? 'exists' : 'missing'
+      });
+
+      // Extract group IDs from managed_groups
+      const managedGroups = response.data.user_settings.managed_groups || [];
+      
+      // 详细记录数据提取过程
+      logger.info('🔧 [DATA_EXTRACT] Extracting group IDs from managed_groups', {
+        userId: parseInt(userId),
+        requestId,
+        originalManagedGroups: managedGroups,
+        managedGroupsType: Array.isArray(managedGroups) ? 'array' : typeof managedGroups,
+        managedGroupsLength: Array.isArray(managedGroups) ? managedGroups.length : 'not_array',
+        rawData: JSON.stringify(managedGroups).substring(0, 300)
+      });
+
+      const groupIds = managedGroups.map((group, index) => {
+        const groupId = group?.group_id;
+        logger.debug(`🔍 [DATA_EXTRACT] Processing group ${index}`, {
+          userId: parseInt(userId),
+          requestId,
+          index,
+          group,
+          extractedGroupId: groupId,
+          groupIdType: typeof groupId,
+          groupIdValid: !!groupId
+        });
+        return groupId;
+      }).filter(id => id); // 过滤掉空值
+
+      logger.info('📋 [DATA_EXTRACT] Group ID extraction completed', {
+        userId: parseInt(userId),
+        requestId,
+        originalGroupsCount: managedGroups.length,
+        extractedGroupsCount: groupIds.length,
+        extractedGroupIds: groupIds,
+        extractionSuccess: groupIds.length > 0
+      });
+
+      // 诊断日志：数据提取阶段
+      this.logComprehensiveDiagnosis('data_extraction', {
+        userId,
+        requestId,
+        success: groupIds.length > 0,
+        details: {
+          managedGroupsFromAPI: managedGroups.length,
+          extractedValidGroupIds: groupIds.length,
+          extractedGroupIds: groupIds,
+          apiResponseStructureValid: !!response.data?.user_settings,
+          managedGroupsFieldExists: response.data?.user_settings?.managed_groups !== undefined
+        }
+      });
+      
+      const duration = Date.now() - startTime;
+      
+      if (groupIds.length > 0) {
+        logger.info('✅ [GROUP_FETCH] Successfully retrieved bound groups', {
+          userId: parseInt(userId),
+          groupCount: groupIds.length,
+          duration: `${duration}ms`,
+          groups: managedGroups.map(g => ({ 
+            id: g.group_id, 
+            name: g.group_name,
+            bound_at: g.bound_at,
+            boundDaysAgo: Math.floor((Date.now() - new Date(g.bound_at).getTime()) / (1000 * 60 * 60 * 24))
+          })),
+          requestId,
+          dataSource: 'api_response.managed_groups'
+        });
+      } else {
+        logger.info('⚪ [GROUP_FETCH] No bound groups found for user', {
+          userId: parseInt(userId),
+          duration: `${duration}ms`,
+          requestId,
+          reason: 'managed_groups_empty_or_missing',
+          apiResponseReceived: !!response.data.user_settings
+        });
+      }
+
+      return groupIds;
       
     } catch (error) {
-      logger.warn('Failed to get bound groups', {
+      const duration = Date.now() - startTime;
+      logger.error('❌ [GROUP_FETCH] Failed to retrieve bound groups', {
         userId: parseInt(userId),
-        error: (error as Error).message
+        duration: `${duration}ms`,
+        error: (error as Error).message,
+        errorType: error.constructor.name,
+        requestId,
+        fallback: 'returning_empty_array'
       });
       return [];
     }
@@ -606,10 +834,19 @@ export class PushHandler {
     message: { content: string; symbol?: string },
     requestId: string = 'unknown'
   ): Promise<{ success: number; failed: number; errors: string[] }> {
+    const startTime = Date.now();
     const results = { success: 0, failed: 0, errors: [] as string[] };
     
+    logger.info(`🎯 [GROUP_PUSH] Starting test push to groups`, {
+      groupCount: groupIds.length,
+      requestId,
+      messageType: message.symbol ? `${message.symbol} push` : 'generic push',
+      contentLength: message.content.length,
+      timestamp: new Date().toISOString()
+    });
+    
     if (groupIds.length === 0) {
-      logger.debug('No groups to send to', { requestId });
+      logger.warn('⚠️ [GROUP_PUSH] No bound groups found for test push', { requestId });
       return results;
     }
 
@@ -617,40 +854,115 @@ export class PushHandler {
     const { telegramBot } = await import('../index');
     const bot = telegramBot.getBot();
 
-    for (const groupId of groupIds) {
+    logger.info('🤖 [TG_SEND] Telegram Bot instance check', {
+      requestId,
+      botAvailable: !!bot,
+      botType: bot?.constructor?.name || 'unknown'
+    });
+
+    if (!bot) {
+      logger.error('❌ [TG_SEND] Telegram Bot instance not available', { requestId });
+      throw new Error('Telegram Bot instance not available');
+    }
+
+    for (let i = 0; i < groupIds.length; i++) {
+      const groupId = groupIds[i];
+      const groupStartTime = Date.now();
+      
       try {
-        logger.debug(`Sending test message to group ${groupId}`, { 
+        logger.info(`📤 [TG_SEND] Preparing to send to group ${i + 1}/${groupIds.length}`, { 
           groupId, 
           requestId,
-          contentLength: message.content.length 
+          contentLength: message.content.length,
+          sequence: `${i + 1}/${groupIds.length}`,
+          groupIdType: typeof groupId,
+          groupIdValid: !!groupId
         });
 
         // Add group push identifier to message
         const groupMessage = message.content + '\n\n📢 <i>群组推送测试</i>';
 
+        // 记录即将发送的完整参数
+        logger.info('📋 [TG_SEND] Telegram API call parameters', {
+          groupId,
+          requestId,
+          sequence: `${i + 1}/${groupIds.length}`,
+          chatId: groupId,
+          chatIdParsed: parseInt(groupId),
+          messageLength: groupMessage.length,
+          parseMode: 'HTML',
+          messageSample: groupMessage.substring(0, 100) + '...'
+        });
+
         // Send message to group
-        await bot.telegram.sendMessage(groupId, groupMessage, { 
+        const telegramResponse = await bot.telegram.sendMessage(groupId, groupMessage, { 
           parse_mode: 'HTML' 
         });
 
+        const groupDuration = Date.now() - groupStartTime;
         results.success++;
-        logger.info(`✅ Test message sent to group successfully`, {
+        
+        logger.info(`✅ [TG_SEND] Message delivered to group successfully`, {
           groupId,
-          requestId
+          requestId,
+          sequence: `${i + 1}/${groupIds.length}`,
+          duration: `${groupDuration}ms`,
+          messageId: telegramResponse.message_id,
+          deliveryStatus: 'success',
+          telegramResponse: {
+            messageId: telegramResponse.message_id,
+            date: telegramResponse.date,
+            chat: {
+              id: telegramResponse.chat.id,
+              type: telegramResponse.chat.type
+            }
+          }
         });
 
+        // Add small delay between group messages to avoid rate limits
+        if (i < groupIds.length - 1) {
+          logger.debug('⏱️ [TG_SEND] Rate limit delay', { requestId, delay: '100ms' });
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+
       } catch (error) {
+        const groupDuration = Date.now() - groupStartTime;
         results.failed++;
         const errorMessage = (error as Error).message;
         results.errors.push(`Group ${groupId}: ${errorMessage}`);
         
-        logger.error(`❌ Failed to send test message to group`, {
+        logger.error(`❌ [TG_SEND] Failed to deliver message to group`, {
           groupId,
           error: errorMessage,
-          requestId
+          requestId,
+          sequence: `${i + 1}/${groupIds.length}`,
+          duration: `${groupDuration}ms`,
+          deliveryStatus: 'failed',
+          errorType: error.constructor.name,
+          errorStack: (error as Error).stack?.split('\n').slice(0, 3).join('\n'),
+          telegramErrorDetails: {
+            message: errorMessage,
+            possibleCauses: [
+              'Bot not added to group',
+              'Bot lacks send message permission',
+              'Group ID format incorrect',
+              'Group has been deleted or archived'
+            ]
+          }
         });
       }
     }
+
+    const totalDuration = Date.now() - startTime;
+    logger.info(`📊 [GROUP_PUSH] Test push batch completed`, {
+      requestId,
+      totalDuration: `${totalDuration}ms`,
+      totalGroups: groupIds.length,
+      successCount: results.success,
+      failedCount: results.failed,
+      successRate: groupIds.length > 0 ? `${Math.round((results.success / groupIds.length) * 100)}%` : 'N/A',
+      avgTimePerGroup: groupIds.length > 0 ? `${Math.round(totalDuration / groupIds.length)}ms` : 'N/A'
+    });
 
     return results;
   }

@@ -4,12 +4,22 @@ import { logger } from '../utils/logger';
 import { ApiError } from './api.service';
 
 /**
+ * 管理的群组信息接口
+ */
+export interface ManagedGroup {
+  group_id: string;
+  group_name: string;
+  bound_at: string;
+}
+
+/**
  * 推送设置接口
  */
 export interface PushSettings {
   flash_enabled: boolean;   // 快讯推送
   whale_enabled: boolean;   // 鲸鱼动向推送  
   fund_enabled: boolean;    // 资金流向推送
+  managed_groups?: ManagedGroup[]; // 绑定的群组列表
 }
 
 /**
@@ -118,7 +128,12 @@ export class PushService {
       }
 
       // 调用后端API获取推送设置
-      logger.info('Fetching push settings from API', { userId: parseInt(userId || '0') });
+      logger.info('🌐 [API_RAW] Fetching push settings from API', { 
+        userId: parseInt(userId || '0'),
+        endpoint: '/api/user/push-settings',
+        timeout: 10000,
+        retry: 2
+      });
       
       const response = await apiService.getWithAuth<PushSettingsResponse>(
         '/api/user/push-settings',
@@ -130,20 +145,57 @@ export class PushService {
         }
       );
 
+      // API响应数据验证和详细日志
+      logger.info('📥 [API_RAW] Raw API response received', {
+        userId: parseInt(userId || '0'),
+        responseStructure: {
+          hasData: !!response.data,
+          hasUserSettings: !!response.data?.user_settings,
+          hasPushData: !!response.data?.push_data,
+          hasCacheInfo: !!response.data?.cache_info,
+          code: response.code,
+          message: response.message?.substring(0, 100) || 'no_message'
+        }
+      });
+
       // 验证响应格式
       if (!response.data?.user_settings) {
+        logger.error('❌ [API_RAW] Invalid API response format', {
+          userId: parseInt(userId || '0'),
+          responseData: response.data ? 'exists_but_no_user_settings' : 'no_data_field',
+          fullResponse: JSON.stringify(response).substring(0, 500)
+        });
         throw new ApiError('Invalid API response format', 500, 'INVALID_RESPONSE');
       }
+
+      // 详细记录 managed_groups 数据
+      const managedGroups = response.data.user_settings.managed_groups;
+      logger.info('🔍 [API_RAW] Managed groups data extracted', {
+        userId: parseInt(userId || '0'),
+        managedGroupsExists: !!managedGroups,
+        managedGroupsType: Array.isArray(managedGroups) ? 'array' : typeof managedGroups,
+        managedGroupsLength: Array.isArray(managedGroups) ? managedGroups.length : 'not_array',
+        managedGroupsContent: Array.isArray(managedGroups) ? managedGroups.map(g => ({
+          group_id: g?.group_id || 'missing',
+          group_name: g?.group_name || 'missing',
+          bound_at: g?.bound_at || 'missing'
+        })) : managedGroups
+      });
 
       // 缓存结果
       await cacheService.set(cacheKey, response, this.cacheTTL);
 
       const duration = Date.now() - startTime;
-      logger.info('Push settings retrieved successfully', {
+      logger.info('✅ [API_RAW] Push settings retrieved successfully', {
         userId: parseInt(userId || '0'),
         duration,
         source: 'api',
-        settings: response.data.user_settings
+        settings: {
+          flash_enabled: response.data.user_settings.flash_enabled,
+          whale_enabled: response.data.user_settings.whale_enabled,
+          fund_enabled: response.data.user_settings.fund_enabled,
+          managed_groups_count: Array.isArray(managedGroups) ? managedGroups.length : 0
+        }
       });
 
       return response;
