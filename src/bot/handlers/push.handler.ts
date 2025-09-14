@@ -21,11 +21,50 @@ import { shortHandler } from './short.handler';
  * - Comprehensive error handling and user feedback
  */
 export class PushHandler {
+  // Rate limiting for test push messages
+  private lastTestPushTime = new Map<string, number>();
+  private readonly TEST_PUSH_COOLDOWN = 3000; // 3 seconds cooldown
+
+  /**
+   * Check if user can send test push (rate limiting)
+   */
+  private canSendTestPush(userId: string): { allowed: boolean; remainingTime?: number } {
+    const lastTime = this.lastTestPushTime.get(userId);
+    const now = Date.now();
+    
+    if (!lastTime) {
+      return { allowed: true };
+    }
+    
+    const elapsed = now - lastTime;
+    if (elapsed >= this.TEST_PUSH_COOLDOWN) {
+      return { allowed: true };
+    }
+    
+    const remaining = Math.ceil((this.TEST_PUSH_COOLDOWN - elapsed) / 1000);
+    return { allowed: false, remainingTime: remaining };
+  }
+
+  /**
+   * Record test push attempt
+   */
+  private recordTestPushAttempt(userId: string): void {
+    this.lastTestPushTime.set(userId, Date.now());
+    
+    // Clean up old entries (older than 5 minutes) to prevent memory leak
+    const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
+    for (const [id, time] of this.lastTestPushTime.entries()) {
+      if (time < fiveMinutesAgo) {
+        this.lastTestPushTime.delete(id);
+      }
+    }
+  }
+
   /**
    * Log group push operation with detailed context
    */
   private logGroupPushOperation(
-    operation: 'bind_request' | 'unbind_request' | 'creator_check' | 'api_call' | 'success' | 'error',
+    operation: 'bind_request' | 'unbind_request' | 'creator_check' | 'api_call' | 'success' | 'error' | 'test_push_initiated' | 'test_push_sent' | 'test_push_error',
     requestId: string,
     context: {
       userId?: string | number;
@@ -34,6 +73,11 @@ export class PushHandler {
       error?: string;
       duration?: number;
       isCreator?: boolean;
+      pushType?: string;
+      action?: string;
+      privateChat?: boolean;
+      groupCount?: number;
+      success?: boolean;
       [key: string]: any;
     }
   ): void {
@@ -65,6 +109,15 @@ export class PushHandler {
         break;
       case 'error':
         logger.error(`❌ Group push operation failed`, logData);
+        break;
+      case 'test_push_initiated':
+        logger.info(`🧪 Test push message initiated for ${context.pushType}`, logData);
+        break;
+      case 'test_push_sent':
+        logger.info(`🧪✅ Test push message sent successfully`, logData);
+        break;
+      case 'test_push_error':
+        logger.error(`🧪❌ Test push message failed`, logData);
         break;
       default:
         logger.debug(`Group push operation: ${operation}`, logData);
@@ -373,6 +426,236 @@ export class PushHandler {
   }
 
   /**
+   * Generate test push message content
+   */
+  private generateTestPushMessage(type: 'flash' | 'whale' | 'fund'): { content: string; symbol?: string } {
+    const timestamp = new Date().toLocaleString('zh-CN', {
+      year: 'numeric',
+      month: '2-digit', 
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+
+    switch (type) {
+      case 'flash':
+        return {
+          content: 
+            `🚨 <b>测试快讯</b>\n\n` +
+            `📈 <b>BTC突破$75,000重要阻力位</b>\n` +
+            `💡 大量资金涌入，市场情绪极度乐观\n` +
+            `📊 24h涨幅: +8.5%\n` +
+            `⏰ ${timestamp}\n\n` +
+            `<i>🧪 这是一条测试推送消息</i>`,
+          symbol: 'BTC'
+        };
+
+      case 'whale':
+        return {
+          content:
+            `🐋 <b>测试鲸鱼动向</b>\n\n` +
+            `💰 <b>巨鲸地址大额转入</b>\n` +
+            `📍 地址: 0x742d...8a3f\n` +
+            `🔢 数量: 10,000 ETH\n` +
+            `💵 价值: ~$25,000,000\n` +
+            `📈 操作: 买入建仓\n` +
+            `⏰ ${timestamp}\n\n` +
+            `<i>🧪 这是一条测试推送消息</i>`,
+          symbol: 'ETH'
+        };
+
+      case 'fund':
+        return {
+          content:
+            `💰 <b>测试资金流向</b>\n\n` +
+            `📤 <b>Binance大额资金流出</b>\n` +
+            `🏦 交易所: Binance → 未知钱包\n` +
+            `🔢 数量: 50,000 BTC\n` +
+            `💵 价值: ~$3,750,000,000\n` +
+            `📊 流向: 冷钱包储存\n` +
+            `⏰ ${timestamp}\n\n` +
+            `<i>🧪 这是一条测试推送消息</i>`,
+          symbol: 'BTC'
+        };
+
+      default:
+        return {
+          content: `🧪 <b>测试推送</b>\n\n未知类型的推送测试\n⏰ ${timestamp}`
+        };
+    }
+  }
+
+  /**
+   * Send test push message to user
+   */
+  private async sendTestPushMessage(
+    ctx: ExtendedContext, 
+    type: 'flash' | 'whale' | 'fund', 
+    userId: string
+  ): Promise<void> {
+    const requestId = ctx.requestId || 'unknown';
+
+    try {
+      // 记录测试推送开始
+      this.logGroupPushOperation('test_push_initiated', requestId, {
+        userId,
+        pushType: type,
+        action: 'send_test_message'
+      });
+
+      // 生成测试消息
+      const testMessage = this.generateTestPushMessage(type);
+      
+      // 1. 发送到私聊（当前对话）
+      await ctx.reply(testMessage.content, { parse_mode: 'HTML' });
+
+      // 2. 检查是否有绑定的群组并发送
+      const boundGroups = await this.getBoundGroups(userId);
+      let groupResults = { success: 0, failed: 0, errors: [] as string[] };
+      
+      if (boundGroups.length > 0) {
+        logger.info(`Sending test message to ${boundGroups.length} bound groups`, {
+          userId: parseInt(userId),
+          groupCount: boundGroups.length,
+          requestId
+        });
+        
+        groupResults = await this.sendToGroups(boundGroups, testMessage, requestId);
+      }
+
+      // 记录测试推送成功
+      this.logGroupPushOperation('test_push_sent', requestId, {
+        userId,
+        pushType: type,
+        privateChat: true,
+        groupCount: boundGroups.length,
+        groupSuccess: groupResults.success,
+        groupFailed: groupResults.failed,
+        success: true
+      });
+
+      logger.info(`Test push message sent successfully [${requestId}]`, {
+        userId: parseInt(userId),
+        type,
+        symbol: testMessage.symbol,
+        requestId
+      });
+
+    } catch (error) {
+      // 记录测试推送失败
+      this.logGroupPushOperation('test_push_error', requestId, {
+        userId,
+        pushType: type,
+        error: (error as Error).message
+      });
+
+      logger.error(`Failed to send test push message [${requestId}]`, {
+        userId: parseInt(userId),
+        type,
+        error: (error as Error).message,
+        requestId
+      });
+
+      // 发送错误提示
+      try {
+        await ctx.reply(
+          `❌ 测试推送发送失败\n\n` +
+          `推送类型: ${this.getTypeName(type)}\n` +
+          `请稍后重试或联系管理员`,
+          { parse_mode: 'HTML' }
+        );
+      } catch (replyError) {
+        logger.error(`Failed to send error message [${requestId}]`, {
+          replyError: (replyError as Error).message,
+          requestId
+        });
+      }
+    }
+  }
+
+  /**
+   * Get bound groups for a user (placeholder implementation)
+   */
+  private async getBoundGroups(userId: string): Promise<string[]> {
+    // TODO: This should call an API to get bound groups for the user
+    // For now, return empty array as we don't have the backend implementation yet
+    
+    try {
+      // Placeholder: In future this would call something like:
+      // const response = await apiService.getWithAuth('/api/user/bound-groups', accessToken, {userId});
+      // return response.data.groups.map(g => g.groupId);
+      
+      logger.debug('Getting bound groups for user', { userId: parseInt(userId) });
+      return []; // Return empty array for now
+      
+    } catch (error) {
+      logger.warn('Failed to get bound groups', {
+        userId: parseInt(userId),
+        error: (error as Error).message
+      });
+      return [];
+    }
+  }
+
+  /**
+   * Send message to specific groups
+   */
+  private async sendToGroups(
+    groupIds: string[], 
+    message: { content: string; symbol?: string },
+    requestId: string = 'unknown'
+  ): Promise<{ success: number; failed: number; errors: string[] }> {
+    const results = { success: 0, failed: 0, errors: [] as string[] };
+    
+    if (groupIds.length === 0) {
+      logger.debug('No groups to send to', { requestId });
+      return results;
+    }
+
+    // Import telegramBot to send messages
+    const { telegramBot } = await import('../index');
+    const bot = telegramBot.getBot();
+
+    for (const groupId of groupIds) {
+      try {
+        logger.debug(`Sending test message to group ${groupId}`, { 
+          groupId, 
+          requestId,
+          contentLength: message.content.length 
+        });
+
+        // Add group push identifier to message
+        const groupMessage = message.content + '\n\n📢 <i>群组推送测试</i>';
+
+        // Send message to group
+        await bot.telegram.sendMessage(groupId, groupMessage, { 
+          parse_mode: 'HTML' 
+        });
+
+        results.success++;
+        logger.info(`✅ Test message sent to group successfully`, {
+          groupId,
+          requestId
+        });
+
+      } catch (error) {
+        results.failed++;
+        const errorMessage = (error as Error).message;
+        results.errors.push(`Group ${groupId}: ${errorMessage}`);
+        
+        logger.error(`❌ Failed to send test message to group`, {
+          groupId,
+          error: errorMessage,
+          requestId
+        });
+      }
+    }
+
+    return results;
+  }
+
+  /**
    * Show push settings interface
    */
   private async showPushSettings(ctx: ExtendedContext): Promise<void> {
@@ -580,6 +863,55 @@ export class PushHandler {
         // Update user settings
         await this.updateUserPushSetting(userIdString, type, enabled);
 
+        // 🧪 NEW: Send test push message when turning ON
+        if (enabled) {
+          // Check rate limiting
+          const rateCheck = this.canSendTestPush(userIdString);
+          
+          if (!rateCheck.allowed) {
+            logger.info(`Test push rate limited for user [${requestId}]`, {
+              userId,
+              type,
+              remainingTime: rateCheck.remainingTime,
+              requestId
+            });
+            
+            // Still update the settings but inform about rate limit
+            await ctx.answerCbQuery(
+              `✅ Settings updated! ⏰ Test message cooldown: ${rateCheck.remainingTime}s`
+            );
+          } else {
+            logger.info(`Sending test push message for type: ${type} [${requestId}]`, {
+              userId,
+              type,
+              requestId
+            });
+
+            // Record the attempt
+            this.recordTestPushAttempt(userIdString);
+
+            try {
+              // Send test push message asynchronously (don't wait)
+              this.sendTestPushMessage(ctx, type as 'flash' | 'whale' | 'fund', userIdString)
+                .catch(error => {
+                  logger.error(`Async test push failed [${requestId}]`, {
+                    error: error.message,
+                    type,
+                    userId,
+                    requestId
+                  });
+                });
+            } catch (error) {
+              logger.warn(`Test push initiation failed [${requestId}]`, {
+                error: (error as Error).message,
+                type,
+                userId,
+                requestId
+              });
+            }
+          }
+        }
+
         // Get updated settings
         const { settings: updatedSettings, pushData } = await this.getUserPushSettings(userIdString);
 
@@ -594,16 +926,23 @@ export class PushHandler {
           }
         });
 
-        // Give user feedback
-        const typeName = this.getTypeName(type);
-        const statusText = enabled ? 'enabled' : 'disabled';
-        await ctx.answerCbQuery(`✅ ${typeName} push notifications ${statusText}`);
+        // Give user feedback with test push notification (only if not already sent due to rate limiting)
+        if (!(enabled && !this.canSendTestPush(userIdString).allowed)) {
+          const typeName = this.getTypeName(type);
+          const statusText = enabled ? 'enabled' : 'disabled';
+          const feedbackMessage = enabled 
+            ? `✅ ${typeName} push notifications ${statusText}! 🧪 Test message sent!`
+            : `✅ ${typeName} push notifications ${statusText}`;
+            
+          await ctx.answerCbQuery(feedbackMessage);
+        }
 
         const duration = Date.now() - startTime;
         logger.info(`Push callback completed [${requestId}] - ${duration}ms`, {
           userId,
           type,
           enabled,
+          testPushSent: enabled,
           duration,
           requestId
         });
