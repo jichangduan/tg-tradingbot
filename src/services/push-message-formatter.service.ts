@@ -138,21 +138,21 @@ export class PushMessageFormatterService {
 
   /**
    * 格式化英文鲸鱼交易消息（统一格式）
-   * 模板：🐋 Whale 0x7c33…502a just closed 1.56M FARTCOIN long position (10x cross), loss 2,484.66 USDT
+   * 模板：🐋 Whale 0x7c33…502a just closed 1.56M FARTCOIN long position (10x cross), loss 2,484.66 USDT.
    */
   private formatEnglishWhaleMessage(action: WhaleActionData, truncatedAddress: string): string {
     const formattedAmount = this.formatTradeAmount(action.amount);
     const symbol = action.symbol || 'TOKEN';
     
-    let message = `🐋 Whale ${truncatedAddress}`;
+    let message = `🐋 Whale ${truncatedAddress} just`;
     
-    // 动作描述 - 优先使用trade_type，fallback到action
+    // 动作描述 - 优先使用trade_type，fallback到action，确保过去时
     if (action.trade_type === 'close') {
-      message += ` just closed`;
+      message += ` closed`;
     } else if (action.trade_type === 'open') {
-      message += ` just opened`;
+      message += ` opened`;
     } else if (action.action) {
-      // 处理action字段，转换为英文动作
+      // 处理action字段，转换为英文动作（过去时）
       const actionText = this.normalizeActionText(action.action);
       message += ` ${actionText}`;
     } else {
@@ -184,53 +184,105 @@ export class PushMessageFormatterService {
       message += `, ${pnlInfo}`;
     }
     
+    // 确保消息以句号结尾
+    if (!message.endsWith('.')) {
+      message += '.';
+    }
+    
     return message;
   }
 
   /**
-   * 标准化动作文本为英文
+   * 标准化动作文本为英文（确保过去时）
    */
   private normalizeActionText(action: string): string {
     if (!action) return 'traded';
     
-    const actionLower = action.toLowerCase();
+    const actionLower = action.toLowerCase().trim();
     
-    // 常见动作映射
+    // 常见动作映射 - 确保都是过去时
     const actionMap: { [key: string]: string } = {
+      // 英文动作映射
+      'open': 'opened',
       'opened': 'opened',
-      'open': 'opened', 
+      'opening': 'opened',
+      'close': 'closed', 
       'closed': 'closed',
-      'close': 'closed',
-      'bought': 'bought',
+      'closing': 'closed',
       'buy': 'bought',
-      'sold': 'sold',
+      'bought': 'bought',
+      'buying': 'bought',
       'sell': 'sold',
-      'transferred': 'transferred',
+      'sold': 'sold',
+      'selling': 'sold',
       'transfer': 'transferred',
+      'transferred': 'transferred',
+      'transferring': 'transferred',
+      'trade': 'traded',
+      'traded': 'traded',
+      'trading': 'traded',
+      'liquidate': 'liquidated',
+      'liquidated': 'liquidated',
+      'liquidating': 'liquidated',
+      
+      // 中文动作映射
       '买入': 'bought',
+      '购买': 'bought', 
       '卖出': 'sold',
+      '出售': 'sold',
       '开仓': 'opened',
+      '开多': 'opened',
+      '开空': 'opened',
       '平仓': 'closed',
-      '转账': 'transferred'
+      '平多': 'closed',
+      '平空': 'closed',
+      '转账': 'transferred',
+      '转入': 'transferred',
+      '转出': 'transferred',
+      '交易': 'traded',
+      '清算': 'liquidated'
     };
     
-    return actionMap[actionLower] || action;
+    return actionMap[actionLower] || 'traded';
   }
 
   /**
    * 格式化盈亏信息
+   * 确保格式：loss 2,484.66 USDT 或 profit 1,234.56 USDT
    */
   private formatPnlInfo(action: WhaleActionData): string {
     // 方案1：使用pnl字段
     if (action.pnl_type && action.pnl_amount) {
       const pnlCurrency = action.pnl_currency || 'USDT';
-      return `${action.pnl_type} ${action.pnl_amount} ${pnlCurrency}`;
+      const formattedAmount = this.formatPnlAmount(action.pnl_amount);
+      return `${action.pnl_type} ${formattedAmount} ${pnlCurrency}`;
     }
     
     // 方案2：从action或其他字段推断盈亏（如果数据源提供）
     // 这里可以根据实际数据源格式进行扩展
     
     return ''; // 无盈亏信息时返回空字符串
+  }
+
+  /**
+   * 格式化盈亏金额，确保正确的数字格式
+   * @param amount 原始盈亏金额
+   * @returns 格式化后的金额 (如: 2,484.66)
+   */
+  private formatPnlAmount(amount: string): string {
+    if (!amount) return '';
+    
+    // 移除非数字字符，保留小数点和负号
+    const cleanAmount = amount.replace(/[^0-9.-]/g, '');
+    const num = parseFloat(cleanAmount);
+    
+    if (isNaN(num)) return amount;
+    
+    // 格式化为带千分位分隔符的数字，保留2位小数
+    return new Intl.NumberFormat('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(Math.abs(num)); // 使用绝对值，因为loss/profit已经表明了正负
   }
 
   /**
