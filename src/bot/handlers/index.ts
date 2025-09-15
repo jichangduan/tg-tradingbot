@@ -755,6 +755,7 @@ export function getRegisteredCommands(): Array<{ command: string; description: s
 
 /**
  * 设置Bot菜单命令（用于Telegram的命令菜单）
+ * 注意：主要通过BotFather手动设置，此处作为备份
  */
 export async function setBotCommands(bot: Telegraf<ExtendedContext>): Promise<void> {
   const commands = [
@@ -774,54 +775,13 @@ export async function setBotCommands(bot: Telegraf<ExtendedContext>): Promise<vo
   ];
 
   try {
-    // Set commands for all chats (global scope)
+    // Set commands as backup (primary config through BotFather)
     await bot.telegram.setMyCommands(commands);
-    logger.info('✅ Global bot commands set successfully');
-
-    // Set commands for private chats specifically
-    await bot.telegram.setMyCommands(commands, {
-      scope: { type: 'all_private_chats' }
-    });
-    logger.info('✅ Private chat commands set successfully');
-
-    // Set commands for group chats specifically  
-    await bot.telegram.setMyCommands(commands, {
-      scope: { type: 'all_group_chats' }
-    });
-    logger.info('✅ Group chat commands set successfully');
-
-    // Set menu button to show commands list
-    try {
-      await bot.telegram.setChatMenuButton({
-        menuButton: {
-          type: 'commands'
-        }
-      });
-      logger.info('✅ Bot menu button set successfully');
-    } catch (menuError) {
-      logger.warn('Failed to set bot menu button (non-critical)', {
-        error: (menuError as Error).message
-      });
-    }
-    
+    logger.info('✅ Bot commands set successfully');
   } catch (error) {
-    logger.error('Failed to set bot commands', {
-      error: (error as Error).message,
-      stack: (error as Error).stack
+    logger.warn('Failed to set bot commands (using BotFather configuration instead)', {
+      error: (error as Error).message
     });
-    
-    // Retry mechanism for command registration
-    logger.info('Retrying command registration in 3 seconds...');
-    setTimeout(async () => {
-      try {
-        await bot.telegram.setMyCommands(commands);
-        logger.info('✅ Bot commands set successfully on retry');
-      } catch (retryError) {
-        logger.error('Failed to set bot commands on retry', {
-          error: (retryError as Error).message
-        });
-      }
-    }, 3000);
   }
 }
 
