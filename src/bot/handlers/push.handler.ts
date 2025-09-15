@@ -6,6 +6,9 @@ import { pushService, PushSettings, PushData } from '../../services/push.service
 import { ApiError } from '../../services/api.service';
 import { getUserToken, getUserAccessToken } from '../../utils/auth';
 import { pushScheduler } from '../../services/push-scheduler.service';
+import { pushDataService } from '../../services/push-data.service';
+import { pushMessageFormatterService } from '../../services/push-message-formatter.service';
+import { telegramBot } from '../index';
 import { config } from '../../config';
 import { longHandler } from './long.handler';
 import { shortHandler } from './short.handler';
@@ -57,6 +60,110 @@ export class PushHandler {
       if (time < fiveMinutesAgo) {
         this.lastTestPushTime.delete(id);
       }
+    }
+  }
+
+  /**
+   * Send immediate push when user enables a push type
+   */
+  private async sendImmediatePushOnEnable(
+    userId: string, 
+    pushType: 'flash' | 'whale' | 'fund',
+    requestId: string
+  ): Promise<void> {
+    try {
+      logger.info(`Getting push data for immediate send [${requestId}]`, {
+        userId,
+        pushType,
+        requestId
+      });
+
+      // 1. 获取用户的推送数据
+      const pushData = await pushDataService.getPushDataForUser(userId);
+      
+      if (!pushData) {
+        logger.info(`No push data available for immediate send [${requestId}]`, {
+          userId,
+          pushType,
+          requestId
+        });
+        return;
+      }
+
+      // 2. 根据开启的类型过滤数据
+      const settings: PushSettings = {
+        flash_enabled: pushType === 'flash',
+        whale_enabled: pushType === 'whale',
+        fund_enabled: pushType === 'fund'
+      };
+      
+      const filteredContent = pushDataService.filterPushContent(pushData, settings);
+      
+      logger.info(`Filtered content for immediate send [${requestId}]`, {
+        userId,
+        pushType,
+        flashNewsCount: filteredContent.flashNews.length,
+        whaleActionsCount: filteredContent.whaleActions.length,
+        fundFlowsCount: filteredContent.fundFlows.length,
+        requestId
+      });
+
+      // 3. 格式化消息
+      const messages = await pushMessageFormatterService.formatPushMessages({
+        flash_news: filteredContent.flashNews,
+        whale_actions: filteredContent.whaleActions,
+        fund_flows: filteredContent.fundFlows
+      });
+
+      if (messages.length === 0) {
+        logger.info(`No messages to send for immediate push [${requestId}]`, {
+          userId,
+          pushType,
+          requestId
+        });
+        return;
+      }
+
+      // 4. 发送消息给用户
+      const bot = telegramBot.getBot();
+      for (const message of messages) {
+        try {
+          await bot.telegram.sendMessage(userId, message, {
+            parse_mode: 'HTML',
+            disable_web_page_preview: true
+          });
+          
+          logger.info(`Immediate push message sent [${requestId}]`, {
+            userId,
+            pushType,
+            messageLength: message.length,
+            requestId
+          });
+        } catch (sendError) {
+          logger.error(`Failed to send immediate push message [${requestId}]`, {
+            userId,
+            pushType,
+            error: (sendError as Error).message,
+            requestId
+          });
+        }
+      }
+
+      logger.info(`Immediate push completed [${requestId}]`, {
+        userId,
+        pushType,
+        messagesSent: messages.length,
+        requestId
+      });
+
+    } catch (error) {
+      logger.error(`Immediate push failed [${requestId}]`, {
+        userId,
+        pushType,
+        error: (error as Error).message,
+        stack: (error as Error).stack,
+        requestId
+      });
     }
   }
 
@@ -1003,58 +1110,34 @@ export class PushHandler {
         // Update user settings
         await this.updateUserPushSetting(userIdString, type, enabled);
 
-        // 🧪 COMMENTED OUT: Test push messages disabled per user request
-        // No test push messages will be sent when enabling push settings
-        // Users will wait for real push notifications instead
-        /*
+        // 当开启推送时，立即推送一次该类型的数据
         if (enabled) {
-          // Check rate limiting
-          const rateCheck = this.canSendTestPush(userIdString);
-          
-          if (!rateCheck.allowed) {
-            logger.info(`Test push rate limited for user [${requestId}]`, {
-              userId,
-              type,
-              remainingTime: rateCheck.remainingTime,
-              requestId
-            });
-            
-            // Still update the settings but inform about rate limit
-            await ctx.answerCbQuery(
-              `✅ Settings updated! ⏰ Test message cooldown: ${rateCheck.remainingTime}s`
-            );
-          } else {
-            logger.info(`Sending test push message for type: ${type} [${requestId}]`, {
-              userId,
-              type,
-              requestId
-            });
+          logger.info(`Sending immediate push on enable: ${type} [${requestId}]`, {
+            userId,
+            type,
+            requestId
+          });
 
-            // Record the attempt
-            this.recordTestPushAttempt(userIdString);
-
-            try {
-              // Send test push message asynchronously (don't wait)
-              this.sendTestPushMessage(ctx, type as 'flash' | 'whale' | 'fund', userIdString)
-                .catch(error => {
-                  logger.error(`Async test push failed [${requestId}]`, {
-                    error: error.message,
-                    type,
-                    userId,
-                    requestId
-                  });
+          try {
+            // 立即发送该类型的推送数据（异步执行，不阻塞UI更新）
+            this.sendImmediatePushOnEnable(userIdString, type as 'flash' | 'whale' | 'fund', requestId)
+              .catch(error => {
+                logger.error(`Immediate push failed [${requestId}]`, {
+                  error: error.message,
+                  type,
+                  userId,
+                  requestId
                 });
-            } catch (error) {
-              logger.warn(`Test push initiation failed [${requestId}]`, {
-                error: (error as Error).message,
-                type,
-                userId,
-                requestId
               });
-            }
+          } catch (error) {
+            logger.warn(`Immediate push initiation failed [${requestId}]`, {
+              error: (error as Error).message,
+              type,
+              userId,
+              requestId
+            });
           }
         }
-        */
 
         // Get updated settings
         const { settings: updatedSettings, pushData } = await this.getUserPushSettings(userIdString);
