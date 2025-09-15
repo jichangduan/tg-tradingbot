@@ -793,7 +793,7 @@ export async function setBotCommands(bot: Telegraf<ExtendedContext>): Promise<vo
     // Set menu button to show commands list
     try {
       await bot.telegram.setChatMenuButton({
-        menu_button: {
+        menuButton: {
           type: 'commands'
         }
       });
