@@ -759,19 +759,19 @@ export function getRegisteredCommands(): Array<{ command: string; description: s
 export async function setBotCommands(bot: Telegraf<ExtendedContext>): Promise<void> {
   try {
     await bot.telegram.setMyCommands([
-      { command: 'start', description: '🚀 Start Bot' },
-      { command: 'help', description: '📚 Help Guide' },
-      { command: 'price', description: '💰 Price Query' },
-      { command: 'chart', description: '📊 Chart Analysis' },
-      { command: 'positions', description: '📊 View Positions' },
-      // { command: 'orders', description: '📋 View Orders' }, // Temporarily disabled
-      { command: 'pnl', description: '📈 P&L Analysis' },
-      { command: 'markets', description: '📈 Market Data' },
-      { command: 'wallet', description: '💰 Wallet Balance' },
-      // { command: 'invite', description: '🎁 Invitation Stats' }, // temporarily disabled
-      // { command: 'points', description: '🎯 Points Details' }, // temporarily disabled
-      { command: 'push', description: '📢 Push Settings' },
-      { command: 'status', description: '⚙️ System Status' }
+      { command: 'start', description: 'Setup your pvp.trade account' },
+      { command: 'help', description: 'Show help information' },
+      { command: 'price', description: 'Query token price' },
+      { command: 'chart', description: 'View the chart for a token' },
+      { command: 'long', description: 'Long a token' },
+      { command: 'short', description: 'Short a token' },
+      { command: 'close', description: 'Close a position' },
+      { command: 'positions', description: 'Show your positions' },
+      { command: 'pnl', description: 'Profit & Loss analysis' },
+      { command: 'markets', description: 'View market data' },
+      { command: 'wallet', description: 'View wallet balance' },
+      { command: 'push', description: 'Manage push settings' },
+      { command: 'status', description: 'View system status' }
     ]);
     
     logger.info('✅ Bot commands menu set successfully');
