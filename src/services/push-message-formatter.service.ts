@@ -86,11 +86,12 @@ export class PushMessageFormatterService {
       // Add title content
       message += `${this.escapeHtml(news.title)}`;
 
-      // If content exists, clean HTML and add content
+      // If content exists, clean HTML and add only first paragraph
       if (news.content && news.content.trim()) {
         const cleanContent = this.cleanHtmlContent(news.content);
-        if (cleanContent) {
-          message += `\n\n${this.escapeHtml(cleanContent)}`;
+        const firstParagraph = this.getFirstParagraph(cleanContent);
+        if (firstParagraph) {
+          message += `\n\n${this.escapeHtml(firstParagraph)}`;
         }
       }
 
@@ -594,6 +595,34 @@ export class PushMessageFormatterService {
       .trim();
 
     return cleanText;
+  }
+
+  /**
+   * Extract first paragraph from cleaned content
+   * @param content Cleaned text content
+   * @returns First paragraph, truncated if too long
+   */
+  private getFirstParagraph(content: string): string {
+    if (!content || typeof content !== 'string') {
+      return '';
+    }
+
+    // Split by newlines and find first non-empty paragraph
+    const paragraphs = content.split('\n').map(p => p.trim()).filter(p => p.length > 0);
+    
+    if (paragraphs.length === 0) {
+      return '';
+    }
+
+    let firstParagraph = paragraphs[0];
+
+    // Truncate if too long (keep within 200 characters for better UX)
+    const maxLength = 200;
+    if (firstParagraph.length > maxLength) {
+      firstParagraph = firstParagraph.substring(0, maxLength).trim() + '...';
+    }
+
+    return firstParagraph;
   }
 
   /**
