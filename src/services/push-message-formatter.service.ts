@@ -23,20 +23,25 @@ export interface FlashNewsData {
  * Whale action data interface
  */
 export interface WhaleActionData {
-  address: string;
-  action: string;
-  amount: string;
-  timestamp: string;
-  symbol?: string;
+  // API返回的核心字段
+  address: string;         // 钱包地址
+  baseCoin: string;        // 交易对 (如 "ETH", "BTC")
+  side: string;            // 方向 ("Long" | "Short")
+  leverage: number;        // 杠杆倍数
+  entryPx: number;         // 开仓价格
+  positionValue: number;   // 仓位价值 (USD)
+  size: number;            // 持仓数量
+  state: number;           // 状态 (1=开仓, 2=平仓)
+  type: string;            // 保证金类型 ("cross" | "isolated")
+  price: number;           // 当前价格
+  unrealizedPnl?: number;  // 未实现盈亏
+  ts: number;              // 时间戳
   
-  // 新增字段用于详细的鲸鱼交易信息
-  leverage?: string;       // 杠杆倍数 (如 "10x")
-  position_type?: string;  // 仓位类型 ("long" | "short")
-  trade_type?: string;     // 交易类型 ("open" | "close")
-  pnl_amount?: string;     // 盈亏金额
-  pnl_currency?: string;   // 盈亏币种 (如 "USDT")
-  pnl_type?: string;       // 盈亏类型 ("profit" | "loss")
-  margin_type?: string;    // 保证金类型 ("cross" | "isolated")
+  // 兼容旧字段 (向后兼容)
+  action?: string;         // 动作描述 (兼容旧版)
+  amount?: string;         // 金额 (兼容旧版)
+  timestamp?: string;      // 时间戳字符串 (兼容旧版)
+  symbol?: string;         // 代币符号 (兼容旧版，优先使用baseCoin)
 }
 
 /**
@@ -138,57 +143,33 @@ export class PushMessageFormatterService {
   }
 
   /**
-   * 格式化英文鲸鱼交易消息（统一格式）
+   * 格式化英文鲸鱼交易消息（紧凑单行格式）
    * 模板：🐋 Whale 0x7c33…502a just closed 1.56M FARTCOIN long position (10x cross), loss 2,484.66 USDT.
    */
   private formatEnglishWhaleMessage(action: WhaleActionData, truncatedAddress: string): string {
-    const formattedAmount = this.formatTradeAmount(action.amount);
-    const symbol = action.symbol || 'TOKEN';
+    // 获取基础信息
+    const symbol = action.baseCoin || action.symbol || 'TOKEN';
+    const side = action.side || this.extractSideFromAction(action);
+    const operation = this.getOperationType(action);
     
-    let message = `🐋 Whale ${truncatedAddress} just`;
+    // 格式化数量
+    const sizeFormatted = this.formatSize(Math.abs(action.size || 0));
     
-    // 动作描述 - 优先使用trade_type，fallback到action，确保过去时
-    if (action.trade_type === 'close') {
-      message += ` closed`;
-    } else if (action.trade_type === 'open') {
-      message += ` opened`;
-    } else if (action.action) {
-      // 处理action字段，转换为英文动作（过去时）
-      const actionText = this.normalizeActionText(action.action);
-      message += ` ${actionText}`;
-    } else {
-      message += ` traded`;
-    }
+    // 格式化杠杆和保证金类型
+    const marginType = action.type === 'cross' ? 'cross' : action.type || 'cross';
+    const leverageInfo = `${action.leverage}x ${marginType}`;
     
-    // 金额和币种
-    message += ` ${formattedAmount}`;
-    if (symbol) {
-      message += ` ${symbol}`;
-    }
+    // 构建主要消息: 🐋 Whale 0x7c33…502a just closed 1.56M FARTCOIN long position (10x cross)
+    let message = `🐋 Whale ${truncatedAddress} just ${operation} ${sizeFormatted} ${symbol} ${side.toLowerCase()} position (${leverageInfo})`;
     
-    // 仓位信息（如果有）
-    if (action.position_type) {
-      message += ` ${action.position_type} position`;
-    }
-    
-    // 杠杆和保证金类型（如果有）
-    if (action.leverage || action.margin_type) {
-      const leverageInfo = [];
-      if (action.leverage) leverageInfo.push(action.leverage);
-      if (action.margin_type) leverageInfo.push(action.margin_type);
-      message += ` (${leverageInfo.join(' ')})`;
-    }
-    
-    // 盈亏信息（重要：始终尝试显示盈亏）
-    const pnlInfo = this.formatPnlInfo(action);
+    // 添加盈亏信息
+    const pnlInfo = this.formatCompactPnl(action);
     if (pnlInfo) {
       message += `, ${pnlInfo}`;
     }
     
-    // 确保消息以句号结尾
-    if (!message.endsWith('.')) {
-      message += '.';
-    }
+    // 结束句号
+    message += '.';
     
     return message;
   }
@@ -900,6 +881,155 @@ export class PushMessageFormatterService {
         itemCount: fundFlows.length
       });
       return null;
+    }
+  }
+
+  /**
+   * 从动作中提取方向信息 (兼容旧数据)
+   */
+  private extractSideFromAction(action: WhaleActionData): string {
+    if (action.side) {
+      return action.side;
+    }
+    
+    // 从旧的action字段中提取
+    if (action.action) {
+      const lowerAction = action.action.toLowerCase();
+      if (lowerAction.includes('long')) {
+        return 'Long';
+      } else if (lowerAction.includes('short')) {
+        return 'Short';
+      }
+    }
+    
+    // 从size判断（负数通常是short）
+    if (action.size && action.size < 0) {
+      return 'Short';
+    }
+    
+    return 'Long'; // 默认
+  }
+
+  /**
+   * 获取操作类型
+   */
+  private getOperationType(action: WhaleActionData): string {
+    if (action.state === 1) {
+      return 'opened';
+    } else if (action.state === 2) {
+      return 'closed';
+    }
+    
+    // 兼容旧数据
+    if (action.action) {
+      const lowerAction = action.action.toLowerCase();
+      if (lowerAction.includes('open') || lowerAction.includes('增仓') || lowerAction.includes('建仓')) {
+        return 'opened';
+      } else if (lowerAction.includes('close') || lowerAction.includes('平仓')) {
+        return 'closed';
+      }
+    }
+    
+    return 'traded'; // 默认
+  }
+
+  /**
+   * 格式化仓位价值
+   */
+  private formatPositionValue(value: number): string {
+    if (value >= 1000000) {
+      return `$${(value / 1000000).toFixed(2)}M`;
+    } else if (value >= 1000) {
+      return `$${(value / 1000).toFixed(1)}K`;
+    } else {
+      return `$${value.toFixed(2)}`;
+    }
+  }
+
+  /**
+   * 格式化价格
+   */
+  private formatPrice(price: number): string {
+    if (price >= 1000) {
+      return `$${price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    } else if (price >= 1) {
+      return `$${price.toFixed(4)}`;
+    } else {
+      return `$${price.toFixed(6)}`;
+    }
+  }
+
+  /**
+   * 格式化数量
+   */
+  private formatSize(size: number): string {
+    if (size >= 1000000) {
+      return `${(size / 1000000).toFixed(2)}M`;
+    } else if (size >= 1000) {
+      return `${(size / 1000).toFixed(1)}K`;
+    } else {
+      return size.toFixed(4);
+    }
+  }
+
+  /**
+   * 格式化未实现盈亏
+   */
+  private formatUnrealizedPnl(pnl: number): string {
+    const absAmount = Math.abs(pnl);
+    const formattedAmount = absAmount >= 1000 
+      ? `${(absAmount / 1000).toFixed(1)}K` 
+      : absAmount.toFixed(2);
+    
+    if (pnl > 0) {
+      return `📈 Unrealized PnL: +$${formattedAmount}`;
+    } else if (pnl < 0) {
+      return `📉 Unrealized PnL: -$${formattedAmount}`;
+    } else {
+      return `📊 Unrealized PnL: $0.00`;
+    }
+  }
+
+  /**
+   * 格式化紧凑的盈亏信息 (用于单行格式)
+   * 格式: "loss 2,484.66 USDT" 或 "profit 1,234.56 USDT"
+   */
+  private formatCompactPnl(action: WhaleActionData): string {
+    // 对于平仓操作，可以显示实际盈亏
+    if (action.state === 2 && action.unrealizedPnl !== undefined) {
+      const absAmount = Math.abs(action.unrealizedPnl);
+      const formattedAmount = this.formatPnlAmount(absAmount);
+      
+      if (action.unrealizedPnl > 0) {
+        return `profit ${formattedAmount} USDT`;
+      } else if (action.unrealizedPnl < 0) {
+        return `loss ${formattedAmount} USDT`;
+      }
+    }
+    
+    // 对于开仓操作，显示未实现盈亏（如果有）
+    if (action.state === 1 && action.unrealizedPnl !== undefined && action.unrealizedPnl !== 0) {
+      const absAmount = Math.abs(action.unrealizedPnl);
+      const formattedAmount = this.formatPnlAmount(absAmount);
+      
+      if (action.unrealizedPnl > 0) {
+        return `unrealized profit ${formattedAmount} USDT`;
+      } else if (action.unrealizedPnl < 0) {
+        return `unrealized loss ${formattedAmount} USDT`;
+      }
+    }
+    
+    return ''; // 没有盈亏信息
+  }
+
+  /**
+   * 格式化盈亏金额 (带千分位逗号)
+   */
+  private formatPnlAmount(amount: number): string {
+    if (amount >= 1000) {
+      return amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    } else {
+      return amount.toFixed(2);
     }
   }
 }
