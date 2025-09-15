@@ -202,8 +202,28 @@ export class PushSchedulerService {
               // 删除详细的调用前日志
               
               try {
+                // 📊 对比调试: 定时推送 vs 立即推送的API调用模式
+                logger.info(`📊 [SCHEDULED_PUSH_DEBUG] Starting push data request for comparison`, {
+                  userId: parseInt(userId),
+                  apiCallContext: 'scheduled_push_request',
+                  userSettingsExists: !!userSettingsResult
+                });
+                
                 // 获取推送内容数据
                 const pushDataResult = await pushDataService.getPushDataForUser(userId);
+                
+                // 📊 对比结果记录
+                logger.info(`📊 [SCHEDULED_PUSH_DEBUG] Push data result for comparison`, {
+                  userId: parseInt(userId),
+                  pushDataExists: !!pushDataResult,
+                  apiCallContext: 'scheduled_push_request',
+                  hasFlashNews: !!pushDataResult?.flash_news?.length,
+                  hasWhaleActions: !!pushDataResult?.whale_actions?.length,
+                  hasFundFlows: !!pushDataResult?.fund_flows?.length,
+                  flashNewsCount: pushDataResult?.flash_news?.length || 0,
+                  whaleActionsCount: pushDataResult?.whale_actions?.length || 0,
+                  fundFlowsCount: pushDataResult?.fund_flows?.length || 0
+                });
                 
                 // 删除详细的调用完成日志
                 

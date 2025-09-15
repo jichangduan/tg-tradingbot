@@ -78,15 +78,18 @@ export class PushHandler {
         requestId
       });
 
-      // 1. 获取用户的推送数据
-      const pushData = await pushDataService.getPushDataForUser(userId);
+      // 1. 获取用户的推送数据 - 使用重试机制
+      let pushData = await this.getPushDataWithRetry(userId, requestId);
       
       if (!pushData) {
-        logger.info(`No push data available for immediate send [${requestId}]`, {
+        logger.info(`No push data available after retry, sending fallback message [${requestId}]`, {
           userId: parseInt(userId),
           pushType,
           requestId
         });
+        
+        // 发送友好的用户反馈，而不是静默失败
+        await this.sendImmediatePushFallbackMessage(userId, pushType, requestId);
         return;
       }
 
@@ -167,6 +170,126 @@ export class PushHandler {
         stack: (error as Error).stack,
         requestId
       });
+    }
+  }
+
+  /**
+   * Get push data with retry mechanism for immediate push
+   */
+  private async getPushDataWithRetry(userId: string, requestId: string): Promise<any> {
+    const maxRetries = 2;
+    const retryDelay = 1000; // 1 second
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        logger.info(`🔄 [RETRY] Attempt ${attempt}/${maxRetries} to get push data [${requestId}]`, {
+          userId: parseInt(userId),
+          attempt,
+          requestId
+        });
+
+        const pushData = await pushDataService.getPushDataForUser(userId);
+        
+        if (pushData) {
+          logger.info(`✅ [RETRY] Successfully got push data on attempt ${attempt} [${requestId}]`, {
+            userId: parseInt(userId),
+            attempt,
+            requestId
+          });
+          return pushData;
+        }
+
+        if (attempt < maxRetries) {
+          logger.info(`⏳ [RETRY] No data on attempt ${attempt}, retrying in ${retryDelay}ms [${requestId}]`, {
+            userId: parseInt(userId),
+            attempt,
+            retryDelay,
+            requestId
+          });
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+        }
+      } catch (error) {
+        logger.error(`❌ [RETRY] Error on attempt ${attempt} [${requestId}]`, {
+          userId: parseInt(userId),
+          attempt,
+          error: (error as Error).message,
+          requestId
+        });
+        
+        if (attempt === maxRetries) {
+          throw error;
+        }
+      }
+    }
+
+    logger.warn(`⚠️ [RETRY] All attempts failed to get push data [${requestId}]`, {
+      userId: parseInt(userId),
+      maxRetries,
+      requestId
+    });
+
+    return null;
+  }
+
+  /**
+   * Send fallback message when immediate push data is not available
+   */
+  private async sendImmediatePushFallbackMessage(
+    userId: string, 
+    pushType: 'flash' | 'whale' | 'fund',
+    requestId: string
+  ): Promise<void> {
+    try {
+      const typeName = this.getTypeName(pushType);
+      const emoji = this.getTypeEmoji(pushType);
+      
+      const fallbackMessage = `
+${emoji} <b>${typeName} Push Enabled!</b>
+
+✅ Your ${typeName.toLowerCase()} notifications are now active.
+
+📡 <b>What happens next:</b>
+• You'll receive ${typeName.toLowerCase()} updates as they become available
+• New content will be pushed automatically based on our monitoring schedule
+• You can disable notifications anytime using /push
+
+⏰ <b>Next push:</b> Within the next 20 minutes or when new ${typeName.toLowerCase()} activity is detected.
+
+<i>💡 Push system is now actively monitoring for ${typeName.toLowerCase()} content.</i>
+      `.trim();
+
+      const bot = telegramBot.getBot();
+      await bot.telegram.sendMessage(parseInt(userId), fallbackMessage, {
+        parse_mode: 'HTML',
+        link_preview_options: { is_disabled: true }
+      });
+
+      logger.info(`📋 [FALLBACK] Sent immediate push fallback message [${requestId}]`, {
+        userId: parseInt(userId),
+        pushType,
+        typeName,
+        requestId
+      });
+
+    } catch (error) {
+      logger.error(`❌ [FALLBACK] Failed to send fallback message [${requestId}]`, {
+        userId: parseInt(userId),
+        pushType,
+        error: (error as Error).message,
+        requestId
+      });
+    }
+  }
+
+  /**
+   * Get emoji for push type
+   */
+  private getTypeEmoji(type: string): string {
+    switch (type) {
+      case 'flash': return '🚨';
+      case 'whale': return '🐋';
+      case 'fund': return '💰';
+      default: return '🔔';
     }
   }
 

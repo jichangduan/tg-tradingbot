@@ -45,8 +45,31 @@ export class PushDataService {
       const duration = Date.now() - startTime;
       PushLogger.logApiResponse(userId, response, duration);
       
+      // 🔍 详细分析API响应结构 - 用于调试立即推送问题
+      logger.info(`🔍 [IMMEDIATE_PUSH_DEBUG] Detailed API response analysis`, {
+        userId: parseInt(userId),
+        responseExists: !!response,
+        hasData: !!response?.data,
+        hasPushData: !!response?.data?.push_data,
+        hasUserSettings: !!response?.data?.user_settings,
+        pushDataType: typeof response?.data?.push_data,
+        pushDataKeys: response?.data?.push_data ? Object.keys(response.data.push_data) : 'none',
+        flashNewsCount: response?.data?.push_data?.flash_news?.length || 0,
+        whaleActionsCount: response?.data?.push_data?.whale_actions?.length || 0,
+        fundFlowsCount: response?.data?.push_data?.fund_flows?.length || 0,
+        responseCode: response?.code,
+        responseMessage: response?.message?.substring(0, 100) || 'no_message',
+        apiCallContext: 'immediate_push_request'
+      });
+      
       // 检查推送数据是否存在
       if (!response?.data?.push_data) {
+        logger.warn(`⚠️ [IMMEDIATE_PUSH_DEBUG] API returned empty push_data`, {
+          userId: parseInt(userId),
+          fullResponse: JSON.stringify(response).substring(0, 1000),
+          expectedFields: ['flash_news', 'whale_actions', 'fund_flows'],
+          duration
+        });
         PushLogger.logDataFetchSuccess(userId, duration);
         return undefined; // 返回undefined而不是测试数据
       }
