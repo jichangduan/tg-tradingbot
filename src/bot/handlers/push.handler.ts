@@ -929,38 +929,11 @@ export class PushHandler {
     const whaleStatus = settings.whale_enabled ? '✅ On' : '❌ Off';
     const fundStatus = settings.fund_enabled ? '✅ On' : '❌ Off';
 
-    let message = `📢 <b>Active Push Settings</b>\n\n` +
-                  `🚨 Flash News: ${flashStatus}\n` +
-                  `🐋 Whale Movements: ${whaleStatus}\n` +
-                  `💰 Fund Flows: ${fundStatus}\n\n`;
-
-    // Show push content status
-    if (pushData && this.hasValidPushContent(pushData)) {
-      message += `<b>📈 Latest Push Content</b>\n\n`;
-
-      // Show flash news
-      if (pushData.flash_news && pushData.flash_news.length > 0) {
-        const latestFlash = pushData.flash_news[0];
-        message += `🚨 <b>Flash News</b>\n${latestFlash.title}\n⏰ ${this.formatTimestamp(latestFlash.timestamp)}\n\n`;
-      }
-
-      // Show whale movements
-      if (pushData.whale_actions && pushData.whale_actions.length > 0) {
-        const latestWhale = pushData.whale_actions[0];
-        message += `🐋 <b>Whale Movements</b>\nAddress: ${latestWhale.address}\nAction: ${latestWhale.action} ${latestWhale.amount}\n⏰ ${this.formatTimestamp(latestWhale.timestamp)}\n\n`;
-      }
-
-      // Show fund flows
-      if (pushData.fund_flows && pushData.fund_flows.length > 0) {
-        const latestFund = pushData.fund_flows[0];
-        message += `💰 <b>Fund Flows</b>\nFrom: ${latestFund.from} → To: ${latestFund.to}\nAmount: ${latestFund.amount}\n⏰ ${this.formatTimestamp(latestFund.timestamp)}\n\n`;
-      }
-    } else {
-      message += `<b>📋 Push Status</b>\n\n`;
-      message += `📭 <i>No latest push content available</i>\n\n`;
-    }
-
-    message += `Click the buttons below to manage push settings:`;
+    const message = `📢 <b>Active Push Settings</b>\n\n` +
+                    `🚨 Flash News: ${flashStatus}\n` +
+                    `🐋 Whale Movements: ${whaleStatus}\n` +
+                    `💰 Fund Flows: ${fundStatus}\n\n` +
+                    `Click the buttons below to manage push settings:`;
     
     return message;
   }
@@ -1261,52 +1234,7 @@ export class PushHandler {
     }
   }
 
-  /**
-   * Check if there is valid push content
-   */
-  private hasValidPushContent(pushData: PushData): boolean {
-    if (!pushData) return false;
-    
-    const hasFlashNews = pushData.flash_news && pushData.flash_news.length > 0;
-    const hasWhaleActions = pushData.whale_actions && pushData.whale_actions.length > 0;
-    const hasFundFlows = pushData.fund_flows && pushData.fund_flows.length > 0;
-    
-    return !!(hasFlashNews || hasWhaleActions || hasFundFlows);
-  }
 
-  /**
-   * Format timestamp
-   */
-  private formatTimestamp(timestamp: string): string {
-    try {
-      const date = new Date(timestamp);
-      const now = new Date();
-      const diffMs = now.getTime() - date.getTime();
-      const diffMinutes = Math.floor(diffMs / (1000 * 60));
-      const diffHours = Math.floor(diffMinutes / 60);
-      const diffDays = Math.floor(diffHours / 24);
-
-      if (diffMinutes < 1) {
-        return 'Just now';
-      } else if (diffMinutes < 60) {
-        return `${diffMinutes} minutes ago`;
-      } else if (diffHours < 24) {
-        return `${diffHours} hours ago`;
-      } else if (diffDays < 7) {
-        return `${diffDays} days ago`;
-      } else {
-        return date.toLocaleDateString('en-US', {
-          month: 'short',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
-        });
-      }
-    } catch (error) {
-      logger.warn('Failed to format timestamp', { timestamp, error: (error as Error).message });
-      return timestamp;
-    }
-  }
 
   /**
    * Error handling
