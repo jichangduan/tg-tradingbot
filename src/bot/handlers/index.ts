@@ -757,28 +757,71 @@ export function getRegisteredCommands(): Array<{ command: string; description: s
  * 设置Bot菜单命令（用于Telegram的命令菜单）
  */
 export async function setBotCommands(bot: Telegraf<ExtendedContext>): Promise<void> {
+  const commands = [
+    { command: 'start', description: 'Setup your pvp.trade account' },
+    { command: 'help', description: 'Show help information' },
+    { command: 'price', description: 'Query token price' },
+    { command: 'chart', description: 'View the chart for a token' },
+    { command: 'long', description: 'Long a token' },
+    { command: 'short', description: 'Short a token' },
+    { command: 'close', description: 'Close a position' },
+    { command: 'positions', description: 'Show your positions' },
+    { command: 'pnl', description: 'Profit & Loss analysis' },
+    { command: 'markets', description: 'View market data' },
+    { command: 'wallet', description: 'View wallet balance' },
+    { command: 'push', description: 'Manage push settings' },
+    { command: 'status', description: 'View system status' }
+  ];
+
   try {
-    await bot.telegram.setMyCommands([
-      { command: 'start', description: 'Setup your pvp.trade account' },
-      { command: 'help', description: 'Show help information' },
-      { command: 'price', description: 'Query token price' },
-      { command: 'chart', description: 'View the chart for a token' },
-      { command: 'long', description: 'Long a token' },
-      { command: 'short', description: 'Short a token' },
-      { command: 'close', description: 'Close a position' },
-      { command: 'positions', description: 'Show your positions' },
-      { command: 'pnl', description: 'Profit & Loss analysis' },
-      { command: 'markets', description: 'View market data' },
-      { command: 'wallet', description: 'View wallet balance' },
-      { command: 'push', description: 'Manage push settings' },
-      { command: 'status', description: 'View system status' }
-    ]);
-    
-    logger.info('✅ Bot commands menu set successfully');
-  } catch (error) {
-    logger.warn('Failed to set bot commands menu', {
-      error: (error as Error).message
+    // Set commands for all chats (global scope)
+    await bot.telegram.setMyCommands(commands);
+    logger.info('✅ Global bot commands set successfully');
+
+    // Set commands for private chats specifically
+    await bot.telegram.setMyCommands(commands, {
+      scope: { type: 'all_private_chats' }
     });
+    logger.info('✅ Private chat commands set successfully');
+
+    // Set commands for group chats specifically  
+    await bot.telegram.setMyCommands(commands, {
+      scope: { type: 'all_group_chats' }
+    });
+    logger.info('✅ Group chat commands set successfully');
+
+    // Set menu button to show commands list
+    try {
+      await bot.telegram.setChatMenuButton({
+        menu_button: {
+          type: 'commands'
+        }
+      });
+      logger.info('✅ Bot menu button set successfully');
+    } catch (menuError) {
+      logger.warn('Failed to set bot menu button (non-critical)', {
+        error: (menuError as Error).message
+      });
+    }
+    
+  } catch (error) {
+    logger.error('Failed to set bot commands', {
+      error: (error as Error).message,
+      stack: (error as Error).stack
+    });
+    
+    // Retry mechanism for command registration
+    logger.info('Retrying command registration in 3 seconds...');
+    setTimeout(async () => {
+      try {
+        await bot.telegram.setMyCommands(commands);
+        logger.info('✅ Bot commands set successfully on retry');
+      } catch (retryError) {
+        logger.error('Failed to set bot commands on retry', {
+          error: (retryError as Error).message
+        });
+      }
+    }, 3000);
   }
 }
 
