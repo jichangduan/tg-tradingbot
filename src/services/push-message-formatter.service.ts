@@ -228,44 +228,7 @@ export class PushMessageFormatterService {
     return actionMap[actionLower] || 'traded';
   }
 
-  /**
-   * 格式化盈亏信息
-   * 确保格式：loss 2,484.66 USDT 或 profit 1,234.56 USDT
-   */
-  private formatPnlInfo(action: WhaleActionData): string {
-    // 方案1：使用pnl字段
-    if (action.pnl_type && action.pnl_amount) {
-      const pnlCurrency = action.pnl_currency || 'USDT';
-      const formattedAmount = this.formatPnlAmount(action.pnl_amount);
-      return `${action.pnl_type} ${formattedAmount} ${pnlCurrency}`;
-    }
-    
-    // 方案2：从action或其他字段推断盈亏（如果数据源提供）
-    // 这里可以根据实际数据源格式进行扩展
-    
-    return ''; // 无盈亏信息时返回空字符串
-  }
 
-  /**
-   * 格式化盈亏金额，确保正确的数字格式
-   * @param amount 原始盈亏金额
-   * @returns 格式化后的金额 (如: 2,484.66)
-   */
-  private formatPnlAmount(amount: string): string {
-    if (!amount) return '';
-    
-    // 移除非数字字符，保留小数点和负号
-    const cleanAmount = amount.replace(/[^0-9.-]/g, '');
-    const num = parseFloat(cleanAmount);
-    
-    if (isNaN(num)) return amount;
-    
-    // 格式化为带千分位分隔符的数字，保留2位小数
-    return new Intl.NumberFormat('en-US', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    }).format(Math.abs(num)); // 使用绝对值，因为loss/profit已经表明了正负
-  }
 
   /**
    * 截断钱包地址显示
