@@ -353,7 +353,6 @@ export function validateSymbol(symbol: any): string {
   // 如果有建议但符号仍然有效，记录警告但不抛出错误
   if (result.suggestions && result.suggestions.length > 0) {
     // 这里可以添加日志记录，但不阻塞查询
-    console.warn(`Token ${symbol} not in supported list, but attempting query. Suggestions: ${result.suggestions.join(', ')}`);
   }
 
   return result.normalized;

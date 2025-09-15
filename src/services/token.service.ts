@@ -33,7 +33,6 @@ export class TokenService {
     const normalizedSymbol = symbol.toUpperCase().trim();
     const cacheKey = `${this.cacheKeyPrefix}${normalizedSymbol}`;
     
-    logger.info(`Getting token price for ${normalizedSymbol}`);
     
     try {
       // 使用缓存服务的 getOrSet 方法，自动处理缓存逻辑
@@ -58,11 +57,6 @@ export class TokenService {
         } : undefined
       };
 
-      logger.info(`Token price retrieved for ${normalizedSymbol}`, {
-        cached: isCached,
-        price: tokenData.price,
-        change24h: tokenData.change24h
-      });
 
       return cachedTokenData;
 
@@ -82,7 +76,6 @@ export class TokenService {
    * 从API获取代币价格数据 (支持多数据源)
    */
   private async fetchTokenPriceFromApi(symbol: string): Promise<TokenData> {
-    logger.debug(`Fetching token price from API for ${symbol}`);
     
     // 尝试AIW3 BirdEye API
     try {
@@ -94,68 +87,37 @@ export class TokenService {
         const matchedToken = this.findMatchingToken(response.data, symbol);
         if (matchedToken) {
           const processedData = this.processRawApiData(matchedToken, symbol);
-          logger.debug(`AIW3 API data processed successfully for ${symbol}`, {
-            price: processedData.price,
-            source: 'aiw3_birdeye'
-          });
           return processedData;
         }
       }
     } catch (error) {
-      logger.warn(`AIW3 BirdEye API failed for ${symbol}, trying fallbacks`, {
-        error: (error as Error).message
-      });
     }
 
     // Fallback 1: 尝试Hyperliquid价格API
     try {
-      logger.debug(`Trying Hyperliquid API fallback for ${symbol}`);
       const hyperliquidData = await this.fetchFromHyperliquid(symbol);
       if (hyperliquidData) {
-        logger.info(`✅ Fallback success: Hyperliquid API for ${symbol}`, {
-          price: hyperliquidData.price,
-          source: 'hyperliquid'
-        });
         return hyperliquidData;
       }
     } catch (error) {
-      logger.warn(`Hyperliquid API fallback failed for ${symbol}`, {
-        error: (error as Error).message
-      });
     }
 
     // Fallback 2: 尝试Binance公共API
     try {
-      logger.debug(`Trying Binance API fallback for ${symbol}`);
       const binanceData = await this.fetchFromBinance(symbol);
       if (binanceData) {
-        logger.info(`✅ Fallback success: Binance API for ${symbol}`, {
-          price: binanceData.price,
-          source: 'binance'
-        });
         return binanceData;
       }
     } catch (error) {
-      logger.warn(`Binance API fallback failed for ${symbol}`, {
-        error: (error as Error).message
-      });
     }
 
     // Fallback 3: 尝试CoinGecko API
     try {
-      logger.debug(`Trying CoinGecko API fallback for ${symbol}`);
       const geckoData = await this.fetchFromCoinGecko(symbol);
       if (geckoData) {
-        logger.info(`✅ Fallback success: CoinGecko API for ${symbol}`, {
-          price: geckoData.price,
-          source: 'coingecko'
-        });
         return geckoData;
       }
     } catch (error) {
-      logger.warn(`CoinGecko API fallback failed for ${symbol}`, {
-        error: (error as Error).message
-      });
     }
 
     // 所有数据源都失败
@@ -184,7 +146,6 @@ export class TokenService {
     );
     
     if (matchedToken) {
-      logger.debug(`Found direct symbol match for ${normalizedSymbol} → ${searchSymbol}`);
       return matchedToken;
     }
     
@@ -197,7 +158,6 @@ export class TokenService {
     });
     
     if (matchedToken) {
-      logger.debug(`Found name match for ${normalizedSymbol} → ${matchedToken.name}`);
       return matchedToken;
     }
     
@@ -214,12 +174,10 @@ export class TokenService {
         token.symbol && token.symbol.toUpperCase().includes(searchTerm)
       );
       if (matchedToken) {
-        logger.debug(`Found extended match for ${normalizedSymbol} → ${matchedToken.symbol}`);
         return matchedToken;
       }
     }
     
-    logger.debug(`No match found for ${normalizedSymbol} in ${tokens.length} tokens`);
     return null;
   }
 
@@ -360,11 +318,9 @@ export class TokenService {
    * 获取多个代币的价格（批量查询）
    */
   public async getMultipleTokenPrices(symbols: string[]): Promise<CachedTokenData[]> {
-    logger.info(`Getting prices for multiple tokens: ${symbols.join(', ')}`);
 
     const promises = symbols.map(symbol => 
       this.getTokenPrice(symbol).catch(error => {
-        logger.warn(`Failed to get price for ${symbol}`, { error: error.message });
         return null; // 返回null而不是抛出错误，允许部分成功
       })
     );
@@ -374,7 +330,6 @@ export class TokenService {
     // 过滤掉失败的结果
     const successResults = results.filter(result => result !== null) as CachedTokenData[];
     
-    logger.info(`Successfully retrieved prices for ${successResults.length}/${symbols.length} tokens`);
     
     return successResults;
   }
@@ -389,9 +344,7 @@ export class TokenService {
     const result = await cacheService.delete(cacheKey);
     
     if (result.success) {
-      logger.info(`Cache cleared for token: ${normalizedSymbol}`);
     } else {
-      logger.warn(`Failed to clear cache for token: ${normalizedSymbol}`, { error: result.error });
     }
     
     return result.success;
@@ -405,7 +358,6 @@ export class TokenService {
     const keysResult = await cacheService.keys(pattern);
     
     if (!keysResult.success || !keysResult.data) {
-      logger.warn('Failed to get token cache keys', { error: keysResult.error });
       return false;
     }
 
@@ -417,7 +369,6 @@ export class TokenService {
       }
     }
 
-    logger.info(`Cleared ${successCount}/${keysResult.data.length} token cache entries`);
     return successCount === keysResult.data.length;
   }
 
@@ -496,7 +447,6 @@ export class TokenService {
         }
       }
     } catch (error) {
-      logger.debug(`Hyperliquid API error for ${symbol}: ${(error as Error).message}`);
     }
     return null;
   }
@@ -533,7 +483,6 @@ export class TokenService {
         };
       }
     } catch (error) {
-      logger.debug(`Binance API error for ${symbol}: ${(error as Error).message}`);
     }
     return null;
   }
@@ -556,7 +505,6 @@ export class TokenService {
       
       const coinId = coinGeckoIds[symbol.toUpperCase()];
       if (!coinId) {
-        logger.debug(`No CoinGecko mapping for ${symbol}`);
         return null;
       }
       
@@ -582,7 +530,6 @@ export class TokenService {
         };
       }
     } catch (error) {
-      logger.debug(`CoinGecko API error for ${symbol}: ${(error as Error).message}`);
     }
     return null;
   }

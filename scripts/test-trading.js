@@ -12,75 +12,68 @@ const { messageFormatter } = require('../dist/bot/utils/message.formatter');
 const { logger } = require('../dist/utils/logger');
 
 async function runTests() {
-  console.log('🚀 开始测试双模式交易系统...\n');
+  console.log('Starting trading system tests...');
   
   // 测试用户ID
   const testUserId = '12345678';
   
   try {
     // 测试1: 交易状态管理
-    console.log('📊 测试交易状态管理...');
+    console.log('Testing trading state management...');
     
     // 创建交易状态
     const state1 = await tradingStateService.createState(testUserId, 'long');
-    console.log('✅ 创建状态成功:', {
-      userId: state1.userId,
-      action: state1.action,
-      step: state1.step
-    });
+    console.log('State created successfully');
     
     // 更新状态
     const state2 = await tradingStateService.updateState(testUserId, {
       symbol: 'BTC',
       step: 'leverage'
     });
-    console.log('✅ 更新状态成功:', {
-      symbol: state2.symbol,
-      step: state2.step
-    });
+    console.log('State updated successfully');
     
     // 获取状态
     const state3 = await tradingStateService.getState(testUserId);
-    console.log('✅ 获取状态成功:', state3 !== null);
+    console.log('State retrieved successfully:', state3 !== null);
     
     // 验证状态
     const validation = tradingStateService.validateStateForExecution(state2);
-    console.log('✅ 状态验证结果:', validation);
+    console.log('State validation result:', validation);
     
     // 测试2: 消息格式化
-    console.log('\n🎨 测试消息格式化...');
+    console.log('Testing message formatting...');
     
     // 代币选择提示
     const symbolPrompt = messageFormatter.formatTradingSymbolPrompt('long');
-    console.log('✅ 代币选择提示生成成功');
+    console.log('Symbol prompt generated successfully');
     
     // 杠杆选择提示
     const leveragePrompt = messageFormatter.formatTradingLeveragePrompt('long', 'BTC', 45000, 100.5);
-    console.log('✅ 杠杆选择提示生成成功');
+    console.log('Leverage prompt generated successfully');
     
     // 金额输入提示
     const amountPrompt = messageFormatter.formatTradingAmountPrompt('long', 'BTC', '3x', 100.5);
-    console.log('✅ 金额输入提示生成成功');
+    console.log('Amount prompt generated successfully');
     
     // 订单预览
     const orderPreview = messageFormatter.formatTradingOrderPreview(
       'long', 'BTC', '3x', '100', 45000, 0.00667, 36000
     );
-    console.log('✅ 订单预览生成成功');
+    console.log('Order preview generated successfully');
     
     // 测试3: 错误处理
-    console.log('\n❌ 测试错误处理...');
+    console.log('Testing error handling...');
     
     // 尝试获取不存在的状态
     const nonExistentState = await tradingStateService.getState('999999');
-    console.log('✅ 不存在状态处理正确:', nonExistentState === null);
+    console.log('Non-existent state handled correctly:', nonExistentState === null);
     
     // 清理状态
     await tradingStateService.clearState(testUserId);
-    console.log('✅ 状态清理成功');
+    console.log('State cleanup successful');
     
     // 测试4: 性能测试
-    console.log('\n⚡ 测试性能...');
+    console.log('Testing performance...');
     
     const startTime = Date.now();
     
@@ -93,12 +86,12 @@ async function runTests() {
     }
     
     const duration = Date.now() - startTime;
-    console.log(`✅ 批量操作完成，耗时: ${duration}ms`);
+    console.log(`Batch operations completed in ${duration}ms`);
     
-    console.log('\n🎉 所有测试完成！');
+    console.log('All tests completed successfully!');
     
   } catch (error) {
-    console.error('❌ 测试失败:', error.message);
+    console.error('Test failed:', error.message);
     process.exit(1);
   }
 }
@@ -107,11 +100,11 @@ async function runTests() {
 if (require.main === module) {
   runTests()
     .then(() => {
-      console.log('\n✨ 测试脚本执行完成');
+      console.log('Test script execution completed');
       process.exit(0);
     })
     .catch((error) => {
-      console.error('\n💥 测试脚本执行失败:', error);
+      console.error('Test script execution failed:', error);
       process.exit(1);
     });
 }

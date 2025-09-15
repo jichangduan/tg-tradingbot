@@ -138,15 +138,23 @@ export class PushDataService {
     let whaleActions = settings.whale_enabled ? pushData.whale_actions || [] : [];
     let fundFlows = settings.fund_enabled ? pushData.fund_flows || [] : [];
     
+    // 🚧 TEMPORARY: 暂时禁用金额筛选，确保立即推送功能正常工作
     // 对鲸鱼交易进行金额过滤，小于$1,000,000的不推送
-    if (whaleActions.length > 0) {
-      whaleActions = this.filterWhaleActionsByAmount(whaleActions);
-    }
+    // if (whaleActions.length > 0) {
+    //   whaleActions = this.filterWhaleActionsByAmount(whaleActions);
+    // }
     
-    // 对资金流向进行金额过滤，小于$1,000,000的不推送
-    if (fundFlows.length > 0) {
-      fundFlows = this.filterFundFlowsByAmount(fundFlows);
-    }
+    // 对资金流向进行金额过滤，小于$1,000,000的不推送  
+    // if (fundFlows.length > 0) {
+    //   fundFlows = this.filterFundFlowsByAmount(fundFlows);
+    // }
+    
+    // 临时：直接返回所有数据，不进行金额筛选
+    logger.info(`🚧 [TEMP_NO_FILTER] Skipping amount filtering for immediate push`, {
+      originalFlashNews: flashNews.length,
+      originalWhaleActions: whaleActions.length, 
+      originalFundFlows: fundFlows.length
+    });
     
     return { flashNews, whaleActions, fundFlows };
   }

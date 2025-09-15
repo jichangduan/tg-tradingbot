@@ -171,13 +171,11 @@ export class ChartImageService {
     const normalizedSymbol = symbol.toUpperCase().trim();
     const cacheKey = `${this.cacheKeyPrefix}${normalizedSymbol}_${timeFrame}`;
     
-    logger.info(`Generating candlestick chart for ${normalizedSymbol} ${timeFrame}`);
     
     try {
       // 检查缓存
       const cachedImage = await cacheService.get<CachedChartImage>(cacheKey);
       if (cachedImage.success && cachedImage.data) {
-        logger.info(`Chart image retrieved from cache for ${normalizedSymbol} ${timeFrame}`);
         return {
           ...cachedImage.data,
           isCached: true
@@ -190,11 +188,6 @@ export class ChartImageService {
       }
 
       // 简单数据验证 - 确保有足够的K线数据
-      logger.info(`Generating chart for ${normalizedSymbol} ${timeFrame}`, {
-        candleCount: candleData.candles.length,
-        latestPrice: candleData.latestPrice,
-        priceChange24h: candleData.priceChangePercent24h
-      });
 
       // 构建图表配置
       const chartConfig: QuickChartConfig = {
@@ -225,13 +218,6 @@ export class ChartImageService {
       // 缓存图表图像
       await cacheService.set(cacheKey, chartImage, this.cacheTTL);
 
-      logger.info(`Chart image generated successfully for ${normalizedSymbol} ${timeFrame}`, {
-        imageSize: imageResult.imageBuffer.length,
-        candlesCount: candleData.candles.length,
-        latestPrice: candleData.latestPrice,
-        priceChange24h: candleData.priceChangePercent24h?.toFixed(2) + '%',
-        config: chartConfig
-      });
 
       return chartImage;
 
@@ -252,10 +238,6 @@ export class ChartImageService {
   public async generatePnlChart(pnlData: PnlChartData): Promise<CachedChartImage> {
     const cacheKey = `${this.cacheKeyPrefix}pnl_${Date.now()}`;
     
-    logger.info('Generating PNL trend chart', {
-      totalPnl: pnlData.totalPnl,
-      dataPoints: pnlData.pnlHistory.length
-    });
 
     try {
       const chartConfig: QuickChartConfig = {
@@ -283,11 +265,6 @@ export class ChartImageService {
       // 短期缓存PNL图表 (5分钟)
       await cacheService.set(cacheKey, chartImage, 300);
 
-      logger.info('PNL chart generated successfully', {
-        totalPnl: pnlData.totalPnl,
-        dataPoints: pnlData.pnlHistory.length,
-        imageSize: imageResult.imageBuffer.length
-      });
 
       return chartImage;
 
@@ -306,10 +283,6 @@ export class ChartImageService {
   public async generatePositionsChart(positionsData: PositionsChartData): Promise<CachedChartImage> {
     const cacheKey = `${this.cacheKeyPrefix}positions_${Date.now()}`;
     
-    logger.info('Generating positions overview chart', {
-      totalValue: positionsData.totalValue,
-      positionsCount: positionsData.positions.length
-    });
 
     try {
       const chartConfig: QuickChartConfig = {
@@ -337,11 +310,6 @@ export class ChartImageService {
       // 短期缓存Positions图表 (2分钟)
       await cacheService.set(cacheKey, chartImage, 120);
 
-      logger.info('Positions chart generated successfully', {
-        totalValue: positionsData.totalValue,
-        positionsCount: positionsData.positions.length,
-        imageSize: imageResult.imageBuffer.length
-      });
 
       return chartImage;
 
@@ -362,20 +330,9 @@ export class ChartImageService {
       // 🔧 集成数据质量分析
       const qualityResult = this.analyzeDataQuality(candleData, config.timeFrame || '1h');
       
-      logger.info(`Data quality analysis for ${config.symbol} ${config.timeFrame}`, {
-        suitable: qualityResult.suitable,
-        priceRangePercent: qualityResult.priceRangePercent.toFixed(4) + '%',
-        dataPoints: qualityResult.dataPoints,
-        timeSpan: qualityResult.timeSpan + 'min',
-        issues: qualityResult.issues
-      });
       
       // 如果有质量问题，记录警告但继续处理
       if (!qualityResult.suitable && qualityResult.issues.length > 0) {
-        logger.warn(`Data quality issues detected for ${config.symbol} ${config.timeFrame}`, {
-          issues: qualityResult.issues,
-          priceRangePercent: qualityResult.priceRangePercent
-        });
       }
       
       // 转换K线数据为Chart.js格式 (包含增强处理)
@@ -479,14 +436,6 @@ export class ChartImageService {
         
         enhancedCount++;
         
-        logger.debug(`Enhanced flat candle for visualization`, {
-          symbol: candleData.symbol,
-          timeFrame: candleData.timeFrame,
-          timestamp: candle.timestamp,
-          original: { o: candle.open, h: candle.high, l: candle.low, c: candle.close },
-          enhanced: { o: enhanced.o, h: enhanced.h, l: enhanced.l, c: enhanced.c },
-          microVariation
-        });
         
         return enhanced;
       }
@@ -502,11 +451,6 @@ export class ChartImageService {
     });
     
     if (enhancedCount > 0) {
-      logger.info(`Enhanced ${enhancedCount}/${candleData.candles.length} flat candles for better visualization`, {
-        symbol: candleData.symbol,
-        timeFrame: candleData.timeFrame,
-        enhancementRate: ((enhancedCount / candleData.candles.length) * 100).toFixed(1) + '%'
-      });
     }
     
     return enhancedData;
@@ -537,16 +481,6 @@ export class ChartImageService {
       yAxisMin = avgPrice - halfRange;
       yAxisMax = avgPrice + halfRange;
       
-      logger.debug(`Enhanced Y-axis range for low volatility`, {
-        symbol: config.symbol,
-        timeFrame: config.timeFrame,
-        originalRange: range,
-        enhancedRange: minVisualRange,
-        originalMin: minPrice,
-        originalMax: maxPrice,
-        enhancedMin: yAxisMin,
-        enhancedMax: yAxisMax
-      });
     } else {
       // 正常情况：使用数据范围加10%padding
       const padding = range * 0.1;
@@ -1222,9 +1156,6 @@ export class ChartImageService {
     const keysResult = await cacheService.keys(pattern);
     
     if (!keysResult.success || !keysResult.data) {
-      logger.warn(`Failed to get chart image cache keys for ${normalizedSymbol}`, { 
-        error: keysResult.error 
-      });
       return false;
     }
 
@@ -1236,7 +1167,6 @@ export class ChartImageService {
       }
     }
 
-    logger.info(`Cleared ${successCount}/${keysResult.data.length} chart image cache entries for ${normalizedSymbol}`);
     return successCount === keysResult.data.length;
   }
 

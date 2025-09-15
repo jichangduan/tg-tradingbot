@@ -140,7 +140,6 @@ export class CacheService {
           } else {
             await this.client!.set(key, serializedValue);
           }
-          logger.logCache('set', key, ttlSeconds);
           return { success: true, data: true };
         } catch (redisError) {
           const errorMessage = (redisError as Error).message;
@@ -156,7 +155,6 @@ export class CacheService {
       const expiry = ttlSeconds ? Date.now() + (ttlSeconds * 1000) : 0;
       this.memoryCache.set(key, { value: serializedValue, expiry });
       
-      logger.debug(`Fallback memory cache set for key: ${key}`, { ttlSeconds });
       return { success: true, data: true };
 
     } catch (error) {
@@ -177,7 +175,6 @@ export class CacheService {
           const value = await this.client!.get(key);
           if (value !== null) {
             const parsedValue = JSON.parse(value) as T;
-            logger.logCache('hit', key);
             return { success: true, data: parsedValue };
           }
         } catch (redisError) {
@@ -193,16 +190,13 @@ export class CacheService {
         // 检查是否过期
         if (memoryItem.expiry > 0 && Date.now() > memoryItem.expiry) {
           this.memoryCache.delete(key);
-          logger.logCache('miss', key);
           return { success: false };
         }
         
         const parsedValue = JSON.parse(memoryItem.value) as T;
-        logger.debug(`Fallback memory cache hit for key: ${key}`);
         return { success: true, data: parsedValue };
       }
 
-      logger.logCache('miss', key);
       return { success: false };
 
     } catch (error) {
@@ -234,7 +228,6 @@ export class CacheService {
       // 同时从内存缓存删除
       const memoryDeleted = this.memoryCache.delete(key);
       
-      logger.logCache('delete', key);
       return { success: true, data: redisDeleted || memoryDeleted };
 
     } catch (error) {
@@ -388,13 +381,11 @@ export class CacheService {
     // 尝试从缓存获取
     const cacheResult = await this.get<T>(key);
     if (cacheResult.success && cacheResult.data !== undefined) {
-      logger.debug(`🎯 Cache hit for key: ${key}`);
       return cacheResult.data;
     }
 
     // 缓存未命中，执行回调函数
     try {
-      logger.debug(`📥 Cache miss for key: ${key}, executing fallback function`);
       const data = await fallbackFn();
       
       // 尝试设置缓存（不阻塞主流程）
@@ -402,7 +393,6 @@ export class CacheService {
         const errorMessage = (error as Error).message || error;
         if (typeof errorMessage === 'string' && 
             (errorMessage.includes('MISCONF') || errorMessage.includes('stop-writes-on-bgsave-error'))) {
-          logger.debug(`🔧 Redis config issue prevents caching key: ${key}, but data retrieved successfully`);
         } else {
           logger.warn(`Failed to cache data for key: ${key}`, { error: errorMessage });
         }

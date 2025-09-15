@@ -45,7 +45,6 @@ export class PushSchedulerService {
       // 修复cron表达式：生产环境20分钟，开发环境1分钟
       const cronPattern = process.env.NODE_ENV === 'production' ? '*/20 * * * *' : '*/1 * * * *';
       
-      logger.info('Initializing push scheduler', { cronPattern, environment: process.env.NODE_ENV });
 
       this.scheduleTask = cron.schedule(cronPattern, async () => {
         await this.executeScheduledPush();
@@ -58,7 +57,6 @@ export class PushSchedulerService {
       this.scheduleTask.start();
       this.isRunning = true;
 
-      logger.info('Push scheduler started successfully', { cronPattern });
 
       // 添加测试用户以便测试推送功能
       this.addTestUserToPushTracking();
@@ -91,14 +89,12 @@ export class PushSchedulerService {
     }
 
     this.isRunning = false;
-    logger.info('Push scheduler stopped');
   }
 
   /**
    * 手动执行一次推送任务（用于测试）
    */
   public async executeManualPush(): Promise<void> {
-    logger.info('Executing manual push task');
     await this.executeScheduledPush();
   }
 
@@ -110,16 +106,13 @@ export class PushSchedulerService {
     const executionId = `push_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 
     try {
-      logger.info(`Starting push execution [${executionId}]`);
 
       const enabledUsers = await this.getEnabledPushUsers();
       
       if (enabledUsers.length === 0) {
-        logger.warn(`No users with push enabled [${executionId}]`);
         return;
       }
 
-      logger.info(`Found ${enabledUsers.length} users with push enabled`);
 
       let successCount = 0;
       let failureCount = 0;
@@ -147,11 +140,6 @@ export class PushSchedulerService {
       await this.updateLastPushTime();
 
       const duration = Date.now() - startTime;
-      logger.info(`Push execution completed [${executionId}] - ${duration}ms`, {
-        totalUsers: enabledUsers.length,
-        successCount,
-        failureCount
-      });
 
     } catch (error) {
       const duration = Date.now() - startTime;
@@ -528,7 +516,6 @@ export class PushSchedulerService {
         const errorMessage = result.error || 'Unknown cache error';
         // Redis配置问题不影响推送核心功能
         if (errorMessage.includes('Redis config issue')) {
-          logger.debug('🔧 Redis config prevents caching push time, but push system continues normally');
         } else {
           logger.warn('Failed to cache push time - push tracking may be affected', { error: errorMessage });
         }
@@ -563,7 +550,6 @@ export class PushSchedulerService {
    */
   private async getUserBoundGroups(userId: string): Promise<string[]> {
     try {
-      logger.debug(`🔍 [GROUP_UNIFY] Getting bound groups for user ${userId}`);
       
       const accessToken = await getUserAccessToken(userId, {
         username: undefined,
@@ -620,7 +606,6 @@ export class PushSchedulerService {
           const userBoundGroups = await this.getUserBoundGroups(user.userId);
           
           if (userBoundGroups.length === 0) {
-            logger.debug(`[${executionId}] No bound groups for user ${user.userId}`);
             continue;
           }
           
@@ -633,7 +618,6 @@ export class PushSchedulerService {
           for (const groupId of userBoundGroups) {
             // 避免重复推送 (如果多个用户绑定了同一个群组)
             if (processedGroups.has(groupId)) {
-              logger.debug(`[${executionId}] Skipping already processed group ${groupId}`);
               continue;
             }
             

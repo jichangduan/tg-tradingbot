@@ -119,21 +119,10 @@ export class PushService {
       // 尝试从缓存获取
       const cachedResult = await cacheService.get<PushSettingsResponse>(cacheKey);
       if (cachedResult.success && cachedResult.data) {
-        logger.info('Push settings retrieved from cache', {
-          userId: parseInt(userId || '0'),
-          duration: Date.now() - startTime,
-          source: 'cache'
-        });
         return cachedResult.data;
       }
 
       // 调用后端API获取推送设置
-      logger.info('🌐 [API_RAW] Fetching push settings from API', { 
-        userId: parseInt(userId || '0'),
-        endpoint: '/api/user/push-settings',
-        timeout: 10000,
-        retry: 2
-      });
       
       const response = await apiService.getWithAuth<PushSettingsResponse>(
         '/api/user/push-settings',
@@ -146,57 +135,19 @@ export class PushService {
       );
 
       // API响应数据验证和详细日志
-      logger.info('📥 [API_RAW] Raw API response received', {
-        userId: parseInt(userId || '0'),
-        responseStructure: {
-          hasData: !!response.data,
-          hasUserSettings: !!response.data?.user_settings,
-          hasPushData: !!response.data?.push_data,
-          hasCacheInfo: !!response.data?.cache_info,
-          code: response.code,
-          message: response.message?.substring(0, 100) || 'no_message'
-        }
-      });
 
       // 验证响应格式
       if (!response.data?.user_settings) {
-        logger.error('❌ [API_RAW] Invalid API response format', {
-          userId: parseInt(userId || '0'),
-          responseData: response.data ? 'exists_but_no_user_settings' : 'no_data_field',
-          fullResponse: JSON.stringify(response).substring(0, 500)
-        });
         throw new ApiError('Invalid API response format', 500, 'INVALID_RESPONSE');
       }
 
       // 详细记录 managed_groups 数据
       const managedGroups = response.data.user_settings.managed_groups;
-      logger.info('🔍 [API_RAW] Managed groups data extracted', {
-        userId: parseInt(userId || '0'),
-        managedGroupsExists: !!managedGroups,
-        managedGroupsType: Array.isArray(managedGroups) ? 'array' : typeof managedGroups,
-        managedGroupsLength: Array.isArray(managedGroups) ? managedGroups.length : 'not_array',
-        managedGroupsContent: Array.isArray(managedGroups) ? managedGroups.map(g => ({
-          group_id: g?.group_id || 'missing',
-          group_name: g?.group_name || 'missing',
-          bound_at: g?.bound_at || 'missing'
-        })) : managedGroups
-      });
 
       // 缓存结果
       await cacheService.set(cacheKey, response, this.cacheTTL);
 
       const duration = Date.now() - startTime;
-      logger.info('✅ [API_RAW] Push settings retrieved successfully', {
-        userId: parseInt(userId || '0'),
-        duration,
-        source: 'api',
-        settings: {
-          flash_enabled: response.data.user_settings.flash_enabled,
-          whale_enabled: response.data.user_settings.whale_enabled,
-          fund_enabled: response.data.user_settings.fund_enabled,
-          managed_groups_count: Array.isArray(managedGroups) ? managedGroups.length : 0
-        }
-      });
 
       return response;
 
@@ -238,10 +189,6 @@ export class PushService {
       // 参数验证
       this.validateUpdateRequest(settings);
 
-      logger.info('Updating push settings', {
-        userId: parseInt(userId || '0'),
-        settings
-      });
 
       // 调用后端API更新设置
       const response = await apiService.postWithAuth<PushSettingsResponse>(
@@ -263,11 +210,6 @@ export class PushService {
       await cacheService.set(cacheKey, response, this.cacheTTL);
 
       const duration = Date.now() - startTime;
-      logger.info('Push settings updated successfully', {
-        userId: parseInt(userId || '0'),
-        duration,
-        updatedSettings: response.data.user_settings
-      });
 
       return response;
 
@@ -306,7 +248,6 @@ export class PushService {
     try {
       // TODO: 实现获取启用推送的用户列表API
       // 目前返回空数组，待后端API实现
-      logger.info('Getting enabled push users', { pushType });
       return [];
       
     } catch (error) {
@@ -358,7 +299,6 @@ export class PushService {
   public async clearUserCache(userId: string): Promise<void> {
     const cacheKey = `${this.cacheKeyPrefix}:${userId}`;
     await cacheService.delete(cacheKey);
-    logger.debug('Cleared push settings cache', { userId: parseInt(userId || '0') });
   }
 
   /**
@@ -373,11 +313,6 @@ export class PushService {
     const startTime = Date.now();
 
     try {
-      logger.info('Binding group push', {
-        userId: parseInt(userId || '0'),
-        groupId,
-        groupName
-      });
 
       const requestData: GroupPushBindRequest = {
         group_action: 'bind',
@@ -402,12 +337,6 @@ export class PushService {
       }
 
       const duration = Date.now() - startTime;
-      logger.info('Group push bound successfully', {
-        userId: parseInt(userId || '0'),
-        groupId,
-        groupName,
-        duration
-      });
 
       return response;
 
@@ -447,10 +376,6 @@ export class PushService {
     const startTime = Date.now();
 
     try {
-      logger.info('Unbinding group push', {
-        userId: parseInt(userId || '0'),
-        groupId
-      });
 
       const requestData: GroupPushBindRequest = {
         group_action: 'unbind',
@@ -474,11 +399,6 @@ export class PushService {
       }
 
       const duration = Date.now() - startTime;
-      logger.info('Group push unbound successfully', {
-        userId: parseInt(userId || '0'),
-        groupId,
-        duration
-      });
 
       return response;
 
