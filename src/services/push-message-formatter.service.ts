@@ -684,12 +684,20 @@ export class PushMessageFormatterService {
         }
       }
 
-      // Process whale actions - merge to one message
+      // Process whale actions - send individual messages (no batch merging)
       if (whaleActions.length > 0) {
-        const batchMessage = this.formatBatchWhaleActions(whaleActions);
-        if (batchMessage) {
-          messages.push(batchMessage);
-        }
+        whaleActions.forEach(action => {
+          const singleMessage = this.formatWhaleActionMessage(action);
+          if (singleMessage) {
+            // Create individual message with trading keyboard
+            const actionMessage: FormattedPushMessage = {
+              content: singleMessage,
+              type: 'whale_action',
+              keyboard: this.createTradingKeyboard(action.symbol || 'BTC')
+            };
+            messages.push(actionMessage);
+          }
+        });
       }
 
       // Process fund flows - merge to one message
@@ -809,102 +817,6 @@ export class PushMessageFormatterService {
     }
   }
 
-  /**
-   * Batch format whale action messages - merge multiple whale actions into one message
-   * @param whaleActions Whale action data array
-   * @returns Formatted message object
-   */
-  public formatBatchWhaleActions(whaleActions: WhaleActionData[]): FormattedPushMessage | null {
-    if (!whaleActions || whaleActions.length === 0) {
-      return null;
-    }
-
-    try {
-      let message = '';
-      let symbols: string[] = [];
-      let allActionText = ''; // Collect all action text for symbol extraction
-      
-      if (whaleActions.length === 1) {
-        // Single whale action keeps original format
-        const action = whaleActions[0];
-        message = this.formatWhaleActionMessage(action);
-        
-        // Try to get symbol from API data first
-        if (action.symbol) {
-          symbols.push(action.symbol);
-        } else {
-          // Extract symbol from action content if not provided by API
-          allActionText = `${action.action} ${action.amount || ''}`;
-          const extractedSymbol = this.extractSymbolFromText(allActionText);
-          if (extractedSymbol) {
-            symbols.push(extractedSymbol);
-          }
-        }
-      } else {
-        // Multiple whale actions merged format
-        message = `🐋 <b>Whale Alert</b> (${whaleActions.length} actions)\n\n`;
-        
-        whaleActions.forEach((action, index) => {
-          if (action.address && action.action) {
-            const truncatedAddress = this.truncateAddress(action.address);
-            message += `${index + 1}. <code>${truncatedAddress}</code> | ${this.escapeHtml(action.action)}`;
-            if (action.amount) {
-              message += ` | ${this.escapeHtml(action.amount)}`;
-            }
-            message += '\n';
-            
-            // Try to get symbol from API data first
-            if (action.symbol && !symbols.includes(action.symbol)) {
-              symbols.push(action.symbol);
-            } else {
-              // Collect action text for symbol extraction
-              allActionText += ` ${action.action} ${action.amount || ''}`;
-            }
-          }
-        });
-        
-        // If no symbols from API, try to extract from all action text
-        if (symbols.length === 0) {
-          const extractedSymbol = this.extractSymbolFromText(allActionText);
-          if (extractedSymbol) {
-            symbols.push(extractedSymbol);
-          }
-        }
-      }
-
-      // Create trading buttons - if there are related token symbols
-      let keyboard: any = undefined;
-      if (symbols.length > 0) {
-        // Use first symbol to create trading buttons
-        keyboard = this.createTradingKeyboard(symbols[0]);
-        
-        // If multiple symbols, show at message end
-        if (symbols.length > 1) {
-          message += `\n💡 <i>Related tokens: ${symbols.join(', ')}</i>`;
-        } else {
-          message += `\n💡 <i>Related token: ${symbols[0]}</i>`;
-        }
-      } else {
-        // Fallback: provide generic trading buttons for whale actions
-        // Most whale actions are likely about major tokens, default to BTC
-        keyboard = this.createTradingKeyboard('BTC');
-        message += `\n💡 <i>Whale activity detected - Trade major tokens</i>`;
-      }
-
-      return {
-        content: message,
-        type: 'whale_action_batch',
-        keyboard
-      };
-      
-    } catch (error) {
-      logger.error('Failed to format batch whale actions', {
-        error: (error as Error).message,
-        itemCount: whaleActions.length
-      });
-      return null;
-    }
-  }
 
   /**
    * Batch format fund flow messages - merge multiple fund flows into one message
