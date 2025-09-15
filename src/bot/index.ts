@@ -124,6 +124,15 @@ export class TelegramBot {
       const userId = ctx.from?.id;
       const chatId = ctx.chat?.id;
       
+      logger.info(`[DEBUG] Group redirect middleware START [${requestId}]`, {
+        isGroup,
+        messageText,
+        chatType: ctx.chat?.type,
+        userId,
+        chatId,
+        requestId
+      });
+      
       // 详细记录群组命令检测情况
       if (messageText?.startsWith('/')) {
         logger.info(`Command detected [${requestId}]`, {
@@ -137,6 +146,13 @@ export class TelegramBot {
       }
       
       if (isGroup && messageText?.startsWith('/')) {
+        logger.info(`[DEBUG] Entering group command processing [${requestId}]`, {
+          messageText,
+          isGroup,
+          chatType: ctx.chat?.type,
+          requestId
+        });
+        
         const parts = messageText.trim().split(/\s+/);
         const command = parts[0].toLowerCase();
         const args = parts.slice(1);
@@ -144,7 +160,35 @@ export class TelegramBot {
         // 需要跳转到私聊的命令列表（保持公共命令在群组正常执行）
         const redirectCommands = ['/start', '/long', '/short', '/close', '/positions', '/wallet', '/pnl', '/push'];
         
+        // 详细的命令解析和匹配检查日志
+        logger.info(`[DEBUG] Command parsing details [${requestId}]`, {
+          originalCommand: messageText,
+          parsedParts: parts,
+          extractedCommand: command,
+          extractedArgs: args,
+          isGroup,
+          chatType: ctx.chat?.type,
+          requestId
+        });
+        
+        // 检查原始命令和清理后的命令是否匹配
+        const cleanCommand = command.split('@')[0]; // 去掉@bot_username后缀
+        logger.info(`[DEBUG] Redirect command check [${requestId}]`, {
+          originalCommand: command,
+          cleanCommand: cleanCommand,
+          redirectCommands: redirectCommands,
+          isOriginalCommandInList: redirectCommands.includes(command),
+          isCleanCommandInList: redirectCommands.includes(cleanCommand),
+          shouldRedirect: redirectCommands.includes(cleanCommand),
+          requestId
+        });
+        
         if (redirectCommands.includes(command)) {
+          logger.info(`[DEBUG] Original command matched for redirect [${requestId}]`, {
+            command,
+            matchedBy: 'original'
+          });
+          
           logger.warn(`SENSITIVE COMMAND IN GROUP DETECTED [${requestId}]`, {
             command,
             args,
@@ -208,8 +252,107 @@ export class TelegramBot {
             // 无论如何都要阻止命令继续执行
             return;
           }
+        } else if (redirectCommands.includes(cleanCommand)) {
+          // 使用清理后的命令进行匹配
+          logger.info(`[DEBUG] Clean command matched for redirect [${requestId}]`, {
+            originalCommand: command,
+            cleanCommand: cleanCommand,
+            matchedBy: 'clean'
+          });
+          
+          logger.warn(`SENSITIVE COMMAND IN GROUP DETECTED (via clean command) [${requestId}]`, {
+            originalCommand: command,
+            cleanCommand: cleanCommand,
+            args,
+            chatId,
+            userId,
+            chatType: ctx.chat?.type,
+            isRedirectRequired: true,
+            requestId
+          });
+          
+          try {
+            // 动态导入处理函数避免循环依赖
+            const { handleGroupCommandRedirect } = await import('./handlers/group-redirect.handler');
+            await handleGroupCommandRedirect(ctx, cleanCommand, args);
+            
+            logger.info(`Group redirect successful (clean command) [${requestId}]`, {
+              originalCommand: command,
+              cleanCommand: cleanCommand,
+              userId,
+              requestId
+            });
+            
+            return; // 停止继续处理，不执行命令
+            
+          } catch (importError) {
+            logger.error(`CRITICAL: Group redirect handler failed (clean command) [${requestId}]`, {
+              error: (importError as Error).message,
+              stack: (importError as Error).stack,
+              originalCommand: command,
+              cleanCommand: cleanCommand,
+              userId,
+              chatId,
+              requestId
+            });
+            
+            // 如果导入失败，发送强制重定向消息，绝不允许在群组执行敏感命令
+            try {
+              const botUsername = config.telegram.botUsername || 'yuze_trading_bot';
+              const fallbackMessage = 
+                `🔒 <b>Private ${cleanCommand.replace('/', '').toUpperCase()} Required</b>\n\n` +
+                `pvp.trade\n` +
+                `This command contains sensitive information and must be used in private chat.\n\n` +
+                `👉 Click here to continue: https://t.me/${botUsername}\n\n` +
+                `⚠️ <i>For security reasons, wallet and trading commands are not available in groups.</i>`;
+              
+              await ctx.reply(fallbackMessage, { parse_mode: 'HTML' });
+              
+              logger.info(`Fallback redirect message sent (clean command) [${requestId}]`, {
+                originalCommand: command,
+                cleanCommand: cleanCommand,
+                userId,
+                requestId
+              });
+              
+            } catch (fallbackError) {
+              logger.error(`CRITICAL: Fallback redirect also failed (clean command) [${requestId}]`, {
+                error: (fallbackError as Error).message,
+                originalCommand: command,
+                cleanCommand: cleanCommand,
+                userId,
+                requestId
+              });
+            }
+            
+            // 无论如何都要阻止命令继续执行
+            return;
+          }
+        } else {
+          logger.info(`[DEBUG] Command NOT matched for redirect [${requestId}]`, {
+            command,
+            cleanCommand: cleanCommand,
+            redirectCommands,
+            isOriginalInList: redirectCommands.includes(command),
+            isCleanInList: redirectCommands.includes(cleanCommand),
+            willContinueToNormalHandler: true,
+            requestId
+          });
         }
+      } else {
+        logger.info(`[DEBUG] Not group command or not command format [${requestId}]`, {
+          isGroup,
+          startsWithSlash: messageText?.startsWith('/'),
+          messageText,
+          requestId
+        });
       }
+      
+      logger.info(`[DEBUG] Group redirect middleware END - continuing to next [${requestId}]`, {
+        isGroup,
+        messageText,
+        requestId
+      });
       
       // 只有非敏感命令或私聊命令才能继续执行
       await next();
