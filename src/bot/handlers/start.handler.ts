@@ -573,14 +573,7 @@ Please contact administrator or restart with /start
         requestId
       });
 
-      // 发送确认消息
-      await ctx.reply(
-        `✅ <b>Command Executed from Group</b>\n\n` +
-        `Executing: <code>${command} ${commandArgs.join(' ')}</code>`,
-        { parse_mode: 'HTML' }
-      );
-
-      // 路由到相应的处理器
+      // 直接路由到相应的处理器，不显示确认消息
       switch (command) {
         case '/start':
           // 避免递归调用，直接执行初始化逻辑
