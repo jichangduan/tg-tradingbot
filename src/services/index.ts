@@ -10,3 +10,4 @@ export { chartService } from './chart.service';
 export { chartImageService } from './chart-image.service';
 export { userService } from './user.service';
 export { tradingStateService } from './trading-state.service';
+export { groupAutoBindingService } from './group-auto-binding.service';

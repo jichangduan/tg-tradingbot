@@ -5,6 +5,7 @@ import { config } from '../config';
 import { cacheService } from '../services/cache.service';
 import { apiService } from '../services/api.service';
 import { registerCommands } from './handlers';
+import { groupAutoBindingService } from '../services/group-auto-binding.service';
 
 /**
  * 扩展的Telegram Context，添加自定义属性
@@ -113,6 +114,27 @@ export class TelegramBot {
       // 目前只是记录，实际限制可以基于Redis实现
       
       await next();
+    });
+
+    // 群组自动绑定中间件
+    this.bot.use(async (ctx, next) => {
+      // 先执行命令，不阻塞用户体验
+      await next();
+      
+      // 异步处理群组自动绑定
+      // 只在群组环境下且命令成功执行后尝试绑定
+      if (ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup') {
+        // 异步执行绑定逻辑，不等待结果，不影响用户体验
+        groupAutoBindingService.tryAutoBindGroup(ctx).catch(error => {
+          // 绑定失败不影响正常功能，只记录调试日志
+          logger.debug('群组自动绑定失败（不影响正常使用）', {
+            userId: ctx.from?.id,
+            chatId: ctx.chat?.id,
+            error: error.message,
+            requestId: ctx.requestId
+          });
+        });
+      }
     });
   }
 

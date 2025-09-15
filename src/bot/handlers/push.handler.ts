@@ -161,7 +161,7 @@ export class PushHandler {
 
       // 检查是否在群组中执行
       if (chatType === 'group' || chatType === 'supergroup') {
-        // 群组环境 - 处理群组推送绑定
+        // 群组环境 - 验证群主权限后显示推送设置
         await this.handleGroupPushCommand(ctx, args);
       } else {
         // 私聊环境 - 显示个人推送设置
@@ -194,7 +194,7 @@ export class PushHandler {
   }
 
   /**
-   * Handle group push command
+   * Handle group push command - 验证群主权限后显示推送设置
    */
   private async handleGroupPushCommand(ctx: ExtendedContext, args: string[]): Promise<void> {
     const userId = ctx.from?.id;
@@ -209,63 +209,48 @@ export class PushHandler {
 
     try {
       // 记录群组推送命令接收
-      this.logGroupPushOperation('bind_request', requestId, {
+      logger.info(`群组推送设置请求 [${requestId}]`, {
         userId,
         groupId: chatId,
         groupName: chatTitle,
-        args: args.join(' ')
+        requestId
       });
 
       // 验证用户是否为群主
       const isCreator = await this.verifyGroupCreator(ctx, userId, chatId);
       
-      // 记录权限验证结果
-      this.logGroupPushOperation('creator_check', requestId, {
-        userId,
-        groupId: chatId,
-        groupName: chatTitle,
-        isCreator
-      });
-
       if (!isCreator) {
         await ctx.reply(
           '⚠️ <b>权限不足</b>\n\n' +
-          '只有群主可以设置群组推送功能\n\n' +
+          '只有群主可以查看和设置群组推送功能\n\n' +
           '💡 如果您是群主，请确认机器人具有读取群组成员权限',
           { parse_mode: 'HTML' }
         );
         return;
       }
 
-      // 解析命令参数 - 支持 bind/unbind 操作
-      const action = args[0]?.toLowerCase();
-      
-      if (action === 'unbind') {
-        // 记录解绑请求
-        this.logGroupPushOperation('unbind_request', requestId, {
-          userId,
-          groupId: chatId,
-          groupName: chatTitle
-        });
-        
-        // 解绑群组推送
-        await this.unbindGroupPush(ctx, userId.toString(), chatId.toString());
-      } else {
-        // 默认为绑定操作（bind 或无参数）
-        await this.bindGroupPush(ctx, userId.toString(), chatId.toString(), chatTitle);
-      }
+      // 群主权限验证通过，显示推送设置界面（与私聊相同）
+      // 群组的自动绑定由中间件处理，这里只负责显示设置
+      await this.showPushSettings(ctx);
 
-    } catch (error) {
-      // 记录错误
-      this.logGroupPushOperation('error', requestId, {
+      logger.info(`群组推送设置显示成功 [${requestId}]`, {
         userId,
         groupId: chatId,
         groupName: chatTitle,
-        error: (error as Error).message
+        requestId
+      });
+
+    } catch (error) {
+      logger.error(`群组推送设置失败 [${requestId}]`, {
+        userId,
+        groupId: chatId,
+        groupName: chatTitle,
+        error: (error as Error).message,
+        requestId
       });
 
       await ctx.reply(
-        '❌ 群组推送设置失败\n\n' +
+        '❌ 推送设置显示失败\n\n' +
         '请稍后重试，如果问题持续存在，请联系管理员',
         { parse_mode: 'HTML' }
       );
@@ -312,138 +297,6 @@ export class PushHandler {
     }
   }
 
-  /**
-   * Bind group push
-   */
-  private async bindGroupPush(ctx: ExtendedContext, userId: string, groupId: string, groupName: string): Promise<void> {
-    const requestId = ctx.requestId || 'unknown';
-
-    try {
-      // 记录开始绑定
-      this.logGroupPushOperation('api_call', requestId, {
-        userId,
-        groupId,
-        groupName,
-        action: 'bind'
-      });
-
-      // 获取用户访问令牌
-      const accessToken = await getUserAccessToken(userId, {
-        username: ctx.from?.username,
-        first_name: ctx.from?.first_name,
-        last_name: ctx.from?.last_name
-      });
-
-      // 调用推送服务绑定群组
-      await pushService.bindGroupPush(userId, accessToken, groupId, groupName);
-
-      // 发送成功消息
-      await ctx.reply(
-        '✅ <b>群组推送绑定成功</b>\n\n' +
-        `📢 群组：<code>${groupName}</code>\n` +
-        `👤 群主：@${ctx.from?.username || ctx.from?.first_name || '未知'}\n\n` +
-        '🔔 后续推送将根据群主的个人推送设置发送到本群\n' +
-        '⚙️ 群主可通过私聊机器人使用 /push 命令调整推送设置\n\n' +
-        '💡 使用 <code>/push unbind</code> 可以解除群组推送绑定',
-        { parse_mode: 'HTML' }
-      );
-
-      // 记录成功绑定
-      this.logGroupPushOperation('success', requestId, {
-        userId,
-        groupId,
-        groupName,
-        action: 'bind'
-      });
-
-    } catch (error) {
-      // 记录绑定失败
-      this.logGroupPushOperation('error', requestId, {
-        userId,
-        groupId,
-        groupName,
-        action: 'bind',
-        error: (error as Error).message
-      });
-
-      // 根据错误类型提供不同提示
-      let errorMessage = '❌ 群组推送绑定失败\n\n';
-      
-      if ((error as Error).message.includes('token')) {
-        errorMessage += '🔐 用户认证失败，请先私聊机器人发送 /start 进行初始化\n\n';
-      } else if ((error as Error).message.includes('403')) {
-        errorMessage += '🚫 权限不足，请确认您已完成用户初始化\n\n';
-      } else {
-        errorMessage += '⚠️ 系统暂时繁忙，请稍后重试\n\n';
-      }
-      
-      errorMessage += '💡 如需帮助，请联系管理员';
-
-      await ctx.reply(errorMessage, { parse_mode: 'HTML' });
-    }
-  }
-
-  /**
-   * Unbind group push
-   */
-  private async unbindGroupPush(ctx: ExtendedContext, userId: string, groupId: string): Promise<void> {
-    const requestId = ctx.requestId || 'unknown';
-    const groupName = (ctx.chat && 'title' in ctx.chat) ? ctx.chat.title || '未知群组' : '未知群组';
-
-    try {
-      // 记录开始解绑
-      this.logGroupPushOperation('api_call', requestId, {
-        userId,
-        groupId,
-        groupName,
-        action: 'unbind'
-      });
-
-      // 获取用户访问令牌
-      const accessToken = await getUserAccessToken(userId, {
-        username: ctx.from?.username,
-        first_name: ctx.from?.first_name,
-        last_name: ctx.from?.last_name
-      });
-
-      // 调用推送服务解绑群组
-      await pushService.unbindGroupPush(userId, accessToken, groupId);
-
-      // 发送成功消息
-      await ctx.reply(
-        '✅ <b>群组推送解绑成功</b>\n\n' +
-        `📢 群组：<code>${groupName}</code>\n` +
-        `👤 群主：@${ctx.from?.username || ctx.from?.first_name || '未知'}\n\n` +
-        '🔕 本群将不再接收推送通知\n\n' +
-        '💡 使用 <code>/push</code> 可以重新绑定群组推送',
-        { parse_mode: 'HTML' }
-      );
-
-      // 记录成功解绑
-      this.logGroupPushOperation('success', requestId, {
-        userId,
-        groupId,
-        groupName,
-        action: 'unbind'
-      });
-
-    } catch (error) {
-      // 记录解绑失败
-      this.logGroupPushOperation('error', requestId, {
-        userId,
-        groupId,
-        groupName,
-        action: 'unbind',
-        error: (error as Error).message
-      });
-
-      await ctx.reply(
-        '❌ 群组推送解绑失败\n\n' +
-        '请稍后重试，如果问题持续存在，请联系管理员',
-        { parse_mode: 'HTML' }
-      );
-    }
-  }
 
   /**
    * Generate test push message content
