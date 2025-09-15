@@ -73,7 +73,7 @@ export class PushHandler {
   ): Promise<void> {
     try {
       logger.info(`Getting push data for immediate send [${requestId}]`, {
-        userId,
+        userId: parseInt(userId),
         pushType,
         requestId
       });
@@ -83,7 +83,7 @@ export class PushHandler {
       
       if (!pushData) {
         logger.info(`No push data available for immediate send [${requestId}]`, {
-          userId,
+          userId: parseInt(userId),
           pushType,
           requestId
         });
@@ -100,7 +100,7 @@ export class PushHandler {
       const filteredContent = pushDataService.filterPushContent(pushData, settings);
       
       logger.info(`Filtered content for immediate send [${requestId}]`, {
-        userId,
+        userId: parseInt(userId),
         pushType,
         flashNewsCount: filteredContent.flashNews.length,
         whaleActionsCount: filteredContent.whaleActions.length,
@@ -109,15 +109,18 @@ export class PushHandler {
       });
 
       // 3. 格式化消息
-      const messages = await pushMessageFormatterService.formatPushMessages({
-        flash_news: filteredContent.flashNews,
-        whale_actions: filteredContent.whaleActions,
-        fund_flows: filteredContent.fundFlows
-      });
+      const formattedMessages = pushMessageFormatterService.formatBatchMessages(
+        filteredContent.flashNews,
+        filteredContent.whaleActions,
+        filteredContent.fundFlows
+      );
+
+      // 提取消息内容
+      const messages = formattedMessages.map(msg => msg.content);
 
       if (messages.length === 0) {
         logger.info(`No messages to send for immediate push [${requestId}]`, {
-          userId,
+          userId: parseInt(userId),
           pushType,
           requestId
         });
@@ -128,20 +131,20 @@ export class PushHandler {
       const bot = telegramBot.getBot();
       for (const message of messages) {
         try {
-          await bot.telegram.sendMessage(userId, message, {
+          await bot.telegram.sendMessage(parseInt(userId), message, {
             parse_mode: 'HTML',
-            disable_web_page_preview: true
+            link_preview_options: { is_disabled: true }
           });
           
           logger.info(`Immediate push message sent [${requestId}]`, {
-            userId,
+            userId: parseInt(userId),
             pushType,
             messageLength: message.length,
             requestId
           });
         } catch (sendError) {
           logger.error(`Failed to send immediate push message [${requestId}]`, {
-            userId,
+            userId: parseInt(userId),
             pushType,
             error: (sendError as Error).message,
             requestId
@@ -150,7 +153,7 @@ export class PushHandler {
       }
 
       logger.info(`Immediate push completed [${requestId}]`, {
-        userId,
+        userId: parseInt(userId),
         pushType,
         messagesSent: messages.length,
         requestId
@@ -158,7 +161,7 @@ export class PushHandler {
 
     } catch (error) {
       logger.error(`Immediate push failed [${requestId}]`, {
-        userId,
+        userId: parseInt(userId),
         pushType,
         error: (error as Error).message,
         stack: (error as Error).stack,
