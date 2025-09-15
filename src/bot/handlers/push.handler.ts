@@ -72,26 +72,26 @@ export class PushHandler {
     requestId: string
   ): Promise<void> {
     try {
-      logger.info(`Getting push data for immediate send [${requestId}]`, {
+      logger.info(`🎯 [IMMEDIATE_PUSH] Starting immediate push for ${pushType} [${requestId}]`, {
         userId: parseInt(userId),
         pushType,
         requestId
       });
 
-      // 1. 获取用户的推送数据 - 使用重试机制
-      let pushData = await this.getPushDataWithRetry(userId, requestId);
+      // 1. 强制获取包含push_data的新数据，绕过缓存
+      let pushData = await this.getFreshPushDataForImmediate(userId, requestId);
       
       if (!pushData) {
-        logger.info(`No push data available after retry, sending fallback message [${requestId}]`, {
-          userId: parseInt(userId),
-          pushType,
-          requestId
-        });
-        
-        // 发送友好的用户反馈，而不是静默失败
+        logger.warn(`⚠️ [IMMEDIATE_PUSH] No push data available after fresh fetch [${requestId}]`);
         await this.sendImmediatePushFallbackMessage(userId, pushType, requestId);
         return;
       }
+
+      logger.info(`✅ [IMMEDIATE_PUSH] Got fresh push data, proceeding with real content [${requestId}]`, {
+        flashNewsCount: pushData.flash_news?.length || 0,
+        whaleActionsCount: pushData.whale_actions?.length || 0,
+        fundFlowsCount: pushData.fund_flows?.length || 0
+      });
 
       // 2. 根据开启的类型过滤数据
       const settings: PushSettings = {
@@ -170,6 +170,54 @@ export class PushHandler {
         stack: (error as Error).stack,
         requestId
       });
+    }
+  }
+
+  /**
+   * Get fresh push data for immediate push - bypasses cache to get real data
+   */
+  private async getFreshPushDataForImmediate(userId: string, requestId: string): Promise<any> {
+    try {
+      logger.info(`🔄 [FRESH_DATA] Getting fresh push data for immediate push [${requestId}]`);
+
+      // 1. 先清除可能的缓存
+      await pushService.clearUserCache(userId);
+      
+      // 2. 获取访问令牌
+      let accessToken = await getUserToken(userId);
+      if (!accessToken) {
+        const userInfo = { username: undefined, first_name: undefined, last_name: undefined };
+        accessToken = await getUserAccessToken(userId, userInfo);
+      }
+
+      // 3. 直接调用push service获取包含push_data的新鲜响应
+      const response = await pushService.getUserPushSettings(userId, accessToken);
+      
+      logger.info(`📡 [FRESH_DATA] API response for immediate push [${requestId}]`, {
+        hasData: !!response.data,
+        hasPushData: !!response.data?.push_data,
+        responseMessage: response.message
+      });
+      
+      if (response.data?.push_data) {
+        const pushData = response.data.push_data;
+        logger.info(`✅ [FRESH_DATA] Successfully got fresh push data [${requestId}]`, {
+          flashNews: pushData.flash_news?.length || 0,
+          whaleActions: pushData.whale_actions?.length || 0,
+          fundFlows: pushData.fund_flows?.length || 0
+        });
+        return pushData;
+      }
+
+      logger.warn(`⚠️ [FRESH_DATA] Fresh API call returned no push data [${requestId}]`);
+      return null;
+
+    } catch (error) {
+      logger.error(`❌ [FRESH_DATA] Error getting fresh push data [${requestId}]`, {
+        error: (error as Error).message,
+        requestId
+      });
+      return null;
     }
   }
 
@@ -1207,13 +1255,7 @@ ${emoji} <b>${typeName} Push Enabled!</b>
     const requestId = ctx.requestId || 'unknown';
 
     try {
-      logger.info(`🔘 [CALLBACK_DEBUG] Push callback received [${requestId}]`, {
-        userId,
-        callbackData,
-        callbackDataLength: callbackData.length,
-        callbackDataType: typeof callbackData,
-        requestId
-      });
+      logger.info(`🔘 [CALLBACK] Push callback: ${callbackData} [${requestId}]`);
 
       if (!userIdString) {
         await ctx.answerCbQuery('Invalid user information');
@@ -1235,25 +1277,14 @@ ${emoji} <b>${typeName} Push Enabled!</b>
         const [, type, value] = callbackParts;
         const enabled = value === 'true';
         
-        logger.info(`🔄 [TOGGLE_DEBUG] Processing toggle action [${requestId}]`, {
-          userId,
-          type,
-          value,
-          enabled,
-          callbackParts,
-          requestId
-        });
+        logger.info(`🔄 [TOGGLE] ${enabled ? 'Enabling' : 'Disabling'} ${type} push [${requestId}]`);
         
         // Update user settings
         await this.updateUserPushSetting(userIdString, type, enabled);
 
         // 当开启推送时，立即推送一次该类型的数据
         if (enabled) {
-          logger.info(`🚀 [IMMEDIATE_PUSH_TRIGGER] Sending immediate push on enable: ${type} [${requestId}]`, {
-            userId,
-            type,
-            requestId
-          });
+          logger.info(`🚀 [IMMEDIATE_PUSH] Triggering immediate push for ${type} [${requestId}]`);
 
           try {
             // 立即发送该类型的推送数据（异步执行，不阻塞UI更新）
