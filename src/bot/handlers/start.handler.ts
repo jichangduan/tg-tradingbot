@@ -29,6 +29,12 @@ export class StartHandler {
     try {
       logger.logCommand('start', userId!, username, args);
 
+      // 检查是否为群组跳转命令
+      if (args.length > 0 && args[0].startsWith('cmd_')) {
+        await this.handleGroupRedirectCommand(ctx, args[0]);
+        return;
+      }
+
       // 检查是否为群组启动场景（通过startgroup参数识别）
       const isGroupStart = args.length > 0 && args[0] === 'welcome' && chatType !== 'private';
       
@@ -540,6 +546,137 @@ Please contact administrator or restart with /start
   }
 
   /**
+   * 处理群组跳转命令
+   */
+  private async handleGroupRedirectCommand(ctx: ExtendedContext, encodedParam: string): Promise<void> {
+    const requestId = ctx.requestId || 'unknown';
+    const userId = ctx.from?.id;
+
+    try {
+      logger.info(`Processing group redirect command [${requestId}]`, {
+        userId,
+        encodedParam: encodedParam.substring(0, 20) + '...', // 截断显示
+        requestId
+      });
+
+      // 解码命令参数
+      const encodedCommand = encodedParam.substring(4); // 移除'cmd_'前缀
+      const decoded = Buffer.from(encodedCommand, 'base64').toString('utf-8');
+      const commandData = JSON.parse(decoded);
+      
+      const { cmd: command, args: commandArgs } = commandData;
+      
+      logger.info(`Decoded group redirect command [${requestId}]`, {
+        command,
+        args: commandArgs,
+        userId,
+        requestId
+      });
+
+      // 发送确认消息
+      await ctx.reply(
+        `✅ <b>Command Executed from Group</b>\n\n` +
+        `Executing: <code>${command} ${commandArgs.join(' ')}</code>`,
+        { parse_mode: 'HTML' }
+      );
+
+      // 路由到相应的处理器
+      switch (command) {
+        case '/start':
+          // 避免递归调用，直接执行初始化逻辑
+          const welcomeMessage = this.getWelcomeMessage();
+          await ctx.reply(welcomeMessage, { parse_mode: 'HTML' });
+          await this.initializeUserInBackground(ctx, [], requestId);
+          break;
+        case '/long':
+          try {
+            const { longHandler } = await import('./long.handler');
+            await longHandler.handle(ctx, commandArgs);
+          } catch (importError) {
+            logger.error(`Failed to import long handler [${requestId}]`, { error: (importError as Error).message });
+            await ctx.reply('❌ Long trading feature temporarily unavailable');
+          }
+          break;
+        case '/short':
+          try {
+            const { shortHandler } = await import('./short.handler');
+            await shortHandler.handle(ctx, commandArgs);
+          } catch (importError) {
+            logger.error(`Failed to import short handler [${requestId}]`, { error: (importError as Error).message });
+            await ctx.reply('❌ Short trading feature temporarily unavailable');
+          }
+          break;
+        case '/close':
+          try {
+            const { closeHandler } = await import('./close.handler');
+            await closeHandler.handle(ctx, commandArgs);
+          } catch (importError) {
+            logger.error(`Failed to import close handler [${requestId}]`, { error: (importError as Error).message });
+            await ctx.reply('❌ Position closing feature temporarily unavailable');
+          }
+          break;
+        case '/positions':
+          try {
+            const { positionsHandler } = await import('./positions.handler');
+            await positionsHandler.handle(ctx, commandArgs);
+          } catch (importError) {
+            logger.error(`Failed to import positions handler [${requestId}]`, { error: (importError as Error).message });
+            await ctx.reply('❌ Positions view feature temporarily unavailable');
+          }
+          break;
+        case '/wallet':
+          try {
+            const { walletHandler } = await import('./wallet.handler');
+            await walletHandler.handle(ctx, commandArgs);
+          } catch (importError) {
+            logger.error(`Failed to import wallet handler [${requestId}]`, { error: (importError as Error).message });
+            await ctx.reply('❌ Wallet feature temporarily unavailable');
+          }
+          break;
+        case '/pnl':
+          try {
+            const { pnlHandler } = await import('./pnl.handler');
+            await pnlHandler.handle(ctx, commandArgs);
+          } catch (importError) {
+            logger.error(`Failed to import pnl handler [${requestId}]`, { error: (importError as Error).message });
+            await ctx.reply('❌ PnL analysis feature temporarily unavailable');
+          }
+          break;
+        case '/push':
+          try {
+            const { pushHandler } = await import('./push.handler');
+            await pushHandler.handle(ctx, commandArgs);
+          } catch (importError) {
+            logger.error(`Failed to import push handler [${requestId}]`, { error: (importError as Error).message });
+            await ctx.reply('❌ Push settings feature temporarily unavailable');
+          }
+          break;
+        default:
+          await ctx.reply(
+            `❌ <b>Unsupported Command</b>\n\n` +
+            `Command "${command}" is not supported for group redirect`,
+            { parse_mode: 'HTML' }
+          );
+      }
+
+    } catch (error) {
+      logger.error(`Group redirect command failed [${requestId}]`, {
+        error: (error as Error).message,
+        encodedParam,
+        userId,
+        requestId
+      });
+
+      await ctx.reply(
+        '❌ <b>Command Execution Failed</b>\n\n' +
+        'Invalid command format from group redirect.\n' +
+        'Please try again or use the command directly in private chat.',
+        { parse_mode: 'HTML' }
+      );
+    }
+  }
+
+  /**
    * 获取处理器统计信息
    */
   public getStats(): any {
@@ -554,6 +691,7 @@ Please contact administrator or restart with /start
         'Background processing',
         'AccessToken caching',
         'Group usage guidance',
+        'Group command redirect handling',
         'Comprehensive error handling'
       ]
     };

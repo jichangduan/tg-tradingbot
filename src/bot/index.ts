@@ -116,6 +116,46 @@ export class TelegramBot {
       await next();
     });
 
+    // 群组命令拦截中间件 - 处理需要跳转到私聊的命令
+    this.bot.use(async (ctx, next) => {
+      const isGroup = ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
+      const messageText = ctx.message && 'text' in ctx.message ? ctx.message.text : '';
+      
+      if (isGroup && messageText?.startsWith('/')) {
+        const parts = messageText.trim().split(/\s+/);
+        const command = parts[0].toLowerCase();
+        const args = parts.slice(1);
+        
+        // 需要跳转到私聊的命令列表（保持公共命令在群组正常执行）
+        const redirectCommands = ['/start', '/long', '/short', '/close', '/positions', '/wallet', '/pnl', '/push'];
+        
+        if (redirectCommands.includes(command)) {
+          try {
+            // 动态导入处理函数避免循环依赖
+            const { handleGroupCommandRedirect } = await import('./handlers/group-redirect.handler');
+            await handleGroupCommandRedirect(ctx, command, args);
+            return; // 停止继续处理，不执行命令
+          } catch (importError) {
+            logger.error('Failed to import group redirect handler', {
+              error: (importError as Error).message,
+              command,
+              userId: ctx.from?.id,
+              requestId: ctx.requestId
+            });
+            // 如果导入失败，发送简单的错误消息
+            await ctx.reply(
+              '❌ Group redirect feature temporarily unavailable\n\n' +
+              'Please use commands directly in private chat',
+              { parse_mode: 'HTML' }
+            );
+            return;
+          }
+        }
+      }
+      
+      await next();
+    });
+
     // 群组自动绑定中间件
     this.bot.use(async (ctx, next) => {
       // 先执行命令，不阻塞用户体验
