@@ -1003,7 +1003,10 @@ export class PushHandler {
         // Update user settings
         await this.updateUserPushSetting(userIdString, type, enabled);
 
-        // 🧪 NEW: Send test push message when turning ON
+        // 🧪 COMMENTED OUT: Test push messages disabled per user request
+        // No test push messages will be sent when enabling push settings
+        // Users will wait for real push notifications instead
+        /*
         if (enabled) {
           // Check rate limiting
           const rateCheck = this.canSendTestPush(userIdString);
@@ -1051,6 +1054,7 @@ export class PushHandler {
             }
           }
         }
+        */
 
         // Get updated settings
         const { settings: updatedSettings, pushData } = await this.getUserPushSettings(userIdString);
@@ -1066,23 +1070,19 @@ export class PushHandler {
           }
         });
 
-        // Give user feedback with test push notification (only if not already sent due to rate limiting)
-        if (!(enabled && !this.canSendTestPush(userIdString).allowed)) {
-          const typeName = this.getTypeName(type);
-          const statusText = enabled ? 'enabled' : 'disabled';
-          const feedbackMessage = enabled 
-            ? `✅ ${typeName} push notifications ${statusText}! 🧪 Test message sent!`
-            : `✅ ${typeName} push notifications ${statusText}`;
-            
-          await ctx.answerCbQuery(feedbackMessage);
-        }
+        // Give user feedback (no test message notification since test messages are disabled)
+        const typeName = this.getTypeName(type);
+        const statusText = enabled ? 'enabled' : 'disabled';
+        const feedbackMessage = `✅ ${typeName} push notifications ${statusText}!`;
+        
+        await ctx.answerCbQuery(feedbackMessage);
 
         const duration = Date.now() - startTime;
         logger.info(`Push callback completed [${requestId}] - ${duration}ms`, {
           userId,
           type,
           enabled,
-          testPushSent: enabled,
+          testPushSent: false, // Test push disabled
           duration,
           requestId
         });
