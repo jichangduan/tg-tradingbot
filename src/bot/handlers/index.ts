@@ -357,8 +357,6 @@ Examples: <code>/long BTC 10x 200</code>, <code>/short ETH 5x 100</code>, <code>
 
 <b>💰 Account Management:</b>
 <code>/wallet</code> - View wallet balance
-<!-- <code>/invite</code> - View invitation stats and points -->
-<!-- <code>/points</code> - View your earned points -->
 
 <b>📢 Push Notifications:</b>
 <code>/push</code> - Manage push notification settings
