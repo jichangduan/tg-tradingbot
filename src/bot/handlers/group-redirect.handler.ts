@@ -149,7 +149,7 @@ export async function handleGroupCommandRedirect(
 🔒 <b>Private ${actionName} Required</b>
 
 pvp.trade
-nick, press ${buttonText} to open ${actionName.toLowerCase()}.
+nick, press ${buttonText} to continue in private chat.
 
 ⚠️ <i>Parameters too long for direct transfer. You'll need to enter them manually in private chat.</i>
       `.trim();
@@ -177,7 +177,7 @@ nick, press ${buttonText} to open ${actionName.toLowerCase()}.
 🔒 <b>Private ${actionName} Required</b>
 
 pvp.trade
-nick, press ${buttonText} to open a position.
+nick, press ${buttonText} to continue in private chat.
     `.trim();
     
     // 创建跳转按钮
