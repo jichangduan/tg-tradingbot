@@ -148,8 +148,9 @@ export async function handleGroupCommandRedirect(
       const message = `
 🔒 <b>Private ${actionName} Required</b>
 
-pvp.trade
-nick, press ${buttonText} to continue in private chat.
+This command contains sensitive information and must be used in private chat.
+
+Please press ${buttonText} to continue safely.
 
 ⚠️ <i>Parameters too long for direct transfer. You'll need to enter them manually in private chat.</i>
       `.trim();
@@ -176,8 +177,9 @@ nick, press ${buttonText} to continue in private chat.
     const message = `
 🔒 <b>Private ${actionName} Required</b>
 
-pvp.trade
-nick, press ${buttonText} to continue in private chat.
+This command contains sensitive information and must be used in private chat.
+
+Please press ${buttonText} to continue safely.
     `.trim();
     
     // 创建跳转按钮

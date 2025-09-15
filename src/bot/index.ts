@@ -227,7 +227,6 @@ export class TelegramBot {
               const botUsername = config.telegram.botUsername || 'yuze_trading_bot';
               const fallbackMessage = 
                 `🔒 <b>Private ${command.replace('/', '').toUpperCase()} Required</b>\n\n` +
-                `pvp.trade\n` +
                 `This command contains sensitive information and must be used in private chat.\n\n` +
                 `👉 Click here to continue: https://t.me/${botUsername}\n\n` +
                 `⚠️ <i>For security reasons, wallet and trading commands are not available in groups.</i>`;
@@ -301,7 +300,6 @@ export class TelegramBot {
               const botUsername = config.telegram.botUsername || 'yuze_trading_bot';
               const fallbackMessage = 
                 `🔒 <b>Private ${cleanCommand.replace('/', '').toUpperCase()} Required</b>\n\n` +
-                `pvp.trade\n` +
                 `This command contains sensitive information and must be used in private chat.\n\n` +
                 `👉 Click here to continue: https://t.me/${botUsername}\n\n` +
                 `⚠️ <i>For security reasons, wallet and trading commands are not available in groups.</i>`;
