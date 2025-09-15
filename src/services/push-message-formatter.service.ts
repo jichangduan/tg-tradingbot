@@ -122,9 +122,10 @@ export class PushMessageFormatterService {
    * @returns Formatted message content
    */
   public formatWhaleActionMessage(action: WhaleActionData): string {
-    if (!action || !action.address || !action.action) {
-      logger.warn('Invalid whale action data provided', { action });
-      return '🐋 Whale Alert: Invalid whale action data';
+    // 添加数据有效性验证
+    if (!this.isValidWhaleAction(action)) {
+      logger.warn('Invalid or insufficient whale action data, skipping', { action });
+      return ''; // 返回空字符串，让上层过滤掉
     }
 
     try {
@@ -138,8 +139,51 @@ export class PushMessageFormatterService {
         error: (error as Error).message,
         action
       });
-      return `🐋 Whale ${this.truncateWalletAddress(action.address)} ${action.action}`;
+      return ''; // 出错时返回空字符串，让上层过滤掉
     }
+  }
+
+  /**
+   * 验证鲸鱼动作数据是否有效
+   */
+  private isValidWhaleAction(action: WhaleActionData): boolean {
+    if (!action) {
+      return false;
+    }
+
+    // 检查地址是否有效
+    if (!action.address || action.address.length < 10) {
+      return false;
+    }
+
+    // 检查代币符号是否有效 (优先使用baseCoin)
+    const symbol = action.baseCoin || action.symbol;
+    if (!symbol || symbol === 'TOKEN' || symbol.includes('undefined')) {
+      return false;
+    }
+
+    // 检查仓位价值是否有效 (至少$1,000,000)
+    if (!action.positionValue || action.positionValue < 1000000) {
+      return false;
+    }
+
+    // 检查数量是否有效
+    if (!action.size || action.size === 0) {
+      return false;
+    }
+
+    // 检查杠杆是否有效
+    if (!action.leverage || action.leverage <= 0 || action.leverage > 100) {
+      return false;
+    }
+
+    // 检查方向是否有效
+    const side = action.side || this.extractSideFromAction(action);
+    if (!side || (side !== 'Long' && side !== 'Short')) {
+      return false;
+    }
+
+    return true;
   }
 
   /**
@@ -147,17 +191,18 @@ export class PushMessageFormatterService {
    * 模板：🐋 Whale 0x7c33…502a just closed 1.56M FARTCOIN long position (10x cross), loss 2,484.66 USDT.
    */
   private formatEnglishWhaleMessage(action: WhaleActionData, truncatedAddress: string): string {
-    // 获取基础信息
+    // 获取基础信息 (优先使用新API字段)
     const symbol = action.baseCoin || action.symbol || 'TOKEN';
     const side = action.side || this.extractSideFromAction(action);
     const operation = this.getOperationType(action);
     
-    // 格式化数量
+    // 格式化数量 (使用实际持仓数量，不是金额)
     const sizeFormatted = this.formatSize(Math.abs(action.size || 0));
     
-    // 格式化杠杆和保证金类型
-    const marginType = action.type === 'cross' ? 'cross' : action.type || 'cross';
-    const leverageInfo = `${action.leverage}x ${marginType}`;
+    // 格式化杠杆和保证金类型 (确保杠杆有效)
+    const leverage = action.leverage || 1;
+    const marginType = action.type === 'cross' ? 'cross' : (action.type || 'cross');
+    const leverageInfo = `${leverage}x ${marginType}`;
     
     // 构建主要消息: 🐋 Whale 0x7c33…502a just closed 1.56M FARTCOIN long position (10x cross)
     let message = `🐋 Whale ${truncatedAddress} just ${operation} ${sizeFormatted} ${symbol} ${side.toLowerCase()} position (${leverageInfo})`;

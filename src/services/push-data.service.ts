@@ -113,11 +113,16 @@ export class PushDataService {
   } {
     const flashNews = settings.flash_enabled ? pushData.flash_news || [] : [];
     let whaleActions = settings.whale_enabled ? pushData.whale_actions || [] : [];
-    const fundFlows = settings.fund_enabled ? pushData.fund_flows || [] : [];
+    let fundFlows = settings.fund_enabled ? pushData.fund_flows || [] : [];
     
     // 对鲸鱼交易进行金额过滤，小于$1,000,000的不推送
     if (whaleActions.length > 0) {
       whaleActions = this.filterWhaleActionsByAmount(whaleActions);
+    }
+    
+    // 对资金流向进行金额过滤，小于$1,000,000的不推送
+    if (fundFlows.length > 0) {
+      fundFlows = this.filterFundFlowsByAmount(fundFlows);
     }
     
     return { flashNews, whaleActions, fundFlows };
@@ -133,26 +138,51 @@ export class PushDataService {
     
     return whaleActions.filter(action => {
       try {
-        if (!action.amount || typeof action.amount !== 'string') {
-          return true; // 如果没有金额信息，保留
-        }
+        // 使用 positionValue 字段进行过滤，而不是 amount
+        const positionValue = action.positionValue || action.amount;
         
-        const parsedAmount = this.parseAmountToUSD(action.amount);
-        
-        // 如果解析失败，保留该条记录（保守处理）
-        if (parsedAmount === null) {
-          logger.debug('Failed to parse whale action amount, keeping record', {
-            amount: action.amount,
+        if (!positionValue) {
+          // 没有金额信息的记录直接过滤掉，避免推送异常数据
+          logger.debug('Filtering out whale action without position value', {
+            action: JSON.stringify(action),
             address: action.address
           });
-          return true;
+          return false;
+        }
+        
+        let parsedAmount: number;
+        
+        // 如果 positionValue 是数字，直接使用
+        if (typeof positionValue === 'number') {
+          parsedAmount = positionValue;
+        } 
+        // 如果是字符串，进行解析
+        else if (typeof positionValue === 'string') {
+          const parsed = this.parseAmountToUSD(positionValue);
+          if (parsed === null) {
+            logger.debug('Failed to parse whale action position value, filtering out', {
+              positionValue: positionValue,
+              address: action.address
+            });
+            return false; // 解析失败的异常数据不推送
+          }
+          parsedAmount = parsed;
+        } 
+        // 其他类型直接过滤掉
+        else {
+          logger.debug('Invalid positionValue type, filtering out', {
+            positionValue: positionValue,
+            positionValueType: typeof positionValue,
+            address: action.address
+          });
+          return false;
         }
         
         const shouldKeep = parsedAmount >= minThreshold;
         
         if (!shouldKeep) {
           logger.debug('Filtering out whale action below threshold', {
-            amount: action.amount,
+            positionValue: positionValue,
             parsedAmount: parsedAmount,
             threshold: minThreshold,
             address: action.address
@@ -166,7 +196,80 @@ export class PushDataService {
           error: (error as Error).message,
           action
         });
-        return true; // 出错时保留记录
+        return false; // 出错时不保留记录，避免推送异常数据
+      }
+    });
+  }
+
+  /**
+   * 根据交易金额过滤资金流向
+   * @param fundFlows 资金流向数组
+   * @returns 过滤后的资金流向数组
+   */
+  private filterFundFlowsByAmount(fundFlows: any[]): any[] {
+    const minThreshold = 1000000; // $1,000,000 门槛
+    
+    return fundFlows.filter(flow => {
+      try {
+        // 资金流向可能使用 amount, value, 或者其他字段
+        const flowAmount = flow.amount || flow.value || flow.positionValue;
+        
+        if (!flowAmount) {
+          // 没有金额信息的记录直接过滤掉，避免推送异常数据
+          logger.debug('Filtering out fund flow without amount value', {
+            flow: JSON.stringify(flow),
+            address: flow.address || flow.from || flow.to
+          });
+          return false;
+        }
+        
+        let parsedAmount: number;
+        
+        // 如果金额是数字，直接使用
+        if (typeof flowAmount === 'number') {
+          parsedAmount = flowAmount;
+        } 
+        // 如果是字符串，进行解析
+        else if (typeof flowAmount === 'string') {
+          const parsed = this.parseAmountToUSD(flowAmount);
+          if (parsed === null) {
+            logger.debug('Failed to parse fund flow amount, filtering out', {
+              amount: flowAmount,
+              address: flow.address || flow.from || flow.to
+            });
+            return false; // 解析失败的异常数据不推送
+          }
+          parsedAmount = parsed;
+        } 
+        // 其他类型直接过滤掉
+        else {
+          logger.debug('Invalid fund flow amount type, filtering out', {
+            amount: flowAmount,
+            amountType: typeof flowAmount,
+            address: flow.address || flow.from || flow.to
+          });
+          return false;
+        }
+        
+        const shouldKeep = parsedAmount >= minThreshold;
+        
+        if (!shouldKeep) {
+          logger.debug('Filtering out fund flow below threshold', {
+            amount: flowAmount,
+            parsedAmount: parsedAmount,
+            threshold: minThreshold,
+            address: flow.address || flow.from || flow.to
+          });
+        }
+        
+        return shouldKeep;
+        
+      } catch (error) {
+        logger.warn('Error filtering fund flow by amount', {
+          error: (error as Error).message,
+          flow
+        });
+        return false; // 出错时不保留记录，避免推送异常数据
       }
     });
   }
