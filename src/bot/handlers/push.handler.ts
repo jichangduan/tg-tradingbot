@@ -1207,9 +1207,11 @@ ${emoji} <b>${typeName} Push Enabled!</b>
     const requestId = ctx.requestId || 'unknown';
 
     try {
-      logger.info(`Push callback received [${requestId}]`, {
+      logger.info(`🔘 [CALLBACK_DEBUG] Push callback received [${requestId}]`, {
         userId,
         callbackData,
+        callbackDataLength: callbackData.length,
+        callbackDataType: typeof callbackData,
         requestId
       });
 
@@ -1233,12 +1235,21 @@ ${emoji} <b>${typeName} Push Enabled!</b>
         const [, type, value] = callbackParts;
         const enabled = value === 'true';
         
+        logger.info(`🔄 [TOGGLE_DEBUG] Processing toggle action [${requestId}]`, {
+          userId,
+          type,
+          value,
+          enabled,
+          callbackParts,
+          requestId
+        });
+        
         // Update user settings
         await this.updateUserPushSetting(userIdString, type, enabled);
 
         // 当开启推送时，立即推送一次该类型的数据
         if (enabled) {
-          logger.info(`Sending immediate push on enable: ${type} [${requestId}]`, {
+          logger.info(`🚀 [IMMEDIATE_PUSH_TRIGGER] Sending immediate push on enable: ${type} [${requestId}]`, {
             userId,
             type,
             requestId
