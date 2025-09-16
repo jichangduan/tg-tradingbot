@@ -57,7 +57,7 @@ export class MarketsHandler {
         undefined,
         formattedMessage,
         { 
-          parse_mode: 'Markdown',
+          parse_mode: 'HTML',
           reply_markup: keyboard
         }
       );
@@ -137,8 +137,8 @@ export class MarketsHandler {
       const endIndex = startIndex + itemsPerPage;
       const pageData = marketData.slice(startIndex, endIndex);
 
-      // Header with code block for perfect alignment
-      let message = `🏪 *PERP MARKETS*\n\n\`\`\`\n`;
+      // Header with HTML pre tag for perfect alignment without copy button
+      let message = `🏪 <b>PERP MARKETS</b>\n\n<pre>\n`;
       
       // Format each coin with precise column alignment
       pageData.forEach((coin) => {
@@ -157,8 +157,8 @@ export class MarketsHandler {
         message += `${tokenName}${price}  ${change}\n`;
       });
 
-      // Close code block
-      message += `\`\`\``;
+      // Close pre tag
+      message += `</pre>`;
 
       return message;
 
@@ -302,7 +302,7 @@ export class MarketsHandler {
       
       // Update message
       await ctx.editMessageText(formattedMessage, {
-        parse_mode: 'Markdown',
+        parse_mode: 'HTML',
         reply_markup: keyboard
       });
       
