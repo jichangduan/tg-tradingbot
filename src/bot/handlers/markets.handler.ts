@@ -1,4 +1,5 @@
 import { Context } from 'telegraf';
+import { InlineKeyboardMarkup } from 'telegraf/typings/core/types/typegram';
 import { logger } from '../../utils/logger';
 import { apiService } from '../../services/api.service';
 
@@ -46,15 +47,19 @@ export class MarketsHandler {
       // Get market data
       const marketData = await this.fetchMarketData();
       
-      // Format and send text response directly
-      const formattedMessage = this.formatMarketMessage(marketData);
+      // Format and send text response with pagination (default page 1)
+      const formattedMessage = this.formatMarketMessage(marketData, 1);
+      const keyboard = this.createMarketsKeyboard(1, marketData.length);
       
       await ctx.telegram.editMessageText(
         ctx.chat?.id,
         loadingMessage.message_id,
         undefined,
         formattedMessage,
-        { parse_mode: 'Markdown' }
+        { 
+          parse_mode: 'Markdown',
+          reply_markup: keyboard
+        }
       );
 
       logger.info('Markets data sent successfully', {
@@ -119,36 +124,31 @@ export class MarketsHandler {
   }
 
   /**
-   * Format market data as Telegram message
+   * Format market data as Telegram message with pagination
    */
-  private formatMarketMessage(marketData: MarketData[]): string {
+  private formatMarketMessage(marketData: MarketData[], page: number = 1): string {
     try {
-      // Header matching Image #1 style
-      let message = '🏪 *PERP MARKETS*\\n\\n';
+      const itemsPerPage = 10;
+      const totalPages = Math.ceil(marketData.length / itemsPerPage);
+      const startIndex = (page - 1) * itemsPerPage;
+      const endIndex = startIndex + itemsPerPage;
+      const pageData = marketData.slice(startIndex, endIndex);
+
+      // Header with page info
+      let message = `🏪 *PERP MARKETS*                    第 ${page}/${totalPages} 页\n\n`;
       
       // Format each coin in a clean single-line format
-      marketData.forEach((coin) => {
+      pageData.forEach((coin) => {
         const priceText = this.formatPrice(coin.price);
         const changeText = this.formatChangeText(coin.change);
         
         // Create aligned format: TOKEN    PRICE    CHANGE%
-        const tokenName = coin.name.padEnd(8);
-        const price = `$${priceText}`.padStart(12);
-        const change = changeText.padStart(8);
+        const tokenName = coin.name.padEnd(12);
+        const price = `$${priceText}`.padStart(15);
+        const change = changeText.padStart(10);
         
-        message += `${tokenName}${price}      ${change}\\n`;
+        message += `${tokenName}${price}   ${change}\n`;
       });
-
-      // Add update time
-      const updateTime = new Date().toLocaleTimeString('en-US', {
-        hour12: false,
-        hour: '2-digit', 
-        minute: '2-digit'
-      });
-      message += `\\n⏰ Updated: ${updateTime} UTC`;
-      
-      // Add usage tip
-      message += '\\n\\n💡 Use `/price <token>` for detailed information';
 
       return message;
 
@@ -193,6 +193,72 @@ export class MarketsHandler {
       return price.toFixed(4);
     } else {
       return price.toFixed(8);
+    }
+  }
+
+  /**
+   * Create markets pagination keyboard
+   */
+  private createMarketsKeyboard(currentPage: number, totalItems: number): InlineKeyboardMarkup {
+    const itemsPerPage = 10;
+    const totalPages = Math.ceil(totalItems / itemsPerPage);
+    
+    const buttons = [];
+    
+    // Previous page button
+    if (currentPage > 1) {
+      buttons.push({
+        text: '⬅️ 上一页',
+        callback_data: `markets_page_${currentPage - 1}`
+      });
+    }
+    
+    // Next page button  
+    if (currentPage < totalPages) {
+      buttons.push({
+        text: '下一页 ➡️',
+        callback_data: `markets_page_${currentPage + 1}`
+      });
+    }
+    
+    return {
+      inline_keyboard: buttons.length > 0 ? [buttons] : []
+    };
+  }
+
+  /**
+   * Handle markets pagination callback
+   */
+  public async handleCallback(ctx: Context): Promise<void> {
+    const callbackData = ctx.callbackQuery && 'data' in ctx.callbackQuery ? ctx.callbackQuery.data : undefined;
+    if (!callbackData || !callbackData.startsWith('markets_page_')) return;
+
+    try {
+      const page = parseInt(callbackData.replace('markets_page_', ''));
+      
+      // Show loading status
+      await ctx.answerCbQuery('🔄 加载中...');
+      
+      // Get fresh market data
+      const marketData = await this.fetchMarketData();
+      
+      // Format message for requested page
+      const formattedMessage = this.formatMarketMessage(marketData, page);
+      const keyboard = this.createMarketsKeyboard(page, marketData.length);
+      
+      // Update message
+      await ctx.editMessageText(formattedMessage, {
+        parse_mode: 'Markdown',
+        reply_markup: keyboard
+      });
+      
+    } catch (error) {
+      logger.error('Failed to handle markets pagination callback', {
+        error: (error as Error).message,
+        callbackData
+      });
+      
+      await ctx.answerCbQuery('❌ 翻页失败，请重试');
     }
   }
 

@@ -690,6 +690,12 @@ Need help? Send <code>/help</code> to view complete guide 📚
         return;
       }
 
+      // 路由markets分页相关的回调到marketsHandler
+      if (typeof callbackData === 'string' && callbackData.startsWith('markets_page_')) {
+        await marketsHandler.handleCallback(ctx);
+        return;
+      }
+
       // 处理群组使用说明回调
       if (typeof callbackData === 'string' && callbackData === 'group_usage_guide') {
         await startHandler.handleGroupUsageGuide(ctx);
