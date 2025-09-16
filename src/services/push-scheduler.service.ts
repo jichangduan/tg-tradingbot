@@ -43,31 +43,27 @@ export class PushSchedulerService {
     }
 
     try {
-      // 使用统一的cron配置常量：生产环境20分钟，测试环境2分钟，开发环境1分钟
+      // 🚧 TEMPORARY FIX: 强制使用2分钟间隔，绕过环境变量问题
       const environment = process.env.NODE_ENV || 'development';
-      const cronPattern = environment === 'production' 
-        ? PUSH_CONSTANTS.CRON.PRODUCTION
-        : environment === 'testing'
-        ? PUSH_CONSTANTS.CRON.TESTING
-        : PUSH_CONSTANTS.CRON.TEST;
+      const cronPattern = '*/2 * * * *';  // 强制每2分钟执行一次
       
-      // 🔍 详细记录环境配置信息
-      const getSchedulingInterval = (env: string) => {
-        switch (env) {
-          case 'production': return '20 minutes';
-          case 'testing': return '2 minutes';
-          default: return '1 minute';
-        }
-      };
-
-      logger.info('📅 [PUSH_SCHEDULER] Environment configuration verified', {
-        environment,
-        cronPattern,
-        productionPattern: PUSH_CONSTANTS.CRON.PRODUCTION,
-        testingPattern: PUSH_CONSTANTS.CRON.TESTING,
-        testPattern: PUSH_CONSTANTS.CRON.TEST,
-        schedulingInterval: getSchedulingInterval(environment),
-        timezone: 'Asia/Shanghai'
+      logger.warn('🚧 [TEMP_FIX] Using forced 2-minute interval', {
+        detectedEnvironment: environment,
+        forcedCronPattern: cronPattern,
+        reason: 'environment_variable_issue_on_server'
+      });
+      
+      // 🚨 强制记录实际环境状态和修复信息
+      logger.error('🚨 [ENVIRONMENT_DEBUG] Detailed environment analysis', {
+        nodeEnvFromProcess: process.env.NODE_ENV,
+        nodeEnvOrDefault: environment,
+        forcedCronPattern: cronPattern,
+        expectedForTesting: PUSH_CONSTANTS.CRON.TESTING,
+        actuallyUsing: '2_minute_forced_interval',
+        environmentIssue: 'server_env_not_synced',
+        shouldBeUsing: 'TESTING_environment_with_2min_interval',
+        timezone: 'Asia/Shanghai',
+        timestamp: new Date().toISOString()
       });
 
       this.scheduleTask = cron.schedule(cronPattern, async () => {
@@ -85,7 +81,8 @@ export class PushSchedulerService {
         isRunning: this.isRunning,
         cronPattern,
         environment,
-        nextExecutionEstimate: `in ${getSchedulingInterval(environment)}`
+        nextExecutionEstimate: 'in 2 minutes (forced)',
+        fixApplied: 'forced_2_minute_interval'
       });
 
       // 添加测试用户以便测试推送功能
@@ -128,12 +125,31 @@ export class PushSchedulerService {
     await this.executeScheduledPush();
   }
 
+  // 记录上次推送时间，用于计算实际间隔
+  private lastPushTime: number = 0;
+
   /**
    * 执行定时推送任务
    */
   private async executeScheduledPush(): Promise<void> {
     const startTime = Date.now();
     const executionId = `push_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+
+    // 🕐 记录实际推送间隔
+    const actualInterval = this.lastPushTime > 0 ? startTime - this.lastPushTime : 0;
+    const actualIntervalMinutes = actualInterval / (1000 * 60);
+    
+    logger.error('⏰ [PUSH_INTERVAL_DEBUG] Push execution timing analysis', {
+      executionId,
+      currentTime: new Date(startTime).toISOString(),
+      lastPushTime: this.lastPushTime > 0 ? new Date(this.lastPushTime).toISOString() : 'first_execution',
+      actualIntervalMs: actualInterval,
+      actualIntervalMinutes: actualIntervalMinutes.toFixed(2),
+      expectedInterval: '2_minutes',
+      intervalAccurate: Math.abs(actualIntervalMinutes - 2) < 0.1 ? 'YES' : 'NO'
+    });
+    
+    this.lastPushTime = startTime;
 
     try {
 
@@ -565,11 +581,8 @@ export class PushSchedulerService {
     environment: string;
   } {
     const environment = process.env.NODE_ENV || 'development';
-    const cronPattern = environment === 'production' 
-      ? PUSH_CONSTANTS.CRON.PRODUCTION
-      : environment === 'testing'
-      ? PUSH_CONSTANTS.CRON.TESTING
-      : PUSH_CONSTANTS.CRON.TEST;
+    // 🚧 TEMPORARY FIX: 强制使用2分钟间隔
+    const cronPattern = '*/2 * * * *';
     
     return {
       isRunning: this.isRunning,
