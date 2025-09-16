@@ -697,20 +697,37 @@ export class PushMessageFormatterService {
         }
       }
 
-      // Process whale actions - send individual messages (no batch merging)
+      // Process whale actions - only send the one with highest USDT amount
       if (whaleActions.length > 0) {
-        whaleActions.forEach(action => {
-          const singleMessage = this.formatWhaleActionMessage(action);
-          if (singleMessage) {
-            // Create individual message with trading keyboard
-            const actionMessage: FormattedPushMessage = {
-              content: singleMessage,
-              type: 'whale_action',
-              keyboard: this.createTradingKeyboard(action.symbol || 'BTC')
-            };
-            messages.push(actionMessage);
+        let selectedAction: WhaleActionData;
+        
+        if (whaleActions.length === 1) {
+          // Single whale action keeps original format
+          selectedAction = whaleActions[0];
+        } else {
+          // Multiple whale actions: select the one with highest USDT amount
+          const highestAction = this.findHighestUSDTWhaleAction(whaleActions);
+          if (!highestAction) {
+            // If no valid action found, use the first one as fallback
+            selectedAction = whaleActions[0];
+            logger.warn('No valid USDT amount found in whale actions, using first action as fallback', {
+              totalActions: whaleActions.length
+            });
+          } else {
+            selectedAction = highestAction;
           }
-        });
+        }
+
+        // Format and send only the selected action
+        const singleMessage = this.formatWhaleActionMessage(selectedAction);
+        if (singleMessage) {
+          const actionMessage: FormattedPushMessage = {
+            content: singleMessage,
+            type: 'whale_action',
+            keyboard: this.createTradingKeyboard(selectedAction.symbol || 'BTC')
+          };
+          messages.push(actionMessage);
+        }
       }
 
       // Process fund flows - merge to one message
@@ -1133,6 +1150,83 @@ export class PushMessageFormatterService {
     });
 
     return highestFlow;
+  }
+
+  /**
+   * 从whale action中提取USDT金额
+   * @param action Whale action数据
+   * @returns 提取的USDT金额，如果无法提取则返回0
+   */
+  private extractWhaleActionUSDTAmount(action: WhaleActionData): number {
+    try {
+      // 优先从unrealizedPnl中提取
+      if (action.unrealizedPnl !== undefined && action.unrealizedPnl !== 0) {
+        return Math.abs(action.unrealizedPnl); // 使用绝对值比较
+      }
+
+      // 其次从amount字段中提取USDT金额
+      if (action.amount) {
+        const usdtRegex = /([0-9,]+(?:\.[0-9]+)?)\s*USDT/i;
+        const match = action.amount.match(usdtRegex);
+        if (match && match[1]) {
+          const amount = parseFloat(match[1].replace(/,/g, ''));
+          return isNaN(amount) ? 0 : amount;
+        }
+      }
+
+      // 最后尝试从positionValue中提取（如果是数字）
+      if (action.positionValue && typeof action.positionValue === 'number') {
+        return action.positionValue;
+      }
+
+      // 尝试从action字段中提取USDT信息
+      if (action.action) {
+        const usdtRegex = /([0-9,]+(?:\.[0-9]+)?)\s*USDT/i;
+        const match = action.action.match(usdtRegex);
+        if (match && match[1]) {
+          const amount = parseFloat(match[1].replace(/,/g, ''));
+          return isNaN(amount) ? 0 : amount;
+        }
+      }
+
+      return 0;
+    } catch (error) {
+      logger.warn('Failed to extract USDT amount from whale action', {
+        error: (error as Error).message,
+        action
+      });
+      return 0;
+    }
+  }
+
+  /**
+   * 从whale actions中找到USDT金额最高的一条
+   * @param whaleActions Whale action数据数组
+   * @returns USDT金额最高的whale action，如果没有则返回null
+   */
+  private findHighestUSDTWhaleAction(whaleActions: WhaleActionData[]): WhaleActionData | null {
+    if (!whaleActions || whaleActions.length === 0) {
+      return null;
+    }
+
+    let highestAction: WhaleActionData | null = null;
+    let highestAmount = 0;
+
+    for (const action of whaleActions) {
+      const amount = this.extractWhaleActionUSDTAmount(action);
+      if (amount > highestAmount) {
+        highestAmount = amount;
+        highestAction = action;
+      }
+    }
+
+    logger.info('🐋 [WHALE_ACTION_FILTER] Found highest USDT amount whale action', {
+      totalActions: whaleActions.length,
+      highestAmount,
+      selectedAction: highestAction ? `${highestAction.address?.substring(0, 8)}...${highestAction.action || 'N/A'}` : null
+    });
+
+    return highestAction;
   }
 }
 
