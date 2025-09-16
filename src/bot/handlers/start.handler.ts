@@ -272,13 +272,13 @@ Initializing your account, please wait...
    */
   private async sendErrorMessage(ctx: Context, error: Error): Promise<void> {
     const errorMessage = 
-      '❌ <b>系统错误</b>\n\n' +
-      '很抱歉，处理您的请求时出现了意外错误。\n\n' +
-      '💡 <b>您可以尝试:</b>\n' +
-      '• 稍后重试 /start 命令\n' +
-      '• 查看帮助信息 /help\n' +
-      '• 直接开始使用 /price BTC\n\n' +
-      '<i>如果问题持续存在，请联系管理员</i>';
+      '❌ <b>System Error</b>\n\n' +
+      'Sorry, an unexpected error occurred while processing your request.\n\n' +
+      '💡 <b>You can try:</b>\n' +
+      '• Retry /start command later\n' +
+      '• Check help information /help\n' +
+      '• Start using directly /price BTC\n\n' +
+      '<i>If the problem persists, please contact admin</i>';
 
     try {
       await ctx.reply(errorMessage, { parse_mode: 'HTML' });

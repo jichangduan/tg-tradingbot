@@ -488,7 +488,7 @@ export class TelegramBot {
 
       // 发送用户友好的错误消息
       try {
-        await ctx.reply('❌ 系统错误，请稍后重试\n\n如果问题持续存在，请联系管理员');
+        await ctx.reply('❌ System error, please try again later\n\nIf the problem persists, please contact admin');
       } catch (replyError) {
         logger.error(`Failed to send error reply [${requestId}]`, {
           error: (replyError as Error).message,

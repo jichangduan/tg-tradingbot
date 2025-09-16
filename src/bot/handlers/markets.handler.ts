@@ -289,7 +289,7 @@ export class MarketsHandler {
       }
       
       // Show loading status
-      await ctx.answerCbQuery('🔄 加载中...');
+      await ctx.answerCbQuery('🔄 Loading...');
       
       // Get fresh market data
       const marketData = await this.fetchMarketData();
@@ -297,7 +297,7 @@ export class MarketsHandler {
       // Validate page number
       const totalPages = Math.ceil(marketData.length / 10);
       if (page < 1 || page > totalPages) {
-        await ctx.answerCbQuery('❌ 页码无效');
+        await ctx.answerCbQuery('❌ Invalid page');
         return;
       }
       
@@ -317,7 +317,7 @@ export class MarketsHandler {
         callbackData
       });
       
-      await ctx.answerCbQuery('❌ 翻页失败，请重试');
+      await ctx.answerCbQuery('❌ Pagination failed, please retry');
     }
   }
 

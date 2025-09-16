@@ -174,13 +174,13 @@ export class PriceHandler {
    */
   private async sendGenericErrorMessage(ctx: Context): Promise<void> {
     const errorMessage = 
-      '❌ <b>系统错误</b>\n\n' +
-      '很抱歉，处理您的请求时出现了意外错误。\n\n' +
-      '💡 <b>您可以尝试:</b>\n' +
-      '• 稍后重试\n' +
-      '• 检查代币符号是否正确\n' +
-      '• 使用常见代币 (如 BTC, ETH, SOL)\n\n' +
-      '<i>如果问题持续存在，请联系管理员</i>';
+      '❌ <b>System Error</b>\n\n' +
+      'Sorry, an unexpected error occurred while processing your request.\n\n' +
+      '💡 <b>You can try:</b>\n' +
+      '• Retry later\n' +
+      '• Check if token symbol is correct\n' +
+      '• Use common tokens (like BTC, ETH, SOL)\n\n' +
+      '<i>If the problem persists, please contact admin</i>';
 
     await ctx.reply(errorMessage, { parse_mode: 'HTML' });
   }
