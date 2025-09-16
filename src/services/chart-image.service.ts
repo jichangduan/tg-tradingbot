@@ -358,8 +358,8 @@ export class ChartImageService {
       const chartConfig: QuickChartConfig = {
         type: ChartType.MARKETS_TABLE,
         theme: 'dark',
-        width: 900,
-        height: 600
+        width: 400,
+        height: Math.max(400, marketsData.markets.length * 45 + 100) // 动态高度，每行45px
       };
 
       // 生成图表图像
@@ -991,136 +991,81 @@ export class ChartImageService {
   }
 
   /**
-   * 创建Markets表格图表Chart.js配置（OKX风格）
+   * 创建Markets表格图表Chart.js配置（仿制Image #2样式）
    */
   private createMarketsChartJsConfig(config: QuickChartConfig, marketsData: MarketsTableData): ChartJsConfig {
     const isDark = config.theme === 'dark';
     
-    // 准备表格数据
+    // 构建数据和标签
     const labels = marketsData.markets.map(market => market.name);
     const prices = marketsData.markets.map(market => market.price);
     const changes = marketsData.markets.map(market => market.change);
-    
-    // 根据涨跌幅设置颜色
-    const backgroundColors = changes.map(change => {
-      if (change > 0) return '#00ff88';      // 绿色（上涨）
-      if (change < 0) return '#ff3366';      // 红色（下跌）
-      return '#888888';                      // 灰色（无变化）
-    });
-    
-    const borderColors = backgroundColors.map(color => color);
 
     return {
       type: 'bar',
       data: {
         labels: labels,
-        datasets: [
-          {
-            label: 'Price ($)',
-            data: prices,
-            backgroundColor: backgroundColors,
-            borderColor: borderColors,
-            borderWidth: 1,
-            barThickness: 30,
-            maxBarThickness: 40
-          }
-        ]
+        datasets: [{
+          label: 'Price',
+          data: prices.map(() => 0), // 所有数据设为0，隐藏条形图
+          backgroundColor: 'rgba(0,0,0,0)', // 透明背景
+          borderColor: 'rgba(0,0,0,0)', // 透明边框
+          borderWidth: 0,
+          barThickness: 1 // 最小厚度
+        }]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        indexAxis: 'y', // 水平条形图，类似截图中的样式
+        indexAxis: 'y', // 水平条形图布局
         plugins: {
           title: {
             display: true,
-            text: marketsData.title || 'PERP MARKETS',
-            color: isDark ? '#ffffff' : '#000000',
+            text: 'PERP MARKETS',
+            color: '#ffffff',
             font: {
-              size: 20,
+              size: 16,
               weight: 'bold',
-              family: 'Inter, -apple-system, sans-serif'
+              family: 'Arial, sans-serif'
             },
-            padding: 25,
+            padding: { top: 15, bottom: 10 },
             align: 'start'
           },
           legend: {
-            display: false // 隐藏图例，保持简洁
+            display: false
           },
           tooltip: {
-            enabled: true,
-            backgroundColor: isDark ? 'rgba(0, 0, 0, 0.9)' : 'rgba(255, 255, 255, 0.9)',
-            titleColor: isDark ? '#ffffff' : '#000000',
-            bodyColor: isDark ? '#ffffff' : '#000000',
-            borderColor: '#666666',
-            borderWidth: 1,
-            cornerRadius: 8,
-            displayColors: false,
-            callbacks: {
-              title: (context: any) => {
-                const index = context[0].dataIndex;
-                return marketsData.markets[index].name;
-              },
-              label: (context: any) => {
-                const index = context.dataIndex;
-                const market = marketsData.markets[index];
-                const changeText = market.change >= 0 ? `+${market.change.toFixed(2)}%` : `${market.change.toFixed(2)}%`;
-                return [
-                  `Price: $${market.price.toLocaleString()}`,
-                  `24h Change: ${changeText}`
-                ];
-              }
-            }
+            enabled: false
           }
         },
         scales: {
           x: {
-            type: 'linear',
-            beginAtZero: true,
-            grid: {
-              display: true,
-              color: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
-              drawBorder: false
-            },
-            ticks: {
-              color: isDark ? '#999999' : '#666666',
-              font: {
-                size: 11,
-                family: 'Inter, monospace'
-              },
-              callback: (value: any) => {
-                const num = Number(value);
-                if (num >= 1000000) {
-                  return `$${(num / 1000000).toFixed(1)}M`;
-                } else if (num >= 1000) {
-                  return `$${(num / 1000).toFixed(1)}K`;
-                } else if (num >= 1) {
-                  return `$${num.toFixed(0)}`;
-                } else {
-                  return `$${num.toFixed(4)}`;
-                }
-              }
-            },
-            title: {
-              display: false
-            }
+            display: false, // 完全隐藏X轴
+            min: 0,
+            max: 1
           },
           y: {
             grid: {
-              display: false
+              display: false,
+              drawBorder: false
             },
             ticks: {
-              color: isDark ? '#ffffff' : '#000000',
+              color: '#ffffff',
               font: {
-                size: 13,
-                weight: '600',
-                family: 'Inter, monospace'
+                size: 12,
+                family: 'Arial, sans-serif'
               },
+              padding: 10,
               callback: (value: any, index: number) => {
-                // 自定义Y轴标签，显示代币名称和涨跌幅
+                // 自定义Y轴标签，组合显示所有信息
                 if (index < marketsData.markets.length) {
                   const market = marketsData.markets[index];
+                  const priceText = this.formatPriceForTable(market.price);
                   const changeText = market.change >= 0 ? `+${market.change.toFixed(2)}%` : `${market.change.toFixed(2)}%`;
-                  return `${market.name} ${changeText}`;
+                  const changeColor = market.change >= 0 ? '🟢' : '🔴';
+                  
+                  // 返回组合的字符串：币种名称 + 价格 + 涨跌幅
+                  return `${market.name}    ${priceText}    ${changeColor}${changeText}`;
                 }
                 return '';
               }
@@ -1130,18 +1075,22 @@ export class ChartImageService {
             }
           }
         },
-        backgroundColor: isDark ? '#0d1421' : '#ffffff',
+        backgroundColor: '#1a1a1a', // 深色背景
         layout: {
           padding: {
-            left: 25,
-            right: 25,
-            top: 20,
-            bottom: 20
+            left: 15,
+            right: 15,
+            top: 5,
+            bottom: 15
           }
+        },
+        interaction: {
+          intersect: false,
+          mode: 'nearest'
         },
         elements: {
           bar: {
-            borderRadius: 4 // 圆角条形
+            borderRadius: 0
           }
         }
       }
@@ -1516,6 +1465,29 @@ export class ChartImageService {
         maximumFractionDigits: 0 
       });
       return `$${formatted}`;
+    }
+  }
+
+  /**
+   * 格式化价格显示用于表格 (简化版本)
+   * 专门用于Markets表格显示
+   */
+  private formatPriceForTable(price: number): string {
+    if (price < 0.01) {
+      // 非常小的价格，显示4位小数
+      return `$${price.toFixed(4)}`;
+    } else if (price < 1) {
+      // 小价格，显示4位小数 (如: $0.1234)
+      return `$${price.toFixed(4)}`;
+    } else if (price < 1000) {
+      // 中等价格，显示2位小数 (如: $23.45)
+      return `$${price.toFixed(2)}`;
+    } else {
+      // 高价格，使用千分位格式 (如: $12,345)
+      return `$${price.toLocaleString('en-US', { 
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0 
+      })}`;
     }
   }
 
