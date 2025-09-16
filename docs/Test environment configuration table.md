@@ -16,7 +16,7 @@
 
 **AIW3 后台 API 地址**
 - 测试环境: https://api-test1.aiw3.ai
-- 生产环境: ❓需确认 https://tgbot-api.aiw3.ai
+- 生产环境: ❓需确认 https://api.aiw3.ai
 
 **AIW3 API Key**
 - 测试环境: J0nWlQ3mOp9a8yR6KzXuVbL7TsI2dFx4
@@ -38,9 +38,6 @@
 - 测试环境: info
 - 生产环境: warn
 
-**推送间隔**
-- 测试环境: 1分钟
-- 生产环境: 20分钟
 
 ## 需要切换的API接口
 
