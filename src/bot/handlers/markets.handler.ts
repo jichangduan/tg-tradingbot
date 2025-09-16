@@ -1,8 +1,6 @@
 import { Context } from 'telegraf';
 import { logger } from '../../utils/logger';
 import { apiService } from '../../services/api.service';
-import { messageFormatter } from '../utils/message.formatter';
-import { chartImageService, MarketsTableData, MarketDataItem } from '../../services/chart-image.service';
 
 /**
  * Market data interface response types
@@ -48,69 +46,22 @@ export class MarketsHandler {
       // Get market data
       const marketData = await this.fetchMarketData();
       
-      // Try to generate market chart image
-      let useImageChart = true;
-      let chartImage;
+      // Format and send text response directly
+      const formattedMessage = this.formatMarketMessage(marketData);
       
-      try {
-        const marketsTableData = this.convertToMarketsTableData(marketData);
-        chartImage = await chartImageService.generateMarketsChart(marketsTableData);
-      } catch (imageError) {
-        logger.warn('Markets chart generation failed, falling back to text format', {
-          error: (imageError as Error).message,
-          userId
-        });
-        useImageChart = false;
-      }
+      await ctx.telegram.editMessageText(
+        ctx.chat?.id,
+        loadingMessage.message_id,
+        undefined,
+        formattedMessage,
+        { parse_mode: 'Markdown' }
+      );
 
-      // Send response
-      try {
-        if (useImageChart && chartImage) {
-          // Send clean chart image
-          await ctx.telegram.deleteMessage(ctx.chat?.id!, loadingMessage.message_id);
-          
-          await ctx.replyWithPhoto(
-            { source: chartImage.imageBuffer },
-            {
-              caption: '📊 <b>PERP MARKETS</b>\n\n<i>💡 Use /price &lt;token&gt; for detailed information</i>',
-              parse_mode: 'HTML'
-            }
-          );
-        } else {
-          // Fallback to text format
-          const formattedMessage = this.formatMarketMessage(marketData);
-          
-          await ctx.telegram.editMessageText(
-            ctx.chat?.id,
-            loadingMessage.message_id,
-            undefined,
-            formattedMessage,
-            { parse_mode: 'Markdown' }
-          );
-        }
-
-        logger.info('Markets data sent successfully', {
-          userId,
-          dataCount: marketData.length,
-          chartType: useImageChart ? 'image' : 'text'
-        });
-
-      } catch (messageError) {
-        logger.error('Failed to send markets message', {
-          error: (messageError as Error).message,
-          userId
-        });
-
-        // Final fallback - send simple text message
-        try {
-          const formattedMessage = this.formatMarketMessage(marketData);
-          await ctx.reply(formattedMessage, { parse_mode: 'Markdown' });
-        } catch (fallbackError) {
-          logger.error('Fallback message also failed', {
-            error: (fallbackError as Error).message
-          });
-        }
-      }
+      logger.info('Markets data sent successfully', {
+        userId,
+        dataCount: marketData.length,
+        format: 'text'
+      });
 
     } catch (error) {
       logger.error('Failed to handle markets command', {
@@ -121,7 +72,7 @@ export class MarketsHandler {
 
       // Send user-friendly error message
       await ctx.reply(
-        '❌ Query Failed\n\n' +
+        '❌ Query Failed\\n\\n' +
         'Error occurred while fetching market data, please try again later.',
         { parse_mode: 'HTML' }
       );
@@ -172,29 +123,32 @@ export class MarketsHandler {
    */
   private formatMarketMessage(marketData: MarketData[]): string {
     try {
-      // Message header
-      let message = '🏪 *Major Cryptocurrency Market Data*\n\n';
+      // Header matching Image #1 style
+      let message = '🏪 *PERP MARKETS*\\n\\n';
       
-      // Add information for each coin
-      marketData.forEach((coin, index) => {
-        const changeEmoji = this.getChangeEmoji(coin.change);
-        const changeText = this.formatChangeText(coin.change);
+      // Format each coin in a clean single-line format
+      marketData.forEach((coin) => {
         const priceText = this.formatPrice(coin.price);
+        const changeText = this.formatChangeText(coin.change);
         
-        message += `${index + 1}. *${coin.name}*\n`;
-        message += `   💰 $${priceText}\n`;
-        message += `   ${changeEmoji} ${changeText}\n\n`;
+        // Create aligned format: TOKEN    PRICE    CHANGE%
+        const tokenName = coin.name.padEnd(8);
+        const price = `$${priceText}`.padStart(12);
+        const change = changeText.padStart(8);
+        
+        message += `${tokenName}${price}      ${change}\\n`;
       });
 
       // Add update time
-      const updateTime = new Date().toLocaleString('en-US', {
-        timeZone: 'UTC',
-        hour12: false
+      const updateTime = new Date().toLocaleTimeString('en-US', {
+        hour12: false,
+        hour: '2-digit', 
+        minute: '2-digit'
       });
-      message += `\n⏰ Updated: ${updateTime} UTC`;
+      message += `\\n⏰ Updated: ${updateTime} UTC`;
       
       // Add usage tip
-      message += '\n\n💡 Use `/price <token>` to view detailed price information';
+      message += '\\n\\n💡 Use `/price <token>` for detailed information';
 
       return message;
 
@@ -205,25 +159,6 @@ export class MarketsHandler {
       });
       throw new Error('Message formatting failed');
     }
-  }
-
-  /**
-   * Convert API market data to chart table data format
-   */
-  private convertToMarketsTableData(marketData: MarketData[]): MarketsTableData {
-    const markets: MarketDataItem[] = marketData.map(market => ({
-      name: market.name,
-      price: market.price,
-      change: market.change,
-      volume: undefined, // API doesn't provide volume data
-      marketCap: undefined // API doesn't provide market cap data
-    }));
-
-    return {
-      title: 'PERP MARKETS',
-      markets: markets,
-      timestamp: Date.now()
-    };
   }
 
   /**
