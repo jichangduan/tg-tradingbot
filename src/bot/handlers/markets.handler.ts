@@ -112,7 +112,10 @@ export class MarketsHandler {
         throw new Error('No valid market data received from API');
       }
 
-      logger.debug(`Successfully fetched ${validData.length} market entries`);
+      logger.debug(`Successfully fetched ${validData.length} market entries`, {
+        totalEntries: validData.length,
+        entries: validData.map(item => ({ name: item.name, price: item.price, change: item.change }))
+      });
       return validData;
 
     } catch (error) {
@@ -134,21 +137,27 @@ export class MarketsHandler {
       const endIndex = startIndex + itemsPerPage;
       const pageData = marketData.slice(startIndex, endIndex);
 
-      // Header with page info
-      let message = `🏪 *PERP MARKETS*                    第 ${page}/${totalPages} 页\n\n`;
+      // Header without page info (page info will be at bottom)
+      let message = `🏪 *PERP MARKETS*\n\n`;
       
-      // Format each coin in a clean single-line format
+      // Format each coin with proper alignment
       pageData.forEach((coin) => {
         const priceText = this.formatPrice(coin.price);
         const changeText = this.formatChangeText(coin.change);
         
-        // Create aligned format: TOKEN    PRICE    CHANGE%
-        const tokenName = coin.name.padEnd(12);
-        const price = `$${priceText}`.padStart(15);
-        const change = changeText.padStart(10);
+        // Create properly aligned format:
+        // Token name: 15 chars left-aligned
+        // Price: 12 chars right-aligned  
+        // Change: 8 chars right-aligned
+        const tokenName = coin.name.padEnd(15);
+        const price = `$${priceText}`.padStart(12);
+        const change = changeText.padStart(8);
         
         message += `${tokenName}${price}   ${change}\n`;
       });
+
+      // Add page info at bottom
+      message += `\n第 ${page}/${totalPages} 页`;
 
       return message;
 
@@ -203,6 +212,13 @@ export class MarketsHandler {
     const itemsPerPage = 10;
     const totalPages = Math.ceil(totalItems / itemsPerPage);
     
+    logger.debug('Creating markets keyboard', {
+      currentPage,
+      totalItems,
+      totalPages,
+      itemsPerPage
+    });
+    
     const buttons = [];
     
     // Previous page button
@@ -221,9 +237,18 @@ export class MarketsHandler {
       });
     }
     
-    return {
+    // If only one page, still show the keyboard structure but with no buttons
+    // This helps with UI consistency
+    const keyboard = {
       inline_keyboard: buttons.length > 0 ? [buttons] : []
     };
+    
+    logger.debug('Markets keyboard created', {
+      buttonsCount: buttons.length,
+      keyboard: JSON.stringify(keyboard)
+    });
+    
+    return keyboard;
   }
 
   /**
