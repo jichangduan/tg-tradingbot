@@ -1202,7 +1202,7 @@ export class PushMessageFormatterService {
   /**
    * 从whale actions中找到USDT金额最高的一条
    * @param whaleActions Whale action数据数组
-   * @returns USDT金额最高的whale action，如果没有则返回null
+   * @returns USDT金额最高的whale action，如果没有或低于1M USDT则返回null
    */
   private findHighestUSDTWhaleAction(whaleActions: WhaleActionData[]): WhaleActionData | null {
     if (!whaleActions || whaleActions.length === 0) {
@@ -1211,6 +1211,7 @@ export class PushMessageFormatterService {
 
     let highestAction: WhaleActionData | null = null;
     let highestAmount = 0;
+    const MIN_USDT_THRESHOLD = 1000000; // 1M USDT 最低门槛
 
     for (const action of whaleActions) {
       const amount = this.extractWhaleActionUSDTAmount(action);
@@ -1220,9 +1221,24 @@ export class PushMessageFormatterService {
       }
     }
 
-    logger.info('🐋 [WHALE_ACTION_FILTER] Found highest USDT amount whale action', {
+    // 检查最高金额是否达到1M USDT门槛
+    if (highestAmount < MIN_USDT_THRESHOLD) {
+      logger.info('🐋 [WHALE_ACTION_FILTER] Highest whale action below 1M USDT threshold - not pushing', {
+        totalActions: whaleActions.length,
+        highestAmount,
+        threshold: MIN_USDT_THRESHOLD,
+        thresholdFormatted: '1M USDT',
+        rejected: true
+      });
+      return null;
+    }
+
+    logger.info('🐋 [WHALE_ACTION_FILTER] Found qualified whale action above 1M USDT threshold', {
       totalActions: whaleActions.length,
       highestAmount,
+      threshold: MIN_USDT_THRESHOLD,
+      thresholdFormatted: '1M USDT',
+      amountFormatted: `${(highestAmount / 1000000).toFixed(2)}M USDT`,
       selectedAction: highestAction ? `${highestAction.address?.substring(0, 8)}...${highestAction.action || 'N/A'}` : null
     });
 

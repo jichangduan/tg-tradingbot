@@ -33,7 +33,8 @@ export class PushSchedulerService {
 
   /**
    * 启动定时推送调度器
-   * 测试环境：每1分钟执行一次
+   * 开发环境：每1分钟执行一次
+   * 测试环境：每2分钟执行一次
    * 生产环境：每20分钟执行一次
    */
   public start(): void {
@@ -43,27 +44,28 @@ export class PushSchedulerService {
     }
 
     try {
-      // 🚧 TEMPORARY FIX: 强制使用2分钟间隔，绕过环境变量问题
       const environment = process.env.NODE_ENV || 'development';
-      const cronPattern = '*/2 * * * *';  // 强制每2分钟执行一次
       
-      logger.warn('🚧 [TEMP_FIX] Using forced 2-minute interval', {
-        detectedEnvironment: environment,
-        forcedCronPattern: cronPattern,
-        reason: 'environment_variable_issue_on_server'
-      });
+      // 根据环境变量选择推送间隔
+      let cronPattern: string;
+      switch (environment) {
+        case 'production':
+          cronPattern = PUSH_CONSTANTS.CRON.PRODUCTION; // 每20分钟
+          break;
+        case 'testing':
+          cronPattern = PUSH_CONSTANTS.CRON.TESTING; // 每2分钟
+          break;
+        case 'development':
+        default:
+          cronPattern = PUSH_CONSTANTS.CRON.TEST; // 每1分钟
+          break;
+      }
       
-      // 🚨 强制记录实际环境状态和修复信息
-      logger.error('🚨 [ENVIRONMENT_DEBUG] Detailed environment analysis', {
-        nodeEnvFromProcess: process.env.NODE_ENV,
-        nodeEnvOrDefault: environment,
-        forcedCronPattern: cronPattern,
-        expectedForTesting: PUSH_CONSTANTS.CRON.TESTING,
-        actuallyUsing: '2_minute_forced_interval',
-        environmentIssue: 'server_env_not_synced',
-        shouldBeUsing: 'TESTING_environment_with_2min_interval',
-        timezone: 'Asia/Shanghai',
-        timestamp: new Date().toISOString()
+      logger.info('📅 [PUSH_SCHEDULER] Push scheduler configuration', {
+        environment,
+        cronPattern,
+        intervalDescription: this.getCronDescription(cronPattern),
+        timezone: 'Asia/Shanghai'
       });
 
       this.scheduleTask = cron.schedule(cronPattern, async () => {
@@ -81,8 +83,8 @@ export class PushSchedulerService {
         isRunning: this.isRunning,
         cronPattern,
         environment,
-        nextExecutionEstimate: 'in 2 minutes (forced)',
-        fixApplied: 'forced_2_minute_interval'
+        intervalDescription: this.getCronDescription(cronPattern),
+        timezone: 'Asia/Shanghai'
       });
 
       // 添加测试用户以便测试推送功能
@@ -579,16 +581,47 @@ export class PushSchedulerService {
     isRunning: boolean;
     cronPattern: string;
     environment: string;
+    intervalDescription: string;
   } {
     const environment = process.env.NODE_ENV || 'development';
-    // 🚧 TEMPORARY FIX: 强制使用2分钟间隔
-    const cronPattern = '*/2 * * * *';
+    
+    // 根据环境变量选择推送间隔
+    let cronPattern: string;
+    switch (environment) {
+      case 'production':
+        cronPattern = PUSH_CONSTANTS.CRON.PRODUCTION; // 每20分钟
+        break;
+      case 'testing':
+        cronPattern = PUSH_CONSTANTS.CRON.TESTING; // 每2分钟
+        break;
+      case 'development':
+      default:
+        cronPattern = PUSH_CONSTANTS.CRON.TEST; // 每1分钟
+        break;
+    }
     
     return {
       isRunning: this.isRunning,
       cronPattern,
-      environment
+      environment,
+      intervalDescription: this.getCronDescription(cronPattern)
     };
+  }
+
+  /**
+   * 获取Cron表达式的描述
+   */
+  private getCronDescription(cronPattern: string): string {
+    switch (cronPattern) {
+      case PUSH_CONSTANTS.CRON.PRODUCTION:
+        return 'Every 20 minutes';
+      case PUSH_CONSTANTS.CRON.TESTING:
+        return 'Every 2 minutes';
+      case PUSH_CONSTANTS.CRON.TEST:
+        return 'Every 1 minute';
+      default:
+        return `Custom: ${cronPattern}`;
+    }
   }
 
   // ==================== 群组推送功能 ====================
