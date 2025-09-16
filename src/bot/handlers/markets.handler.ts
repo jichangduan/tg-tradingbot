@@ -137,27 +137,25 @@ export class MarketsHandler {
       const endIndex = startIndex + itemsPerPage;
       const pageData = marketData.slice(startIndex, endIndex);
 
-      // Header without page info (page info will be at bottom)
+      // Header only (no page info in message)
       let message = `🏪 *PERP MARKETS*\n\n`;
       
-      // Format each coin with proper alignment
+      // Format each coin with precise column alignment
       pageData.forEach((coin) => {
         const priceText = this.formatPrice(coin.price);
         const changeText = this.formatChangeText(coin.change);
         
-        // Create properly aligned format:
-        // Token name: 15 chars left-aligned
-        // Price: 12 chars right-aligned  
-        // Change: 8 chars right-aligned
-        const tokenName = coin.name.padEnd(15);
-        const price = `$${priceText}`.padStart(12);
-        const change = changeText.padStart(8);
+        // Create precisely aligned columns:
+        // Token name: 20 chars left-aligned
+        // Price: 15 chars right-aligned with $ prefix
+        // Change: 10 chars right-aligned
+        const tokenName = coin.name.padEnd(20);
+        const price = `$${priceText}`.padStart(15);
+        const change = changeText.padStart(10);
         
-        message += `${tokenName}${price}   ${change}\n`;
+        // Use exact spacing between columns
+        message += `${tokenName}${price}  ${change}\n`;
       });
-
-      // Add page info at bottom
-      message += `\n第 ${page}/${totalPages} 页`;
 
       return message;
 
@@ -206,7 +204,7 @@ export class MarketsHandler {
   }
 
   /**
-   * Create markets pagination keyboard
+   * Create markets pagination keyboard with three-button layout
    */
   private createMarketsKeyboard(currentPage: number, totalItems: number): InlineKeyboardMarkup {
     const itemsPerPage = 10;
@@ -219,32 +217,34 @@ export class MarketsHandler {
       itemsPerPage
     });
     
+    // Three-button layout: [⬅️] [1/3] [➡️]
     const buttons = [];
     
-    // Previous page button
-    if (currentPage > 1) {
-      buttons.push({
-        text: '⬅️ 上一页',
-        callback_data: `markets_page_${currentPage - 1}`
-      });
-    }
+    // Previous page button (disabled if on first page)
+    buttons.push({
+      text: currentPage > 1 ? '⬅️' : '◀️',
+      callback_data: currentPage > 1 ? `markets_prev_${currentPage - 1}` : 'markets_disabled'
+    });
     
-    // Next page button  
-    if (currentPage < totalPages) {
-      buttons.push({
-        text: '下一页 ➡️',
-        callback_data: `markets_page_${currentPage + 1}`
-      });
-    }
+    // Page info button (center)
+    buttons.push({
+      text: `${currentPage}/${totalPages}`,
+      callback_data: 'markets_page_info'
+    });
     
-    // If only one page, still show the keyboard structure but with no buttons
-    // This helps with UI consistency
+    // Next page button (disabled if on last page)
+    buttons.push({
+      text: currentPage < totalPages ? '▶️' : '▶️',
+      callback_data: currentPage < totalPages ? `markets_next_${currentPage + 1}` : 'markets_disabled'
+    });
+    
     const keyboard = {
-      inline_keyboard: buttons.length > 0 ? [buttons] : []
+      inline_keyboard: [buttons]
     };
     
     logger.debug('Markets keyboard created', {
-      buttonsCount: buttons.length,
+      currentPage,
+      totalPages,
       keyboard: JSON.stringify(keyboard)
     });
     
@@ -256,16 +256,42 @@ export class MarketsHandler {
    */
   public async handleCallback(ctx: Context): Promise<void> {
     const callbackData = ctx.callbackQuery && 'data' in ctx.callbackQuery ? ctx.callbackQuery.data : undefined;
-    if (!callbackData || !callbackData.startsWith('markets_page_')) return;
+    if (!callbackData || !callbackData.startsWith('markets_')) return;
 
     try {
-      const page = parseInt(callbackData.replace('markets_page_', ''));
+      // Handle disabled buttons (do nothing)
+      if (callbackData === 'markets_disabled' || callbackData === 'markets_page_info') {
+        await ctx.answerCbQuery();
+        return;
+      }
+
+      let page: number;
+      
+      // Parse different callback formats
+      if (callbackData.startsWith('markets_prev_')) {
+        page = parseInt(callbackData.replace('markets_prev_', ''));
+      } else if (callbackData.startsWith('markets_next_')) {
+        page = parseInt(callbackData.replace('markets_next_', ''));
+      } else if (callbackData.startsWith('markets_page_')) {
+        // Support old format for backward compatibility
+        page = parseInt(callbackData.replace('markets_page_', ''));
+      } else {
+        await ctx.answerCbQuery();
+        return;
+      }
       
       // Show loading status
       await ctx.answerCbQuery('🔄 加载中...');
       
       // Get fresh market data
       const marketData = await this.fetchMarketData();
+      
+      // Validate page number
+      const totalPages = Math.ceil(marketData.length / 10);
+      if (page < 1 || page > totalPages) {
+        await ctx.answerCbQuery('❌ 页码无效');
+        return;
+      }
       
       // Format message for requested page
       const formattedMessage = this.formatMarketMessage(marketData, page);

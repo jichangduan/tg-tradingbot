@@ -690,8 +690,8 @@ Need help? Send <code>/help</code> to view complete guide 📚
         return;
       }
 
-      // 路由markets分页相关的回调到marketsHandler
-      if (typeof callbackData === 'string' && callbackData.startsWith('markets_page_')) {
+      // 路由markets相关的回调到marketsHandler (支持新的callback格式)
+      if (typeof callbackData === 'string' && callbackData.startsWith('markets_')) {
         await marketsHandler.handleCallback(ctx);
         return;
       }
