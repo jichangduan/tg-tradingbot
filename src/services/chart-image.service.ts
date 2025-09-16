@@ -485,16 +485,228 @@ export class ChartImageService {
    */
   private async generateMarketsQuickChart(config: QuickChartConfig, marketsData: MarketsTableData): Promise<ChartImageResponse> {
     try {
-      // 生成Chart.js配置 - Markets表格
-      const chartJsConfig = this.createMarketsChartJsConfig(config, marketsData);
+      // 使用HTML/CSS渲染方式生成表格，而不是Chart.js
+      const htmlContent = this.createMarketsTableHtml(marketsData);
       
-      // 调用QuickChart.io API
-      return await this.callQuickChartApi(chartJsConfig);
+      // 调用QuickChart.io HTML渲染API
+      return await this.callQuickChartHtmlApi(htmlContent, config);
       
     } catch (error) {
       logger.error('Markets QuickChart generation failed', {
         error: (error as Error).message,
         marketsCount: marketsData.markets.length
+      });
+      
+      return {
+        success: false,
+        error: (error as Error).message
+      };
+    }
+  }
+
+  /**
+   * 创建Markets表格的HTML内容（完全仿制Image #1样式）
+   */
+  private createMarketsTableHtml(marketsData: MarketsTableData): string {
+    const timestamp = new Date().toLocaleTimeString('en-US', { 
+      hour12: false, 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+
+    // 生成表格行
+    const tableRows = marketsData.markets.map(market => {
+      const priceText = this.formatPriceForTable(market.price);
+      const changeText = market.change >= 0 
+        ? `+${market.change.toFixed(2)}%` 
+        : `${market.change.toFixed(2)}%`;
+      const changeColor = market.change >= 0 ? '#00ff88' : '#ff4444';
+      
+      return `
+        <tr class="market-row">
+          <td class="icon-cell">
+            <span class="token-icon">🔷</span>
+            <span class="token-name">${market.name}</span>
+          </td>
+          <td class="price-cell">${priceText}</td>
+          <td class="change-cell" style="color: ${changeColor};">${changeText}</td>
+        </tr>
+      `;
+    }).join('');
+
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body {
+            margin: 0;
+            padding: 20px;
+            background-color: #000000;
+            font-family: 'Arial', sans-serif;
+            color: #ffffff;
+            width: 800px;
+            height: ${Math.max(600, marketsData.markets.length * 60 + 150)}px;
+            box-sizing: border-box;
+          }
+          
+          .container {
+            width: 100%;
+            height: 100%;
+            background-color: #000000;
+            border-radius: 12px;
+            padding: 20px;
+            box-sizing: border-box;
+          }
+          
+          .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+          }
+          
+          .title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #ffffff;
+          }
+          
+          .subtitle {
+            font-size: 14px;
+            color: #888888;
+            margin-top: 5px;
+          }
+          
+          .brand {
+            background-color: #333333;
+            padding: 8px 12px;
+            border-radius: 16px;
+            font-size: 14px;
+            color: #ffffff;
+          }
+          
+          .markets-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+          }
+          
+          .market-row {
+            height: 50px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+          }
+          
+          .market-row:last-child {
+            border-bottom: none;
+          }
+          
+          .icon-cell {
+            text-align: left;
+            padding: 12px 15px;
+            width: 40%;
+          }
+          
+          .token-icon {
+            font-size: 20px;
+            margin-right: 12px;
+            vertical-align: middle;
+          }
+          
+          .token-name {
+            font-size: 16px;
+            font-weight: 500;
+            color: #ffffff;
+            vertical-align: middle;
+          }
+          
+          .price-cell {
+            text-align: right;
+            padding: 12px 15px;
+            font-size: 16px;
+            font-weight: 500;
+            color: #ffffff;
+            width: 35%;
+          }
+          
+          .change-cell {
+            text-align: right;
+            padding: 12px 15px;
+            font-size: 16px;
+            font-weight: 500;
+            width: 25%;
+          }
+          
+          .footer {
+            position: absolute;
+            bottom: 20px;
+            right: 30px;
+            font-size: 12px;
+            color: #666666;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <div>
+              <div class="title">PERP MARKETS</div>
+              <div class="subtitle">PAGE 1 / 20</div>
+            </div>
+            <div class="brand">⚆ aiw3.ai</div>
+          </div>
+          
+          <table class="markets-table">
+            ${tableRows}
+          </table>
+          
+          <div class="footer">${timestamp}</div>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
+  /**
+   * 调用QuickChart.io HTML渲染API生成表格图像
+   */
+  private async callQuickChartHtmlApi(htmlContent: string, config: QuickChartConfig): Promise<ChartImageResponse> {
+    try {
+      // QuickChart.io 支持HTML转图片的端点
+      const requestBody = {
+        format: 'png',
+        width: 800,
+        height: Math.max(600, config.height || 600),
+        backgroundColor: '#000000',
+        html: htmlContent
+      };
+
+      const response = await fetch('https://quickchart.io/chart/render', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'AIW3-TGBot/2.0.0 (Markets-Table)'
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!response.ok) {
+        throw new Error(`QuickChart HTML API error: ${response.status} ${response.statusText}`);
+      }
+
+      const imageBuffer = Buffer.from(await response.arrayBuffer());
+      const imageUrl = `data:image/png;base64,${imageBuffer.toString('base64')}`;
+
+      return {
+        success: true,
+        imageBuffer,
+        imageUrl
+      };
+      
+    } catch (error) {
+      logger.error('QuickChart HTML API call failed', {
+        error: (error as Error).message
       });
       
       return {
@@ -994,105 +1206,71 @@ export class ChartImageService {
    * 创建Markets表格图表Chart.js配置（仿制Image #2样式）
    */
   private createMarketsChartJsConfig(config: QuickChartConfig, marketsData: MarketsTableData): ChartJsConfig {
-    const isDark = config.theme === 'dark';
+    // 根据数据量计算动态高度 - 每行60px，最小600px
+    const dynamicHeight = Math.max(600, marketsData.markets.length * 60 + 150);
     
-    // 构建数据和标签
-    const labels = marketsData.markets.map(market => market.name);
-    const prices = marketsData.markets.map(market => market.price);
-    const changes = marketsData.markets.map(market => market.change);
-
     return {
       type: 'bar',
       data: {
-        labels: labels,
+        labels: marketsData.markets.map(() => ''), // 空标签，使用自定义渲染
         datasets: [{
-          label: 'Price',
-          data: prices.map(() => 0), // 所有数据设为0，隐藏条形图
-          backgroundColor: 'rgba(0,0,0,0)', // 透明背景
-          borderColor: 'rgba(0,0,0,0)', // 透明边框
+          label: 'Markets',
+          data: marketsData.markets.map(() => 1), // 统一数据值
+          backgroundColor: 'rgba(0,0,0,0)', // 完全透明
           borderWidth: 0,
-          barThickness: 1 // 最小厚度
+          barThickness: 50 // 控制行高
         }]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        indexAxis: 'y', // 水平条形图布局
+        indexAxis: 'y',
         plugins: {
           title: {
-            display: true,
-            text: 'PERP MARKETS',
-            color: '#ffffff',
-            font: {
-              size: 16,
-              weight: 'bold',
-              family: 'Arial, sans-serif'
-            },
-            padding: { top: 15, bottom: 10 },
-            align: 'start'
+            display: false // 禁用默认标题，使用自定义渲染
           },
           legend: {
             display: false
           },
           tooltip: {
             enabled: false
+          },
+          // 自定义插件：渲染表格内容
+          customCanvasBackgroundColor: {
+            color: '#000000'
+          },
+          customMarketsTable: {
+            marketsData: marketsData,
+            config: {
+              backgroundColor: '#000000',
+              titleColor: '#ffffff',
+              textColor: '#ffffff',
+              positiveColor: '#00ff88',
+              negativeColor: '#ff4444',
+              iconSymbol: '🔷'
+            }
           }
         },
         scales: {
           x: {
-            display: false, // 完全隐藏X轴
+            display: false,
             min: 0,
             max: 1
           },
           y: {
-            grid: {
-              display: false,
-              drawBorder: false
-            },
-            ticks: {
-              color: '#ffffff',
-              font: {
-                size: 12,
-                family: 'Arial, sans-serif'
-              },
-              padding: 10,
-              callback: (value: any, index: number) => {
-                // 自定义Y轴标签，组合显示所有信息
-                if (index < marketsData.markets.length) {
-                  const market = marketsData.markets[index];
-                  const priceText = this.formatPriceForTable(market.price);
-                  const changeText = market.change >= 0 ? `+${market.change.toFixed(2)}%` : `${market.change.toFixed(2)}%`;
-                  const changeColor = market.change >= 0 ? '🟢' : '🔴';
-                  
-                  // 返回组合的字符串：币种名称 + 价格 + 涨跌幅
-                  return `${market.name}    ${priceText}    ${changeColor}${changeText}`;
-                }
-                return '';
-              }
-            },
-            title: {
-              display: false
-            }
+            display: false,
+            reverse: true // 从上到下排列
           }
         },
-        backgroundColor: '#1a1a1a', // 深色背景
         layout: {
           padding: {
-            left: 15,
-            right: 15,
-            top: 5,
-            bottom: 15
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: 20
           }
         },
-        interaction: {
-          intersect: false,
-          mode: 'nearest'
-        },
-        elements: {
-          bar: {
-            borderRadius: 0
-          }
-        }
+        animation: false
       }
     };
   }
