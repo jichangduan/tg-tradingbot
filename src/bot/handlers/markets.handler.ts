@@ -2,6 +2,7 @@ import { Context } from 'telegraf';
 import { logger } from '../../utils/logger';
 import { apiService } from '../../services/api.service';
 import { messageFormatter } from '../utils/message.formatter';
+import { chartImageService, MarketsTableData, MarketDataItem } from '../../services/chart-image.service';
 
 /**
  * Market data interface response types
@@ -42,27 +43,74 @@ export class MarketsHandler {
 
     try {
       // Send loading message
-      const loadingMessage = await ctx.reply('🔍 Fetching market data...');
+      const loadingMessage = await ctx.reply('📊 Fetching market data...');
       
       // Get market data
       const marketData = await this.fetchMarketData();
       
-      // Format market data message
-      const formattedMessage = this.formatMarketMessage(marketData);
+      // Try to generate market chart image
+      let useImageChart = true;
+      let chartImage;
       
-      // Edit message to show results
-      await ctx.telegram.editMessageText(
-        ctx.chat!.id,
-        loadingMessage.message_id,
-        undefined,
-        formattedMessage,
-        { parse_mode: 'Markdown' }
-      );
+      try {
+        const marketsTableData = this.convertToMarketsTableData(marketData);
+        chartImage = await chartImageService.generateMarketsChart(marketsTableData);
+      } catch (imageError) {
+        logger.warn('Markets chart generation failed, falling back to text format', {
+          error: (imageError as Error).message,
+          userId
+        });
+        useImageChart = false;
+      }
 
-      logger.info('Markets data sent successfully', {
-        userId,
-        dataCount: marketData.length
-      });
+      // Send response
+      try {
+        if (useImageChart && chartImage) {
+          // Send clean chart image
+          await ctx.telegram.deleteMessage(ctx.chat?.id!, loadingMessage.message_id);
+          
+          await ctx.replyWithPhoto(
+            { source: chartImage.imageBuffer },
+            {
+              caption: '📊 <b>PERP MARKETS</b>\n\n<i>💡 Use /price &lt;token&gt; for detailed information</i>',
+              parse_mode: 'HTML'
+            }
+          );
+        } else {
+          // Fallback to text format
+          const formattedMessage = this.formatMarketMessage(marketData);
+          
+          await ctx.telegram.editMessageText(
+            ctx.chat?.id,
+            loadingMessage.message_id,
+            undefined,
+            formattedMessage,
+            { parse_mode: 'Markdown' }
+          );
+        }
+
+        logger.info('Markets data sent successfully', {
+          userId,
+          dataCount: marketData.length,
+          chartType: useImageChart ? 'image' : 'text'
+        });
+
+      } catch (messageError) {
+        logger.error('Failed to send markets message', {
+          error: (messageError as Error).message,
+          userId
+        });
+
+        // Final fallback - send simple text message
+        try {
+          const formattedMessage = this.formatMarketMessage(marketData);
+          await ctx.reply(formattedMessage, { parse_mode: 'Markdown' });
+        } catch (fallbackError) {
+          logger.error('Fallback message also failed', {
+            error: (fallbackError as Error).message
+          });
+        }
+      }
 
     } catch (error) {
       logger.error('Failed to handle markets command', {
@@ -157,6 +205,25 @@ export class MarketsHandler {
       });
       throw new Error('Message formatting failed');
     }
+  }
+
+  /**
+   * Convert API market data to chart table data format
+   */
+  private convertToMarketsTableData(marketData: MarketData[]): MarketsTableData {
+    const markets: MarketDataItem[] = marketData.map(market => ({
+      name: market.name,
+      price: market.price,
+      change: market.change,
+      volume: undefined, // API doesn't provide volume data
+      marketCap: undefined // API doesn't provide market cap data
+    }));
+
+    return {
+      title: 'PERP MARKETS',
+      markets: markets,
+      timestamp: Date.now()
+    };
   }
 
   /**

@@ -13,7 +13,8 @@ import {
 export enum ChartType {
   CANDLESTICK = 'candlestick',
   PNL_TREND = 'pnl_trend',
-  POSITIONS_OVERVIEW = 'positions_overview'
+  POSITIONS_OVERVIEW = 'positions_overview',
+  MARKETS_TABLE = 'markets_table'
 }
 
 /**
@@ -86,6 +87,26 @@ interface PositionsChartData {
     availableBalance: string;
     usedMargin: string;
   };
+}
+
+/**
+ * 市场数据项接口
+ */
+interface MarketDataItem {
+  name: string;
+  price: number;
+  change: number;
+  volume?: number;
+  marketCap?: number;
+}
+
+/**
+ * 市场表格图表数据
+ */
+interface MarketsTableData {
+  title: string;
+  markets: MarketDataItem[];
+  timestamp: number;
 }
 
 /**
@@ -323,6 +344,59 @@ export class ChartImageService {
   }
 
   /**
+   * 生成市场数据表格图表（TradingView风格）
+   */
+  public async generateMarketsChart(marketsData: MarketsTableData): Promise<CachedChartImage> {
+    const cacheKey = `${this.cacheKeyPrefix}markets_${Date.now()}`;
+    
+    try {
+      logger.info('📊 [MARKETS_CHART] Starting markets table chart generation', {
+        marketsCount: marketsData.markets.length,
+        title: marketsData.title
+      });
+
+      const chartConfig: QuickChartConfig = {
+        type: ChartType.MARKETS_TABLE,
+        theme: 'dark',
+        width: 900,
+        height: 600
+      };
+
+      // 生成图表图像
+      const imageResult = await this.generateMarketsQuickChart(chartConfig, marketsData);
+      
+      if (!imageResult.success || !imageResult.imageBuffer) {
+        throw new Error(`Markets chart generation failed: ${imageResult.error || 'Unknown error'}`);
+      }
+
+      const chartImage: CachedChartImage = {
+        imageBuffer: imageResult.imageBuffer,
+        imageUrl: imageResult.imageUrl,
+        config: chartConfig,
+        generatedAt: new Date(),
+        isCached: false
+      };
+
+      // 短期缓存Markets图表 (5分钟)
+      await cacheService.set(cacheKey, chartImage, 300);
+
+      logger.info('✅ [MARKETS_CHART] Markets chart generated successfully', {
+        marketsCount: marketsData.markets.length,
+        imageSize: chartImage.imageBuffer.length
+      });
+
+      return chartImage;
+
+    } catch (error) {
+      logger.error('❌ [MARKETS_CHART] Failed to generate markets chart', {
+        error: (error as Error).message,
+        marketsCount: marketsData.markets.length
+      });
+      throw error;
+    }
+  }
+
+  /**
    * 使用QuickChart.io生成K线图表
    */
   private async generateQuickChart(config: QuickChartConfig, candleData: CachedCandleData): Promise<ChartImageResponse> {
@@ -397,6 +471,30 @@ export class ChartImageService {
       logger.error('Positions QuickChart generation failed', {
         error: (error as Error).message,
         totalValue: positionsData.totalValue
+      });
+      
+      return {
+        success: false,
+        error: (error as Error).message
+      };
+    }
+  }
+
+  /**
+   * 使用QuickChart.io生成Markets表格图表
+   */
+  private async generateMarketsQuickChart(config: QuickChartConfig, marketsData: MarketsTableData): Promise<ChartImageResponse> {
+    try {
+      // 生成Chart.js配置 - Markets表格
+      const chartJsConfig = this.createMarketsChartJsConfig(config, marketsData);
+      
+      // 调用QuickChart.io API
+      return await this.callQuickChartApi(chartJsConfig);
+      
+    } catch (error) {
+      logger.error('Markets QuickChart generation failed', {
+        error: (error as Error).message,
+        marketsCount: marketsData.markets.length
       });
       
       return {
@@ -893,6 +991,164 @@ export class ChartImageService {
   }
 
   /**
+   * 创建Markets表格图表Chart.js配置（OKX风格）
+   */
+  private createMarketsChartJsConfig(config: QuickChartConfig, marketsData: MarketsTableData): ChartJsConfig {
+    const isDark = config.theme === 'dark';
+    
+    // 准备表格数据
+    const labels = marketsData.markets.map(market => market.name);
+    const prices = marketsData.markets.map(market => market.price);
+    const changes = marketsData.markets.map(market => market.change);
+    
+    // 根据涨跌幅设置颜色
+    const backgroundColors = changes.map(change => {
+      if (change > 0) return '#00ff88';      // 绿色（上涨）
+      if (change < 0) return '#ff3366';      // 红色（下跌）
+      return '#888888';                      // 灰色（无变化）
+    });
+    
+    const borderColors = backgroundColors.map(color => color);
+
+    return {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: 'Price ($)',
+            data: prices,
+            backgroundColor: backgroundColors,
+            borderColor: borderColors,
+            borderWidth: 1,
+            barThickness: 30,
+            maxBarThickness: 40
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        indexAxis: 'y', // 水平条形图，类似截图中的样式
+        plugins: {
+          title: {
+            display: true,
+            text: marketsData.title || 'PERP MARKETS',
+            color: isDark ? '#ffffff' : '#000000',
+            font: {
+              size: 20,
+              weight: 'bold',
+              family: 'Inter, -apple-system, sans-serif'
+            },
+            padding: 25,
+            align: 'start'
+          },
+          legend: {
+            display: false // 隐藏图例，保持简洁
+          },
+          tooltip: {
+            enabled: true,
+            backgroundColor: isDark ? 'rgba(0, 0, 0, 0.9)' : 'rgba(255, 255, 255, 0.9)',
+            titleColor: isDark ? '#ffffff' : '#000000',
+            bodyColor: isDark ? '#ffffff' : '#000000',
+            borderColor: '#666666',
+            borderWidth: 1,
+            cornerRadius: 8,
+            displayColors: false,
+            callbacks: {
+              title: (context: any) => {
+                const index = context[0].dataIndex;
+                return marketsData.markets[index].name;
+              },
+              label: (context: any) => {
+                const index = context.dataIndex;
+                const market = marketsData.markets[index];
+                const changeText = market.change >= 0 ? `+${market.change.toFixed(2)}%` : `${market.change.toFixed(2)}%`;
+                return [
+                  `Price: $${market.price.toLocaleString()}`,
+                  `24h Change: ${changeText}`
+                ];
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            type: 'linear',
+            beginAtZero: true,
+            grid: {
+              display: true,
+              color: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
+              drawBorder: false
+            },
+            ticks: {
+              color: isDark ? '#999999' : '#666666',
+              font: {
+                size: 11,
+                family: 'Inter, monospace'
+              },
+              callback: (value: any) => {
+                const num = Number(value);
+                if (num >= 1000000) {
+                  return `$${(num / 1000000).toFixed(1)}M`;
+                } else if (num >= 1000) {
+                  return `$${(num / 1000).toFixed(1)}K`;
+                } else if (num >= 1) {
+                  return `$${num.toFixed(0)}`;
+                } else {
+                  return `$${num.toFixed(4)}`;
+                }
+              }
+            },
+            title: {
+              display: false
+            }
+          },
+          y: {
+            grid: {
+              display: false
+            },
+            ticks: {
+              color: isDark ? '#ffffff' : '#000000',
+              font: {
+                size: 13,
+                weight: '600',
+                family: 'Inter, monospace'
+              },
+              callback: (value: any, index: number) => {
+                // 自定义Y轴标签，显示代币名称和涨跌幅
+                if (index < marketsData.markets.length) {
+                  const market = marketsData.markets[index];
+                  const changeText = market.change >= 0 ? `+${market.change.toFixed(2)}%` : `${market.change.toFixed(2)}%`;
+                  return `${market.name} ${changeText}`;
+                }
+                return '';
+              }
+            },
+            title: {
+              display: false
+            }
+          }
+        },
+        backgroundColor: isDark ? '#0d1421' : '#ffffff',
+        layout: {
+          padding: {
+            left: 25,
+            right: 25,
+            top: 20,
+            bottom: 20
+          }
+        },
+        elements: {
+          bar: {
+            borderRadius: 4 // 圆角条形
+          }
+        }
+      }
+    };
+  }
+
+  /**
    * 调用QuickChart.io API生成专业K线图表图像
    */
   private async callQuickChartApi(chartConfig: ChartJsConfig): Promise<ChartImageResponse> {
@@ -1293,7 +1549,7 @@ export class ChartImageService {
 }
 
 // 导出接口类型
-export type { PnlChartData, PositionsChartData, PositionInfo, PnlDataPoint };
+export type { PnlChartData, PositionsChartData, PositionInfo, PnlDataPoint, MarketsTableData, MarketDataItem };
 
 // 导出单例实例
 export const chartImageService = new ChartImageService();
