@@ -1,7 +1,7 @@
 import { Context } from 'telegraf';
 import { InlineKeyboardMarkup } from 'telegraf/typings/core/types/typegram';
 import { logger } from '../../utils/logger';
-import { apiService } from '../../services/api.service';
+import { hyperliquidMarketService } from '../../services/hyperliquid-market.service';
 
 /**
  * Market data interface response types
@@ -85,41 +85,46 @@ export class MarketsHandler {
   }
 
   /**
-   * Fetch market data from API
+   * Fetch market data from Hyperliquid API
    */
   private async fetchMarketData(): Promise<MarketData[]> {
     try {
-      logger.debug('Fetching market data from API');
+      logger.debug('Fetching market data from Hyperliquid API');
       
-      const response = await apiService.get<MarketDataResponse>(
-        '/api/home/getLargeMarketData'
-      );
-
-      // Validate response format
-      if (!response || response.code !== 200 || !Array.isArray(response.data)) {
-        throw new Error(`Invalid API response format: ${JSON.stringify(response).substring(0, 200)}`);
-      }
+      // Fetch data from Hyperliquid API
+      const hyperliquidData = await hyperliquidMarketService.fetchMarketData();
+      
+      // Convert to expected format
+      const marketData = hyperliquidMarketService.convertToMarketData(hyperliquidData);
 
       // Validate data integrity
-      const validData = response.data.filter(item => 
+      const validData = marketData.filter(item => 
         item && 
         typeof item.name === 'string' && 
         typeof item.price === 'number' && 
-        typeof item.change === 'number'
+        typeof item.change === 'number' &&
+        !isNaN(item.price) &&
+        !isNaN(item.change)
       );
 
       if (validData.length === 0) {
-        throw new Error('No valid market data received from API');
+        throw new Error('No valid market data received from Hyperliquid API');
       }
 
-      logger.debug(`Successfully fetched ${validData.length} market entries`, {
+      logger.debug(`Successfully fetched ${validData.length} market entries from Hyperliquid`, {
         totalEntries: validData.length,
-        entries: validData.map(item => ({ name: item.name, price: item.price, change: item.change }))
+        nonZeroChanges: validData.filter(item => Math.abs(item.change) > 0.001).length,
+        entries: validData.slice(0, 5).map(item => ({ 
+          name: item.name, 
+          price: item.price, 
+          change: item.change 
+        }))
       });
+      
       return validData;
 
     } catch (error) {
-      logger.error('Failed to fetch market data from API', {
+      logger.error('Failed to fetch market data from Hyperliquid API', {
         error: (error as Error).message
       });
       throw error;
@@ -317,12 +322,16 @@ export class MarketsHandler {
   }
 
   /**
-   * Health check - test if market data API is working properly
+   * Health check - test if Hyperliquid market data API is working properly
    */
   public async healthCheck(): Promise<boolean> {
     try {
-      await this.fetchMarketData();
-      return true;
+      const isHealthy = await hyperliquidMarketService.healthCheck();
+      if (isHealthy) {
+        // Also test data fetching
+        await this.fetchMarketData();
+      }
+      return isHealthy;
     } catch (error) {
       logger.warn('Markets handler health check failed', { 
         error: (error as Error).message 
