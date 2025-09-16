@@ -8,6 +8,7 @@ import { PushLogger } from '../utils/push-logger';
 import { pushDeduplicator } from '../utils/push-deduplicator';
 import { telegramBot } from '../bot';
 import { getUserAccessToken } from '../utils/auth';
+import { PUSH_CONSTANTS } from '../types/push.types';
 
 /**
  * 推送调度服务
@@ -42,9 +43,21 @@ export class PushSchedulerService {
     }
 
     try {
-      // 修复cron表达式：生产环境20分钟，开发环境1分钟
-      const cronPattern = process.env.NODE_ENV === 'production' ? '*/20 * * * *' : '*/1 * * * *';
+      // 使用统一的cron配置常量：生产环境20分钟，开发/测试环境1分钟
+      const environment = process.env.NODE_ENV || 'development';
+      const cronPattern = environment === 'production' 
+        ? PUSH_CONSTANTS.CRON.PRODUCTION 
+        : PUSH_CONSTANTS.CRON.TEST;
       
+      // 🔍 详细记录环境配置信息
+      logger.info('📅 [PUSH_SCHEDULER] Environment configuration verified', {
+        environment,
+        cronPattern,
+        productionPattern: PUSH_CONSTANTS.CRON.PRODUCTION,
+        testPattern: PUSH_CONSTANTS.CRON.TEST,
+        schedulingInterval: environment === 'production' ? '20 minutes' : '1 minute',
+        timezone: 'Asia/Shanghai'
+      });
 
       this.scheduleTask = cron.schedule(cronPattern, async () => {
         await this.executeScheduledPush();
@@ -57,6 +70,12 @@ export class PushSchedulerService {
       this.scheduleTask.start();
       this.isRunning = true;
 
+      logger.info('✅ [PUSH_SCHEDULER] Push scheduler started successfully', {
+        isRunning: this.isRunning,
+        cronPattern,
+        environment,
+        nextExecutionEstimate: environment === 'production' ? 'in 20 minutes' : 'in 1 minute'
+      });
 
       // 添加测试用户以便测试推送功能
       this.addTestUserToPushTracking();
@@ -534,12 +553,15 @@ export class PushSchedulerService {
     cronPattern: string;
     environment: string;
   } {
-    const cronPattern = process.env.NODE_ENV === 'production' ? '*/20 * * * *' : '*/1 * * * *';
+    const environment = process.env.NODE_ENV || 'development';
+    const cronPattern = environment === 'production' 
+      ? PUSH_CONSTANTS.CRON.PRODUCTION 
+      : PUSH_CONSTANTS.CRON.TEST;
     
     return {
       isRunning: this.isRunning,
       cronPattern,
-      environment: process.env.NODE_ENV || 'development'
+      environment
     };
   }
 
