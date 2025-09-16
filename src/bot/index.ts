@@ -224,7 +224,7 @@ export class TelegramBot {
             
             // 如果导入失败，发送强制重定向消息，绝不允许在群组执行敏感命令
             try {
-              const botUsername = config.telegram.botUsername || 'yuze_trading_bot';
+              const botUsername = config.telegram.botUsername || 'aiw3_tradebot';
               const fallbackMessage = 
                 `🔒 <b>Private ${command.replace('/', '').toUpperCase()} Required</b>\n\n` +
                 `This command contains sensitive information and must be used in private chat.\n\n` +
@@ -297,7 +297,7 @@ export class TelegramBot {
             
             // 如果导入失败，发送强制重定向消息，绝不允许在群组执行敏感命令
             try {
-              const botUsername = config.telegram.botUsername || 'yuze_trading_bot';
+              const botUsername = config.telegram.botUsername || 'aiw3_tradebot';
               const fallbackMessage = 
                 `🔒 <b>Private ${cleanCommand.replace('/', '').toUpperCase()} Required</b>\n\n` +
                 `This command contains sensitive information and must be used in private chat.\n\n` +

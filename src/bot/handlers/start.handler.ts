@@ -199,7 +199,7 @@ Initializing your account, please wait...
 <code>/markets</code> - View market overview
 <code>/wallet</code> - View wallet info
 
-<b>🤖 Bot ID:</b> @yuze_trading_bot
+<b>🤖 Bot ID:</b> @${config.telegram.botUsername || 'aiw3_tradebot'}
 
 <i>💡 Creating your exclusive wallet address...</i>
     `.trim();
@@ -209,7 +209,7 @@ Initializing your account, please wait...
    * 创建添加到群组的内联键盘
    */
   private createAddToGroupKeyboard(): InlineKeyboardMarkup {
-    const botUsername = config.telegram.botUsername || 'yuze_trading_bot';
+    const botUsername = config.telegram.botUsername || 'aiw3_tradebot';
     
     return {
       inline_keyboard: [
@@ -371,7 +371,7 @@ Initializing your account and processing invitation rewards...
     return `
 👋 <b>AIW3 Trading Bot added to group!</b>
 
-🤖 I'm @yuze_trading_bot, your professional crypto trading assistant
+🤖 I'm @${config.telegram.botUsername || 'aiw3_tradebot'}, your professional crypto trading assistant
 
 <b>🚀 Core Features:</b>
 • 💰 Real-time price queries - <code>/price BTC</code>
@@ -391,7 +391,7 @@ Initializing your account and processing invitation rewards...
 3. <code>/wallet</code> - View wallet status
 4. <code>/help</code> - Get complete command list
 
-<b>🤖 Bot Identity Confirmed:</b> @yuze_trading_bot
+<b>🤖 Bot Identity Confirmed:</b> @${config.telegram.botUsername || 'aiw3_tradebot'}
 
 <i>🎉 Start your crypto trading journey!</i>
     `.trim();
@@ -508,7 +508,7 @@ Initializing your account and processing invitation rewards...
 Please ensure you're adding the correct trading bot:
 
 <b>✅ Correct Bot:</b>
-• Username: @yuze_trading_bot
+• Username: @${config.telegram.botUsername || 'aiw3_tradebot'}
 • Name: Test_Trading_Bot  
 • Function: Cryptocurrency trading and price queries
 
@@ -517,7 +517,7 @@ Please ensure you're adding the correct trading bot:
 <b>🔧 Correct Addition Steps:</b>
 1. Click "🤖 Add to Group" button below
 2. Select target group
-3. Confirm bot username is @yuze_trading_bot
+3. Confirm bot username is @${config.telegram.botUsername || 'aiw3_tradebot'}
 4. After successful addition, bot will automatically send welcome message
 
 <b>🎯 Verification Method:</b>
