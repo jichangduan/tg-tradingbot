@@ -11,13 +11,13 @@
 - AIW3 API访问权限和密钥
 
 ## 🤖 Telegram Bot 信息
-- **Bot Name**: yuze_trading_bot
-- **Bot Username**: @yuze_trading_bot
-- **Token**: `8287517157:AAHLMiOfpc37V43biAa7UcQz10j9NHe6Bf0`
+- **Bot Name**: aiw3_tradebot
+- **Bot Username**: @aiw3_tradebot
+- **Token**: `8206714128:AAGXaS0IjjIDIdCBXZpZyvVHyy8K8LBLvs8`
 
 ## 🔗 API 配置信息
 - **API Base URL**: 
-  - **生产环境**: `https://tgbot-api.aiw3.ai`
+  - **生产环境**: `https://api.aiw3.ai`
   - **测试环境**: `https://api-test1.aiw3.ai`
 - **API Key**: `J0nWlQ3mOp9a8yR6KzXuVbL7TsI2dFx4`
 - **认证方式**: Bearer Token Authentication
@@ -40,8 +40,8 @@ npm install
 设置环境变量：
 ```bash
 export NODE_ENV=production
-export TELEGRAM_BOT_TOKEN=8287517157:AAHLMiOfpc37V43biAa7UcQz10j9NHe6Bf0
-export API_BASE_URL=https://tgbot-api.aiw3.ai
+export TELEGRAM_BOT_TOKEN=8206714128:AAGXaS0IjjIDIdCBXZpZyvVHyy8K8LBLvs8
+export API_BASE_URL=https://api.aiw3.ai
 export API_KEY=J0nWlQ3mOp9a8yR6KzXuVbL7TsI2dFx4
 ```
 
@@ -51,7 +51,7 @@ export API_KEY=J0nWlQ3mOp9a8yR6KzXuVbL7TsI2dFx4
 创建 `.env.test` 文件：
 ```bash
 # Telegram Bot配置
-TELEGRAM_BOT_TOKEN=8287517157:AAHLMiOfpc37V43biAa7UcQz10j9NHe6Bf0
+TELEGRAM_BOT_TOKEN=8206714128:AAGXaS0IjjIDIdCBXZpZyvVHyy8K8LBLvs8
 
 # API配置 (测试环境)
 API_BASE_URL=https://api-test1.aiw3.ai
@@ -68,7 +68,7 @@ NODE_ENV=test
 1. **价格查询接口**
    - **路径**: `GET /api/birdeye/token_trending`
    - **完整URL示例**: 
-     - 生产环境: `https://tgbot-api.aiw3.ai/api/birdeye/token_trending`
+     - 生产环境: `https://api.aiw3.ai/api/birdeye/token_trending`
      - 测试环境: `https://api-test1.aiw3.ai/api/birdeye/token_trending`
    - **用途**: `/price BTC` 命令的数据源（从trending列表中查找匹配token）
    - **查找策略**: 直接匹配、别名映射(BTC→WBTC)、模糊匹配
@@ -76,7 +76,7 @@ NODE_ENV=test
 2. **健康检查接口**
    - **路径**: `GET /health`
    - **完整URL**: 
-     - 生产环境: `https://tgbot-api.aiw3.ai/health`
+     - 生产环境: `https://api.aiw3.ai/health`
      - 测试环境: `https://api-test1.aiw3.ai/health`
    - **用途**: 应用启动时的API连通性检测
 
@@ -135,7 +135,7 @@ tail -f logs/tgbot.log
 **排查步骤:**
 1. 检查环境变量中的API_KEY是否正确
 2. 确认API地址可访问:
-   - 生产环境: `https://tgbot-api.aiw3.ai`
+   - 生产环境: `https://api.aiw3.ai`
    - 测试环境: `https://api-test1.aiw3.ai`
 3. 验证请求头使用 `x-api-key` 而非 `Authorization`
 
@@ -172,7 +172,7 @@ TokenService.getTokenPrice() (src/services/token.service.ts:32)
 TokenService.fetchTokenPriceFromApi() (src/services/token.service.ts:84)
   ↓ 调用trending API
 HTTP GET {API_BASE_URL}/api/birdeye/token_trending
-# 生产环境: https://tgbot-api.aiw3.ai/api/birdeye/token_trending
+# 生产环境: https://api.aiw3.ai/api/birdeye/token_trending
 # 测试环境: https://api-test1.aiw3.ai/api/birdeye/token_trending
   ↓ 智能匹配算法
 TokenService.findMatchingToken() (src/services/token.service.ts:125)
