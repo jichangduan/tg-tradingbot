@@ -26,28 +26,6 @@ services:
       - "${HOST_PORT:-38080}:3000"
     restart: unless-stopped
 
-  bot-dev:
-    image: node:18-alpine
-    container_name: aiw3-tgbot-dev
-    working_dir: /app
-    command: sh -c "npm install && npm run dev:watch"
-    environment:
-      - NODE_ENV=development
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-      - API_BASE_URL=${API_BASE_URL:-https://api.aiw3.ai}
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - LOG_LEVEL=${LOG_LEVEL:-debug}
-      - PORT=3000
-      - HEALTH_ENABLED=${HEALTH_ENABLED:-true}
-    volumes:
-      - ./:/app
-    depends_on:
-      - redis
-    ports:
-      - "${HOST_PORT:-38080}:3000"
-    restart: unless-stopped
-    profiles: ["dev"]
 
 volumes:
   redis-data:
