@@ -832,9 +832,9 @@ export class PushMessageFormatterService {
 
 
   /**
-   * Batch format fund flow messages - merge multiple fund flows into one message
+   * Batch format fund flow messages - only return the one with highest USDT amount
    * @param fundFlows Fund flow data array
-   * @returns Formatted message object
+   * @returns Formatted message object for the highest USDT amount flow
    */
   public formatBatchFundFlows(fundFlows: (FundFlowData | AIW3FundFlowData)[]): FormattedPushMessage | null {
     if (!fundFlows || fundFlows.length === 0) {
@@ -845,42 +845,30 @@ export class PushMessageFormatterService {
       let message = '';
       let symbols: string[] = [];
       
+      let selectedFlow: (FundFlowData | AIW3FundFlowData);
+      
       if (fundFlows.length === 1) {
         // Single fund flow keeps original format
-        const flow = fundFlows[0];
-        message = this.formatFundFlowMessage(flow);
-        const symbol = 'symbol' in flow ? flow.symbol : undefined;
-        if (symbol) symbols.push(symbol);
+        selectedFlow = fundFlows[0];
       } else {
-        // Multiple fund flows merged format
-        message = `💰 <b>Fund Flow</b> (${fundFlows.length} flows)\n\n`;
-        
-        fundFlows.forEach((flow, index) => {
-          const isAIW3Format = 'message' in flow && 'flow1h' in flow;
-          
-          if (isAIW3Format) {
-            const aiw3Flow = flow as AIW3FundFlowData;
-            message += `${index + 1}. ${this.escapeHtml(aiw3Flow.message)}\n`;
-            message += `   Token: ${aiw3Flow.symbol} | Price: $${aiw3Flow.price}\n`;
-            
-            if (!symbols.includes(aiw3Flow.symbol)) {
-              symbols.push(aiw3Flow.symbol);
-            }
-          } else {
-            const traditionalFlow = flow as FundFlowData;
-            if (traditionalFlow.from && traditionalFlow.to) {
-              message += `${index + 1}. ${this.escapeHtml(traditionalFlow.from)} → ${this.escapeHtml(traditionalFlow.to)}`;
-              if (traditionalFlow.amount) {
-                message += ` | ${this.escapeHtml(traditionalFlow.amount)}`;
-              }
-              message += '\n';
-              
-              if (traditionalFlow.symbol && !symbols.includes(traditionalFlow.symbol)) {
-                symbols.push(traditionalFlow.symbol);
-              }
-            }
-          }
-        });
+        // Multiple fund flows: select the one with highest USDT amount
+        const highestFlow = this.findHighestUSDTFlow(fundFlows);
+        if (!highestFlow) {
+          // If no valid flow found, use the first one as fallback
+          selectedFlow = fundFlows[0];
+          logger.warn('No valid USDT amount found in fund flows, using first flow as fallback', {
+            totalFlows: fundFlows.length
+          });
+        } else {
+          selectedFlow = highestFlow;
+        }
+      }
+
+      // Format the selected flow using the original single flow format
+      message = this.formatFundFlowMessage(selectedFlow);
+      const symbol = 'symbol' in selectedFlow ? selectedFlow.symbol : undefined;
+      if (symbol) {
+        symbols.push(symbol);
       }
 
       // Create trading buttons - always provide buttons
@@ -1063,6 +1051,88 @@ export class PushMessageFormatterService {
     } else {
       return amount.toFixed(2);
     }
+  }
+
+  /**
+   * 从fund flow消息中提取USDT金额
+   * @param flow Fund flow数据
+   * @returns 提取的USDT金额，如果无法提取则返回0
+   */
+  private extractUSDTAmount(flow: FundFlowData | AIW3FundFlowData): number {
+    try {
+      let messageText = '';
+      
+      if ('message' in flow && flow.message) {
+        // AIW3格式
+        messageText = flow.message;
+      } else if ('from' in flow && 'to' in flow && flow.amount) {
+        // 传统格式，从amount中提取
+        messageText = flow.amount;
+      }
+
+      if (!messageText) {
+        return 0;
+      }
+
+      // 使用正则表达式提取USDT金额
+      // 匹配格式: "profit of 24,505.67 USDT" 或 "loss of 2,570.9 USDT" 或其他包含数字和USDT的格式
+      const usdtRegex = /(?:profit|loss|with|of)\s+([0-9,]+(?:\.[0-9]+)?)\s*USDT/i;
+      const match = messageText.match(usdtRegex);
+
+      if (match && match[1]) {
+        // 移除逗号并转换为数字
+        const amount = parseFloat(match[1].replace(/,/g, ''));
+        return isNaN(amount) ? 0 : amount;
+      }
+
+      // 如果没有匹配到"profit/loss of X USDT"格式，尝试其他格式
+      // 匹配任何包含数字和USDT的格式
+      const generalUsdtRegex = /([0-9,]+(?:\.[0-9]+)?)\s*USDT/i;
+      const generalMatch = messageText.match(generalUsdtRegex);
+
+      if (generalMatch && generalMatch[1]) {
+        const amount = parseFloat(generalMatch[1].replace(/,/g, ''));
+        return isNaN(amount) ? 0 : amount;
+      }
+
+      return 0;
+    } catch (error) {
+      logger.warn('Failed to extract USDT amount from fund flow', {
+        error: (error as Error).message,
+        flow
+      });
+      return 0;
+    }
+  }
+
+  /**
+   * 从fund flows中找到USDT金额最高的一条
+   * @param fundFlows Fund flow数据数组
+   * @returns USDT金额最高的fund flow，如果没有则返回null
+   */
+  private findHighestUSDTFlow(fundFlows: (FundFlowData | AIW3FundFlowData)[]): (FundFlowData | AIW3FundFlowData) | null {
+    if (!fundFlows || fundFlows.length === 0) {
+      return null;
+    }
+
+    let highestFlow: (FundFlowData | AIW3FundFlowData) | null = null;
+    let highestAmount = 0;
+
+    for (const flow of fundFlows) {
+      const amount = this.extractUSDTAmount(flow);
+      if (amount > highestAmount) {
+        highestAmount = amount;
+        highestFlow = flow;
+      }
+    }
+
+    logger.info('🔍 [FUND_FLOW_FILTER] Found highest USDT amount flow', {
+      totalFlows: fundFlows.length,
+      highestAmount,
+      selectedFlow: highestFlow ? ('message' in highestFlow ? highestFlow.message : `${highestFlow.from} → ${highestFlow.to}`) : null
+    });
+
+    return highestFlow;
   }
 }
 
