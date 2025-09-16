@@ -360,7 +360,6 @@ BTC, ETH, SOL, USDT, USDC, BNB, ADA, DOT, LINK, MATIC, AVAX, UNI
       message += `<b>🏦 Your Account Info:</b>\n`;
       message += `👤 <b>User ID:</b> <code>${userId}</code>\n`;
       message += `💎 <b>Wallet Address:</b> <code>${this.truncateAddress(walletAddress)}</code>\n`;
-      message += `⚡ <b>Initial Energy:</b> ${energy} ⚡\n`;
       message += `🔗 <b>Referral Code:</b> <code>${referralCode}</code>\n\n`;
       
       message += `<b>🚀 Now you can:</b>\n`;
@@ -379,7 +378,6 @@ BTC, ETH, SOL, USDT, USDC, BNB, ADA, DOT, LINK, MATIC, AVAX, UNI
       message += `<b>🏦 Your Account Info:</b>\n`;
       message += `👤 <b>User ID:</b> <code>${userId}</code>\n`;
       message += `💎 <b>Wallet Address:</b> <code>${this.truncateAddress(walletAddress)}</code>\n`;
-      message += `⚡ <b>Current Energy:</b> ${energy} ⚡\n`;
       message += `🔗 <b>Referral Code:</b> <code>${referralCode}</code>\n\n`;
       
       message += `<b>💡 Quick Start:</b>\n`;
@@ -475,7 +473,6 @@ BTC, ETH, SOL, USDT, USDC, BNB, ADA, DOT, LINK, MATIC, AVAX, UNI
     message += `<b>🏦 Your Account Info:</b>\n`;
     message += `👤 <b>User ID:</b> <code>${userData.userId}</code>\n`;
     message += `💎 <b>Wallet Address:</b> <code>${this.truncateAddress(userData.walletAddress)}</code>\n`;
-    message += `⚡ <b>Current Energy:</b> ${userData.energy} ⚡\n`;
     message += `🔗 <b>Your Referral Code:</b> <code>${userData.referralCode}</code>\n\n`;
     
     message += `<b>💡 Quick Start:</b>\n`;

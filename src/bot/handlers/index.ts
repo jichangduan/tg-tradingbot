@@ -364,7 +364,6 @@ Examples: <code>/long BTC 10x 200</code>, <code>/short ETH 5x 100</code>, <code>
 <b>💡 Other Commands:</b>
 <code>/start</code> - Restart bot
 <code>/help</code> - Show this help information
-<code>/status</code> - View system status
 
 <b>🪙 Supported Tokens:</b>
 <b>Major Coins:</b> BTC, ETH, SOL, USDT, USDC, BNB, XRP, ADA
@@ -596,9 +595,6 @@ I don't recognize this command. Try these available commands:
 <b>📚 Help Information:</b>
 <code>/help</code> - View complete help
 <code>/start</code> - Restart bot
-
-<b>⚙️ System Information:</b>
-<code>/status</code> - View system status
 
 💡 Tip: Send <code>/help</code> to view all available commands
       `.trim();

@@ -286,19 +286,19 @@ export class WalletService {
   public getBalanceWarnings(balance: FormattedWalletBalance): string[] {
     const warnings: string[] = [];
 
-    // USDC余额过低警告
+    // USDC balance too low warning
     if (balance.totalUsdValue < 10) {
-      warnings.push('⚠️ USDC余额低于$10，建议充值后进行交易');
+      warnings.push('⚠️ USDC balance below $10, recommend depositing before trading');
     }
 
-    // 合约账户余额过低警告
+    // Contract account balance too low warning  
     if (balance.nativeBalance < 1) {
-      warnings.push('⚠️ 合约账户余额不足$1，可能影响交易执行');
+      warnings.push('⚠️ Contract account balance below $1, may affect trade execution');
     }
 
-    // 空钱包警告
+    // Empty wallet warning
     if (balance.totalUsdValue === 0) {
-      warnings.push('📭 钱包暂无资产，请先转入资金');
+      warnings.push('📭 Wallet has no assets, please deposit funds first');
     }
 
     return warnings;
