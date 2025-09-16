@@ -16,11 +16,11 @@
 
 **AIW3 后台 API 地址**
 - 测试环境: https://api-test1.aiw3.ai
-- 生产环境: ❓需确认 https://api.aiw3.ai
+- 生产环境: https://api.aiw3.ai
 
 **AIW3 API Key**
 - 测试环境: J0nWlQ3mOp9a8yR6KzXuVbL7TsI2dFx4
-- 生产环境: ❓需要提供生产环境Key
+- 生产环境: 使用相同测试环境Key (已确认)
 
 **Hyperliquid API**
 - 测试环境: https://api-ui.hyperliquid-testnet.xyz
@@ -28,11 +28,11 @@
 
 **Redis 配置**
 - 测试环境: localhost (无密码)
-- 生产环境: ❓需要提供服务器地址和密码
+- 生产环境: 沿用现有配置 (不需要修改)
 
 **管理员 Chat ID**
 - 测试环境: 未设置
-- 生产环境: ❓需要提供管理员Telegram ID
+- 生产环境: 沿用现有配置 (不需要修改)
 
 **日志级别**
 - 测试环境: info
@@ -42,7 +42,7 @@
 ## 需要切换的API接口
 
 **AIW3后台服务** (24个接口都要换域名)
-从 https://api-test1.aiw3.ai 改为 https://tgbot-api.aiw3.ai
+从 https://api-test1.aiw3.ai 改为 https://api.aiw3.ai
 
 主要接口:
 - /api/tgbot/user/init (用户初始化)
@@ -70,21 +70,18 @@
 ```
 NODE_ENV=production
 TELEGRAM_BOT_TOKEN=8206714128:AAGXaS0IjjIDIdCBXZpZyvVHyy8K8LBLvs8
-API_BASE_URL=❓需确认域名
-API_KEY=❓需要生产Key
-REDIS_HOST=❓需要服务器地址
-REDIS_PASSWORD=❓需要密码
+API_BASE_URL=https://api.aiw3.ai
+API_KEY=J0nWlQ3mOp9a8yR6KzXuVbL7TsI2dFx4
 LOG_LEVEL=warn
 PUSH_INTERVAL_MINUTES=20
-ADMIN_CHAT_ID=❓需要管理员ID
 ```
 
-## 需要您确认的5个配置
+## ✅ 配置已确认完成
 
-1. AIW3生产后台域名是 https://tgbot-api.aiw3.ai 吗？
-2. 生产环境的API Key是什么？
-3. Redis服务器地址是什么？
-4. Redis密码是什么？
-5. 管理员的Telegram Chat ID是什么？
+所有生产环境配置已确定：
+- AIW3生产后台域名: https://api.aiw3.ai
+- API Key: 沿用测试环境Key
+- Redis配置: 沿用现有配置
+- 管理员Chat ID: 沿用现有配置
 
-确认这些后就可以开始修改代码了！
+production分支已配置完成，可直接用于生产部署！

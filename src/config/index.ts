@@ -18,7 +18,7 @@ function getDefaultApiUrl(): string {
   const nodeEnv = process.env.NODE_ENV || 'development';
   switch (nodeEnv) {
     case 'production':
-      return 'https://tgbot-api.aiw3.ai';
+      return 'https://api.aiw3.ai';
     case 'test':
       return 'https://api-test1.aiw3.ai';
     case 'development':
@@ -91,7 +91,7 @@ export const config = {
 
   // 日志配置
   logging: {
-    level: process.env.LOG_LEVEL || 'info',
+    level: process.env.LOG_LEVEL || 'warn', // 生产环境默认warn级别
     file: process.env.LOG_FILE || './logs/tgbot.log',
     maxSize: process.env.LOG_MAX_SIZE || '10m',
     maxFiles: parseInt(process.env.LOG_MAX_FILES || '5'),
@@ -113,7 +113,7 @@ export const config = {
 
   // 推送配置
   push: {
-    intervalMinutes: parseInt(process.env.PUSH_INTERVAL_MINUTES || '1'), // 测试环境1分钟
+    intervalMinutes: parseInt(process.env.PUSH_INTERVAL_MINUTES || '20'), // 生产环境20分钟
     maxRetries: parseInt(process.env.PUSH_MAX_RETRIES || '3'),
     batchSize: parseInt(process.env.PUSH_BATCH_SIZE || '50'),
     enableScheduler: process.env.PUSH_SCHEDULER_ENABLED !== 'false', // 默认启用
