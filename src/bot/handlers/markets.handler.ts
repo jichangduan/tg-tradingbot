@@ -137,8 +137,8 @@ export class MarketsHandler {
       const endIndex = startIndex + itemsPerPage;
       const pageData = marketData.slice(startIndex, endIndex);
 
-      // Header only (no page info in message)
-      let message = `🏪 *PERP MARKETS*\n\n`;
+      // Header with code block for perfect alignment
+      let message = `🏪 *PERP MARKETS*\n\n\`\`\`\n`;
       
       // Format each coin with precise column alignment
       pageData.forEach((coin) => {
@@ -156,6 +156,9 @@ export class MarketsHandler {
         // Use exact spacing between columns
         message += `${tokenName}${price}  ${change}\n`;
       });
+
+      // Close code block
+      message += `\`\`\``;
 
       return message;
 
