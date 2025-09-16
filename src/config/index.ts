@@ -12,6 +12,37 @@ if (!process.env.TELEGRAM_BOT_TOKEN) {
 }
 
 /**
+ * 根据环境获取默认API URL
+ */
+function getDefaultApiUrl(): string {
+  const nodeEnv = process.env.NODE_ENV || 'development';
+  switch (nodeEnv) {
+    case 'production':
+      return 'https://tgbot-api.aiw3.ai';
+    case 'test':
+      return 'https://api-test1.aiw3.ai';
+    case 'development':
+    default:
+      return 'https://api-test1.aiw3.ai';
+  }
+}
+
+/**
+ * 根据环境获取默认Hyperliquid API URL
+ */
+function getDefaultHyperliquidUrl(): string {
+  const nodeEnv = process.env.NODE_ENV || 'development';
+  switch (nodeEnv) {
+    case 'production':
+      return 'https://api.hyperliquid.xyz';
+    case 'test':
+    case 'development':
+    default:
+      return 'https://api-ui.hyperliquid-testnet.xyz';
+  }
+}
+
+/**
  * 应用配置管理
  * 统一管理所有环境变量和配置项
  */
@@ -34,11 +65,18 @@ export const config = {
 
   // API配置
   api: {
-    baseUrl: process.env.API_BASE_URL || 'https://api-test1.aiw3.ai',
+    baseUrl: process.env.API_BASE_URL || getDefaultApiUrl(),
     apiKey: process.env.API_KEY,
     timeout: parseInt(process.env.API_TIMEOUT || '10000'),
     retryAttempts: parseInt(process.env.API_RETRY_ATTEMPTS || '3'),
     retryDelay: parseInt(process.env.API_RETRY_DELAY || '1000')
+  },
+
+  // Hyperliquid配置
+  hyperliquid: {
+    apiUrl: process.env.HYPERLIQUID_API_URL || getDefaultHyperliquidUrl(),
+    timeout: parseInt(process.env.HYPERLIQUID_TIMEOUT || '10000'),
+    isMainnet: process.env.NODE_ENV === 'production'
   },
 
   // Redis缓存配置

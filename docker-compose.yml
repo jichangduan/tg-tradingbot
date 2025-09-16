@@ -14,7 +14,7 @@ services:
     environment:
       - NODE_ENV=${NODE_ENV:-production}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-      - API_BASE_URL=${API_BASE_URL:-https://api.aiw3.com}
+      - API_BASE_URL=${API_BASE_URL:-https://tgbot-api.aiw3.ai}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - LOG_LEVEL=${LOG_LEVEL:-info}
@@ -34,7 +34,7 @@ services:
     environment:
       - NODE_ENV=development
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-      - API_BASE_URL=${API_BASE_URL:-https://api.aiw3.com}
+      - API_BASE_URL=${API_BASE_URL:-https://tgbot-api.aiw3.ai}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - LOG_LEVEL=${LOG_LEVEL:-debug}

@@ -1,5 +1,6 @@
 import axios, { AxiosInstance } from 'axios';
 import { logger } from '../utils/logger';
+import { config } from '../config';
 
 /**
  * Hyperliquid API types
@@ -49,11 +50,11 @@ export class HyperliquidMarketService {
   private readonly cacheExpiry = 30 * 1000; // 30 seconds cache
 
   constructor() {
-    this.baseUrl = 'https://api-ui.hyperliquid-testnet.xyz';
+    this.baseUrl = config.hyperliquid.apiUrl;
     
     this.client = axios.create({
       baseURL: this.baseUrl,
-      timeout: 10000,
+      timeout: config.hyperliquid.timeout,
       headers: {
         'Content-Type': 'application/json',
         'User-Agent': 'AIW3-TGBot/1.0'
@@ -61,6 +62,13 @@ export class HyperliquidMarketService {
     });
 
     this.setupInterceptors();
+    
+    // Log environment information
+    logger.info(`🔧 Hyperliquid Market Service initialized`, {
+      environment: config.env.nodeEnv,
+      apiUrl: this.baseUrl,
+      isMainnet: config.hyperliquid.isMainnet
+    });
   }
 
   /**
