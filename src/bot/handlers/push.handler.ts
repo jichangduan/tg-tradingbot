@@ -1282,29 +1282,9 @@ ${emoji} <b>${typeName} Push Enabled!</b>
         // Update user settings
         await this.updateUserPushSetting(userIdString, type, enabled);
 
-        // 当开启推送时，立即推送一次该类型的数据
+        // 禁用立即推送测试 - 等待20分钟定时器推送
         if (enabled) {
-          logger.info(`🚀 [IMMEDIATE_PUSH] Triggering immediate push for ${type} [${requestId}]`);
-
-          try {
-            // 立即发送该类型的推送数据（异步执行，不阻塞UI更新）
-            this.sendImmediatePushOnEnable(userIdString, type as 'flash' | 'whale' | 'fund', requestId)
-              .catch(error => {
-                logger.error(`Immediate push failed [${requestId}]`, {
-                  error: error.message,
-                  type,
-                  userId,
-                  requestId
-                });
-              });
-          } catch (error) {
-            logger.warn(`Immediate push initiation failed [${requestId}]`, {
-              error: (error as Error).message,
-              type,
-              userId,
-              requestId
-            });
-          }
+          logger.info(`✅ [PUSH_ENABLED] ${type} push enabled, will receive updates via 20-minute timer [${requestId}]`);
         }
 
         // Get updated settings
