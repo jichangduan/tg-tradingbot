@@ -237,7 +237,8 @@ export const PUSH_CONSTANTS = {
   
   // Cron表达式
   CRON: {
-    TEST: '* * * * *',      // 每分钟（测试环境）
+    TEST: '* * * * *',        // 每分钟（开发环境）
+    TESTING: '*/2 * * * *',   // 每2分钟（测试环境）
     PRODUCTION: '*/20 * * * *' // 每20分钟（生产环境）
   }
 } as const;

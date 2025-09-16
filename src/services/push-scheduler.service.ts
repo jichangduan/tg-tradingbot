@@ -43,19 +43,30 @@ export class PushSchedulerService {
     }
 
     try {
-      // 使用统一的cron配置常量：生产环境20分钟，开发/测试环境1分钟
+      // 使用统一的cron配置常量：生产环境20分钟，测试环境2分钟，开发环境1分钟
       const environment = process.env.NODE_ENV || 'development';
       const cronPattern = environment === 'production' 
-        ? PUSH_CONSTANTS.CRON.PRODUCTION 
+        ? PUSH_CONSTANTS.CRON.PRODUCTION
+        : environment === 'testing'
+        ? PUSH_CONSTANTS.CRON.TESTING
         : PUSH_CONSTANTS.CRON.TEST;
       
       // 🔍 详细记录环境配置信息
+      const getSchedulingInterval = (env: string) => {
+        switch (env) {
+          case 'production': return '20 minutes';
+          case 'testing': return '2 minutes';
+          default: return '1 minute';
+        }
+      };
+
       logger.info('📅 [PUSH_SCHEDULER] Environment configuration verified', {
         environment,
         cronPattern,
         productionPattern: PUSH_CONSTANTS.CRON.PRODUCTION,
+        testingPattern: PUSH_CONSTANTS.CRON.TESTING,
         testPattern: PUSH_CONSTANTS.CRON.TEST,
-        schedulingInterval: environment === 'production' ? '20 minutes' : '1 minute',
+        schedulingInterval: getSchedulingInterval(environment),
         timezone: 'Asia/Shanghai'
       });
 
@@ -74,7 +85,7 @@ export class PushSchedulerService {
         isRunning: this.isRunning,
         cronPattern,
         environment,
-        nextExecutionEstimate: environment === 'production' ? 'in 20 minutes' : 'in 1 minute'
+        nextExecutionEstimate: `in ${getSchedulingInterval(environment)}`
       });
 
       // 添加测试用户以便测试推送功能
@@ -555,7 +566,9 @@ export class PushSchedulerService {
   } {
     const environment = process.env.NODE_ENV || 'development';
     const cronPattern = environment === 'production' 
-      ? PUSH_CONSTANTS.CRON.PRODUCTION 
+      ? PUSH_CONSTANTS.CRON.PRODUCTION
+      : environment === 'testing'
+      ? PUSH_CONSTANTS.CRON.TESTING
       : PUSH_CONSTANTS.CRON.TEST;
     
     return {
