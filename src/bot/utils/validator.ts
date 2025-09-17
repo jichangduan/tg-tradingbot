@@ -58,7 +58,7 @@ export class Validator {
       return {
         isValid: false,
         normalized: '',
-        error: '代币符号不能为空且必须是字符串'
+        error: 'Token symbol cannot be empty and must be a string'
       };
     }
 
@@ -70,7 +70,7 @@ export class Validator {
       return {
         isValid: false,
         normalized: '',
-        error: '代币符号不能为空'
+        error: 'Token symbol cannot be empty'
       };
     }
 
@@ -78,7 +78,7 @@ export class Validator {
       return {
         isValid: false,
         normalized: cleanSymbol,
-        error: '代币符号过长，请使用标准代币符号'
+        error: 'Token symbol too long, please use standard token symbols'
       };
     }
 
@@ -87,7 +87,7 @@ export class Validator {
       return {
         isValid: false,
         normalized: cleanSymbol,
-        error: '代币符号只能包含字母和数字'
+        error: 'Token symbol can only contain letters and numbers'
       };
     }
 
@@ -105,12 +105,22 @@ export class Validator {
       };
     }
 
-    // 如果不在支持列表中，但格式正确，仍然允许（可能是新代币）
-    // 但提供建议
+    // 如果不在支持列表中，检查是否为明显无效的输入
     const suggestions = this.findSimilarTokens(cleanSymbol);
 
+    // 对于明显无效的输入（如纯数字、小数或过短），直接拒绝
+    if (/^[0-9.]+$/.test(cleanSymbol) || cleanSymbol.length < 2) {
+      return {
+        isValid: false,
+        normalized: finalSymbol,
+        error: 'Invalid token symbol format',
+        suggestions: suggestions.length > 0 ? suggestions : undefined
+      };
+    }
+
+    // 对于格式正确但不在支持列表中的代币，仍然允许尝试查询
     return {
-      isValid: true, // 允许尝试查询
+      isValid: true,
       normalized: finalSymbol,
       suggestions: suggestions.length > 0 ? suggestions : undefined
     };
@@ -263,7 +273,7 @@ export class Validator {
       } else {
         invalid.push({
           symbol: symbol,
-          error: validation.error || '无效的代币符号',
+          error: validation.error || 'Invalid token symbol',
           suggestions: validation.suggestions
         });
       }
@@ -347,7 +357,7 @@ export function validateSymbol(symbol: any): string {
   const result = validator.validateTokenSymbol(symbol);
   
   if (!result.isValid) {
-    throw new Error(result.error || '无效的代币符号');
+    throw new Error(result.error || 'Invalid token symbol');
   }
 
   // 如果有建议但符号仍然有效，记录警告但不抛出错误

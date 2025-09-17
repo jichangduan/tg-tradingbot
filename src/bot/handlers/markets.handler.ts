@@ -150,19 +150,19 @@ export class MarketsHandler {
         const priceText = this.formatPrice(coin.price);
         const changeText = this.formatChangeText(coin.change);
         
-        // Create precisely aligned columns using dots for spacing:
-        // Token name: left-aligned
-        // Price: right-aligned with $ prefix  
-        // Change: right-aligned with percentage
+        // Create precisely aligned columns using spaces for clean layout:
+        // Token name: left-aligned (8 chars)
+        // Price: right-aligned with $ prefix (16 chars) 
+        // Change: right-aligned with percentage (12 chars)
         const tokenName = coin.name.padEnd(8);
         const price = `$${priceText}`;
         const change = changeText;
         
-        // Use dots and spaces for better visual alignment without copy button
-        const dots1 = '.'.repeat(Math.max(1, 25 - tokenName.length - price.length));
-        const dots2 = '.'.repeat(Math.max(1, 15 - change.length));
+        // Use fixed-width spacing for clean alignment without dots
+        const pricePadded = price.padStart(16);
+        const changePadded = change.padStart(12);
         
-        message += `<code>${tokenName}${dots1}${price}${dots2}${change}</code>\n`;
+        message += `<code>${tokenName}${pricePadded}${changePadded}</code>\n`;
       });
 
       return message;

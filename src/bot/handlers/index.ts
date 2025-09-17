@@ -67,8 +67,8 @@ async function handleTradingInput(ctx: ExtendedContext, state: TradingState, inp
         
       } catch (error) {
         await ctx.reply(
-          `❌ <b>无效的代币符号: ${symbol}</b>\n\n` +
-          `请输入有效的代币符号，例如：BTC, ETH, SOL`,
+          `❌ <b>Invalid token symbol: ${symbol}</b>\n\n` +
+          `Please enter a valid token symbol, for example: BTC, ETH, SOL`,
           { parse_mode: 'HTML' }
         );
       }

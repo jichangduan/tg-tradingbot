@@ -382,27 +382,27 @@ export class TokenService {
 
     if (error.message.includes('404') || error.message.includes('not found')) {
       code = ApiErrorCode.TOKEN_NOT_FOUND;
-      message = `代币 ${symbol} 未找到，请检查代币符号是否正确`;
+      message = `Token ${symbol} not found, please check if the token symbol is correct`;
       retryable = false;
     } else if (error.message.includes('timeout')) {
       code = ApiErrorCode.TIMEOUT_ERROR;
-      message = '查询超时，请稍后重试';
+      message = 'Query timeout, please try again later';
       retryable = true;
     } else if (error.message.includes('rate limit') || error.message.includes('429')) {
       code = ApiErrorCode.RATE_LIMIT_EXCEEDED;
-      message = '请求过于频繁，请稍后重试';
+      message = 'Too many requests, please try again later';
       retryable = true;
     } else if (error.message.includes('network') || error.message.includes('ENOTFOUND')) {
       code = ApiErrorCode.NETWORK_ERROR;
-      message = '网络连接失败，请检查网络连接';
+      message = 'Network connection failed, please check your network connection';
       retryable = true;
     } else if (error.message.includes('server') || error.message.includes('50')) {
       code = ApiErrorCode.SERVER_ERROR;
-      message = '服务器错误，请稍后重试';
+      message = 'Server error, please try again later';
       retryable = true;
     } else {
       code = ApiErrorCode.UNKNOWN_ERROR;
-      message = `查询 ${symbol} 价格失败: ${error.message}`;
+      message = `Failed to query ${symbol} price: ${error.message}`;
       retryable = true;
     }
 
