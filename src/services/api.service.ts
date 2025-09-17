@@ -219,7 +219,7 @@ export class ApiService {
     if (!error.response) {
       // 网络错误或请求超时
       return new ApiError(
-        '网络连接失败，请检查网络连接',
+'Network connection failed, please check network connection',
         undefined,
         'NETWORK_ERROR',
         error
@@ -233,34 +233,34 @@ export class ApiService {
     // 根据HTTP状态码生成用户友好的错误消息
     switch (status) {
       case 400:
-        message = (data as any)?.message || '请求参数错误';
+        message = (data as any)?.message || 'Request parameter error';
         code = 'BAD_REQUEST';
         break;
       case 401:
-        message = 'API认证失败，请检查API密钥';
+        message = 'API authentication failed, please check API key';
         code = 'UNAUTHORIZED';
         break;
       case 403:
-        message = '访问权限不足';
+        message = 'Insufficient access permissions';
         code = 'FORBIDDEN';
         break;
       case 404:
-        message = (data as any)?.message || '请求的资源未找到';
+        message = (data as any)?.message || 'Requested resource not found';
         code = 'NOT_FOUND';
         break;
       case 429:
-        message = '请求频率超限，请稍后重试';
+        message = 'Request rate limit exceeded, please try again later';
         code = 'RATE_LIMIT';
         break;
       case 500:
       case 502:
       case 503:
       case 504:
-        message = '服务器内部错误，请稍后重试';
+        message = 'Internal server error, please try again later';
         code = 'SERVER_ERROR';
         break;
       default:
-        message = (data as any)?.message || `请求失败 (${status})`;
+        message = (data as any)?.message || `Request failed (${status})`;
         code = 'UNKNOWN_ERROR';
     }
 

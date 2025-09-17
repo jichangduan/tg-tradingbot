@@ -480,11 +480,11 @@ ${emoji} <b>${typeName} Push Enabled!</b>
   private async handleGroupPushCommand(ctx: ExtendedContext, args: string[]): Promise<void> {
     const userId = ctx.from?.id;
     const chatId = ctx.chat?.id;
-    const chatTitle = (ctx.chat && 'title' in ctx.chat) ? ctx.chat.title || '未命名群组' : '未命名群组';
+    const chatTitle = (ctx.chat && 'title' in ctx.chat) ? ctx.chat.title || 'Unnamed Group' : 'Unnamed Group';
     const requestId = ctx.requestId || 'unknown';
 
     if (!userId || !chatId) {
-      await ctx.reply('❌ 无法获取用户或群组信息');
+      await ctx.reply('❌ Unable to get user or group information');
       return;
     }
 
@@ -502,9 +502,9 @@ ${emoji} <b>${typeName} Push Enabled!</b>
       
       if (!isCreator) {
         await ctx.reply(
-          '⚠️ <b>权限不足</b>\n\n' +
-          '只有群主可以查看和设置群组推送功能\n\n' +
-          '💡 如果您是群主，请确认机器人具有读取群组成员权限',
+          '⚠️ <b>Insufficient Permissions</b>\n\n' +
+          'Only group admin can view and configure group push functions\n\n' +
+          '💡 If you are the group admin, please ensure the bot has permission to read group members',
           { parse_mode: 'HTML' }
         );
         return;
@@ -531,8 +531,8 @@ ${emoji} <b>${typeName} Push Enabled!</b>
       });
 
       await ctx.reply(
-        '❌ 推送设置显示失败\n\n' +
-        '请稍后重试，如果问题持续存在，请联系管理员',
+        '❌ Push settings display failed\n\n' +
+        'Please try again later, if the problem persists, please contact administrator',
         { parse_mode: 'HTML' }
       );
     }
@@ -596,46 +596,46 @@ ${emoji} <b>${typeName} Push Enabled!</b>
       case 'flash':
         return {
           content: 
-            `🚨 <b>测试快讯</b>\n\n` +
-            `📈 <b>BTC突破$75,000重要阻力位</b>\n` +
-            `💡 大量资金涌入，市场情绪极度乐观\n` +
-            `📊 24h涨幅: +8.5%\n` +
+            `🚨 <b>Test News</b>\n\n` +
+            `📈 <b>BTC Breaks Through $75,000 Major Resistance</b>\n` +
+            `💡 Large capital inflow, market sentiment extremely optimistic\n` +
+            `📊 24h gain: +8.5%\n` +
             `⏰ ${timestamp}\n\n` +
-            `<i>🧪 这是一条测试推送消息</i>`,
+            `<i>🧪 This is a test push message</i>`,
           symbol: 'BTC'
         };
 
       case 'whale':
         return {
           content:
-            `🐋 <b>测试鲸鱼动向</b>\n\n` +
-            `💰 <b>巨鲸地址大额转入</b>\n` +
-            `📍 地址: 0x742d...8a3f\n` +
-            `🔢 数量: 10,000 ETH\n` +
-            `💵 价值: ~$25,000,000\n` +
-            `📈 操作: 买入建仓\n` +
+            `🐋 <b>Test Whale Activity</b>\n\n` +
+            `💰 <b>Whale Address Large Transfer In</b>\n` +
+            `📍 Address: 0x742d...8a3f\n` +
+            `🔢 Amount: 10,000 ETH\n` +
+            `💵 Value: ~$25,000,000\n` +
+            `📈 Action: Buy position\n` +
             `⏰ ${timestamp}\n\n` +
-            `<i>🧪 这是一条测试推送消息</i>`,
+            `<i>🧪 This is a test push message</i>`,
           symbol: 'ETH'
         };
 
       case 'fund':
         return {
           content:
-            `💰 <b>测试资金流向</b>\n\n` +
-            `📤 <b>Binance大额资金流出</b>\n` +
-            `🏦 交易所: Binance → 未知钱包\n` +
-            `🔢 数量: 50,000 BTC\n` +
-            `💵 价值: ~$3,750,000,000\n` +
-            `📊 流向: 冷钱包储存\n` +
+            `💰 <b>Test Fund Flow</b>\n\n` +
+            `📤 <b>Binance Large Fund Outflow</b>\n` +
+            `🏦 Exchange: Binance → Unknown Wallet\n` +
+            `🔢 Amount: 50,000 BTC\n` +
+            `💵 Value: ~$3,750,000,000\n` +
+            `📊 Flow: Cold wallet storage\n` +
             `⏰ ${timestamp}\n\n` +
-            `<i>🧪 这是一条测试推送消息</i>`,
+            `<i>🧪 This is a test push message</i>`,
           symbol: 'BTC'
         };
 
       default:
         return {
-          content: `🧪 <b>测试推送</b>\n\n未知类型的推送测试\n⏰ ${timestamp}`
+          content: `🧪 <b>Test Push</b>\n\nUnknown type push test\n⏰ ${timestamp}`
         };
     }
   }
@@ -785,9 +785,9 @@ ${emoji} <b>${typeName} Push Enabled!</b>
       // 发送错误提示
       try {
         await ctx.reply(
-          `❌ 测试推送发送失败\n\n` +
-          `推送类型: ${this.getTypeName(type)}\n` +
-          `请稍后重试或联系管理员`,
+          `❌ Test push send failed\n\n` +
+          `Push type: ${this.getTypeName(type)}\n` +
+          `Please try again later or contact administrator`,
           { parse_mode: 'HTML' }
         );
       } catch (replyError) {
@@ -1016,7 +1016,7 @@ ${emoji} <b>${typeName} Push Enabled!</b>
         });
 
         // Add group push identifier to message
-        const groupMessage = message.content + '\n\n📢 <i>群组推送测试</i>';
+        const groupMessage = message.content + '\n\n📢 <i>Group Push Test</i>';
 
         // 记录即将发送的完整参数
         logger.info('📋 [TG_SEND] Telegram API call parameters', {

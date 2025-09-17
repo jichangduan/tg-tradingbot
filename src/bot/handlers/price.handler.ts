@@ -198,8 +198,8 @@ export class PriceHandler {
     const maxSymbols = 5;
     if (symbols.length > maxSymbols) {
       await ctx.reply(
-        `⚠️ 批量查询最多支持 ${maxSymbols} 个代币\n\n` +
-        '请减少查询数量后重试',
+        `⚠️ Batch query supports maximum ${maxSymbols} tokens\n\n` +
+        'Please reduce query count and try again',
         { parse_mode: 'HTML' }
       );
       return;
@@ -216,7 +216,7 @@ export class PriceHandler {
 
       // 发送查询中消息
       const loadingMessage = await ctx.reply(
-        `🔍 正在查询 ${symbols.length} 个代币的价格信息...`,
+        `🔍 Querying price information for ${symbols.length} tokens...`,
         { parse_mode: 'HTML' }
       );
 
@@ -228,7 +228,7 @@ export class PriceHandler {
           ctx.chat?.id,
           loadingMessage.message_id,
           undefined,
-          '❌ 未能获取任何代币的价格信息\n\n请检查代币符号是否正确',
+          '❌ Unable to get price information for any token\n\nPlease check if token symbols are correct',
           { parse_mode: 'HTML' }
         );
         return;

@@ -68,7 +68,7 @@ export class UserService {
         throw this.createDetailedError(
           ApiErrorCode.DATA_UNAVAILABLE,
           'Invalid API response format',
-          'API返回数据格式不正确'
+'Invalid API response data format'
         );
       }
 
@@ -116,7 +116,7 @@ export class UserService {
       throw this.createDetailedError(
         ApiErrorCode.INVALID_SYMBOL, // 复用现有错误码
         'telegram_id is required',
-        'Telegram用户ID不能为空'
+'Telegram user ID cannot be empty'
       );
     }
 
@@ -125,7 +125,7 @@ export class UserService {
       throw this.createDetailedError(
         ApiErrorCode.INVALID_SYMBOL,
         'Invalid telegram_id format',
-        'Telegram用户ID格式不正确'
+'Invalid Telegram user ID format'
       );
     }
 
@@ -134,7 +134,7 @@ export class UserService {
       throw this.createDetailedError(
         ApiErrorCode.INVALID_SYMBOL,
         'Username too long',
-        '用户名过长，最多32个字符'
+'Username too long, maximum 32 characters'
       );
     }
 
@@ -142,7 +142,7 @@ export class UserService {
       throw this.createDetailedError(
         ApiErrorCode.INVALID_SYMBOL,
         'First name too long',
-        '名字过长，最多64个字符'
+'First name too long, maximum 64 characters'
       );
     }
 
@@ -150,7 +150,7 @@ export class UserService {
       throw this.createDetailedError(
         ApiErrorCode.INVALID_SYMBOL,
         'Last name too long',
-        '姓氏过长，最多64个字符'
+'Last name too long, maximum 64 characters'
       );
     }
   }
@@ -189,7 +189,7 @@ export class UserService {
       return this.createDetailedError(
         ApiErrorCode.NETWORK_ERROR,
         error.message,
-        '网络连接失败，请检查网络连接'
+'Network connection failed, please check network connection'
       );
     }
 
@@ -198,7 +198,7 @@ export class UserService {
       return this.createDetailedError(
         ApiErrorCode.TIMEOUT_ERROR,
         error.message,
-        '请求超时，请稍后重试'
+'Request timeout, please try again later'
       );
     }
 
@@ -212,31 +212,31 @@ export class UserService {
           return this.createDetailedError(
             ApiErrorCode.INVALID_SYMBOL,
             message,
-            '请求参数错误，请检查输入信息'
+'Request parameter error, please check input information'
           );
         case 401:
           return this.createDetailedError(
             ApiErrorCode.UNAUTHORIZED,
             message,
-            'API认证失败，请联系管理员'
+'API authentication failed, please contact administrator'
           );
         case 403:
           return this.createDetailedError(
             ApiErrorCode.FORBIDDEN,
             message,
-            '访问权限不足'
+'Insufficient access permissions'
           );
         case 404:
           return this.createDetailedError(
             ApiErrorCode.TOKEN_NOT_FOUND,
             message,
-            '用户服务不可用'
+'User service unavailable'
           );
         case 429:
           return this.createDetailedError(
             ApiErrorCode.RATE_LIMIT_EXCEEDED,
             message,
-            '请求过于频繁，请稍后重试'
+'Requests too frequent, please try again later'
           );
         case 500:
         case 502:
@@ -245,13 +245,13 @@ export class UserService {
           return this.createDetailedError(
             ApiErrorCode.SERVER_ERROR,
             message,
-            '服务器内部错误，请稍后重试'
+'Internal server error, please try again later'
           );
         default:
           return this.createDetailedError(
             ApiErrorCode.UNKNOWN_ERROR,
             message || error.message,
-            `服务异常 (${status})`
+`Service error (${status})`
           );
       }
     }
@@ -260,7 +260,7 @@ export class UserService {
     return this.createDetailedError(
       ApiErrorCode.UNKNOWN_ERROR,
       error.message || 'Unknown error',
-      '用户初始化失败，请稍后重试'
+'User initialization failed, please try again later'
     );
   }
 

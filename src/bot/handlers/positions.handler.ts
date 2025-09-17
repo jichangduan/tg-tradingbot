@@ -525,7 +525,7 @@ ${positionsText}
       requestId: reqId
     });
 
-    if (error.message.includes('not logged in') || error.message.includes('未登录')) {
+    if (error.message.includes('not logged in')) {
       logger.info(`Authentication error detected [${reqId}]`, { requestId: reqId });
       return `
 ❌ <b>User Not Logged In</b>
@@ -536,7 +536,7 @@ Please use /start command to login first before querying position information.
       `.trim();
     }
 
-    if (error.message.includes('网络') || error.message.includes('ECONNREFUSED') || error.message.includes('ENOTFOUND')) {
+    if (error.message.includes('network') || error.message.includes('ECONNREFUSED') || error.message.includes('ENOTFOUND')) {
       logger.info(`Network error detected [${reqId}]`, { requestId: reqId });
       return `
 ❌ <b>Network Connection Failed</b>

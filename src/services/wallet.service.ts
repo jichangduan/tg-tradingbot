@@ -59,7 +59,7 @@ export class WalletService {
           throw this.createDetailedError(
             ApiErrorCode.TOKEN_NOT_FOUND,
             'Failed to create Hyperliquid wallet',
-            '无法创建Hyperliquid交易钱包，请稍后重试或联系管理员'
+            'Failed to create Hyperliquid trading wallet, please try again later or contact administrator'
           );
         }
       }
@@ -312,7 +312,7 @@ export class WalletService {
       throw this.createDetailedError(
         ApiErrorCode.INVALID_SYMBOL,
         'telegram_id is required',
-        'Telegram用户ID不能为空'
+        'Telegram user ID cannot be empty'
       );
     }
 
@@ -321,7 +321,7 @@ export class WalletService {
       throw this.createDetailedError(
         ApiErrorCode.INVALID_SYMBOL,
         'Invalid telegram_id format',
-        'Telegram用户ID格式不正确'
+        'Invalid Telegram user ID format'
       );
     }
   }
@@ -340,7 +340,7 @@ export class WalletService {
       return this.createDetailedError(
         ApiErrorCode.NETWORK_ERROR,
         error.message,
-        '🌐 <b>网络连接失败</b>\n\n请先执行 <code>/start</code> 命令确保您的账户状态正常，然后重试钱包查询。\n\n📶 请检查网络连接状态。',
+        '🌐 <b>Network Connection Failed</b>\n\nPlease execute <code>/start</code> command first to ensure your account status is normal, then retry wallet query.\n\n📶 Please check your network connection.',
         true
       );
     }
@@ -350,7 +350,7 @@ export class WalletService {
       return this.createDetailedError(
         ApiErrorCode.TIMEOUT_ERROR,
         error.message,
-        '⏰ <b>请求超时</b>\n\n服务响应较慢，建议先执行 <code>/start</code> 命令刷新账户状态，然后重试。\n\n🔄 请稍后重试钱包查询。',
+        '⏰ <b>Request Timeout</b>\n\nService response is slow, recommend executing <code>/start</code> command first to refresh account status, then retry.\n\n🔄 Please try wallet query again later.',
         true
       );
     }
@@ -365,32 +365,32 @@ export class WalletService {
           return this.createDetailedError(
             ApiErrorCode.INVALID_SYMBOL,
             message,
-            '请求参数错误，请检查用户信息'
+            'Request parameter error, please check user information'
           );
         case 401:
           return this.createDetailedError(
             ApiErrorCode.UNAUTHORIZED,
             message,
-            'Hyperliquid API认证失败，请联系管理员'
+            'Hyperliquid API authentication failed, please contact administrator'
           );
         case 403:
           return this.createDetailedError(
             ApiErrorCode.FORBIDDEN,
             message,
-            '访问权限不足'
+            'Insufficient access permissions'
           );
         case 404:
           return this.createDetailedError(
             ApiErrorCode.TOKEN_NOT_FOUND,
             message,
-            '👤 <b>账户未初始化</b>\n\n请先执行 <code>/start</code> 命令初始化您的账户，创建交易钱包。\n\n🚀 初始化完成后即可查看钱包余额。',
+            '👤 <b>Account Not Initialized</b>\n\nPlease execute <code>/start</code> command first to initialize your account and create trading wallet.\n\n🚀 You can view wallet balance after initialization is complete.',
             false
           );
         case 429:
           return this.createDetailedError(
             ApiErrorCode.RATE_LIMIT_EXCEEDED,
             message,
-            '请求过于频繁，请稍后重试'
+            'Requests too frequent, please try again later'
           );
         case 500:
         case 502:
@@ -399,14 +399,14 @@ export class WalletService {
           return this.createDetailedError(
             ApiErrorCode.SERVER_ERROR,
             message,
-            '🔧 <b>服务初始化中</b>\n\n请先执行 <code>/start</code> 命令初始化您的账户，然后重试钱包查询。\n\n💡 如果问题持续存在，请稍后重试或联系管理员。',
+            '🔧 <b>Service Initializing</b>\n\nPlease execute <code>/start</code> command first to initialize your account, then retry wallet query.\n\n💡 If the problem persists, please try again later or contact administrator.',
             true
           );
         default:
           return this.createDetailedError(
             ApiErrorCode.UNKNOWN_ERROR,
             message || error.message,
-            `Hyperliquid服务异常 (${status})`
+            `Hyperliquid service error (${status})`
           );
       }
     }
@@ -415,7 +415,7 @@ export class WalletService {
     return this.createDetailedError(
       ApiErrorCode.UNKNOWN_ERROR,
       error.message || 'Unknown error',
-      '❌ <b>钱包查询失败</b>\n\n请先执行 <code>/start</code> 命令重新初始化您的账户。\n\n🔄 如果问题持续存在，请稍后重试或联系管理员。',
+      '❌ <b>Wallet Query Failed</b>\n\nPlease execute <code>/start</code> command first to reinitialize your account.\n\n🔄 If the problem persists, please try again later or contact administrator.',
       true
     );
   }

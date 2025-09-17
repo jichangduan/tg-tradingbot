@@ -286,13 +286,13 @@ export class LongHandler {
           error: (balanceError as Error).message,
           requestId
         });
-        // 如果余额检查失败，继续执行交易（让后端处理）
+        // If balance check fails, continue with trade (let backend handle)
       }
 
       logger.info(`🚀 [LONG ORDER] ${symbol.toUpperCase()} ${leverageStr} $${amountStr}`);
       
-      // 显示订单预览而不是直接执行交易
-      // 修复：用户实际购买的代币数量（不考虑leverage）
+      // Show order preview instead of executing trade directly
+      // Fix: actual token quantity user will purchase (excluding leverage)
       const orderSize = parseFloat(amountStr) / tokenData.price;
       const liquidationPrice = this.calculateLiquidationPrice(tokenData.price, parseFloat(leverageStr.replace('x', '')), 'long');
       
@@ -321,15 +321,15 @@ export class LongHandler {
 
 
     } catch (apiError: any) {
-      // 关键交易失败日志
+      // Critical trade failure log
       logger.error(`❌ [LONG FAILED] ${symbol.toUpperCase()} ${leverageStr} $${amountStr}: ${apiError.message}`);
       
-      // 简化错误数据日志
+      // Simplified error data log
       if (apiError.response?.data) {
         logger.debug(`📥 Error response: ${JSON.stringify(apiError.response.data)}`);
       }
       
-      // 使用统一错误处理系统
+      // Use unified error handling system
       await handleTradingError(
         ctx, 
         apiError, 
@@ -358,7 +358,7 @@ export class LongHandler {
           { parse_mode: 'HTML' }
         );
       } else if (callbackData.startsWith('long_leverage_')) {
-        // 处理leverage选择回调
+        // Handle leverage selection callback
         await this.handleLeverageSelection(ctx, callbackData);
       }
     } catch (error) {
@@ -372,12 +372,12 @@ export class LongHandler {
   }
 
   /**
-   * 处理leverage选择回调
+   * Handle leverage selection callback
    */
   private async handleLeverageSelection(ctx: ExtendedContext, callbackData: string): Promise<void> {
     const userId = ctx.from?.id?.toString();
     if (!userId) {
-      await ctx.answerCbQuery('❌ Unable to get user information，请重试');
+      await ctx.answerCbQuery('❌ Unable to get user information, please retry');
       return;
     }
     const leverage = callbackData.split('_')[3]; // long_leverage_BTC_3x
@@ -388,7 +388,7 @@ export class LongHandler {
       return;
     }
 
-    // 更新状态
+    // Update state
     await tradingStateService.updateState(userId, {
       leverage: leverage,
       step: 'amount'
@@ -396,8 +396,8 @@ export class LongHandler {
 
     await ctx.answerCbQuery(`✅ Selected ${leverage} leverage`);
 
-    // 显示金额输入提示
-    // 获取可用保证金
+    // Show amount input prompt
+    // Get available margin
     const accountBalance = await accountService.getAccountBalance(userId);
     const availableMargin = accountBalance.withdrawableAmount || 0;
     
@@ -412,7 +412,7 @@ export class LongHandler {
   }
 
   /**
-   * 执行实际交易
+   * Execute actual trade
    */
   private async executeTrading(ctx: ExtendedContext, action: 'long', symbol: string, leverage: string, amount: string): Promise<void> {
     const userId = ctx.from?.id;
@@ -421,7 +421,7 @@ export class LongHandler {
     try {
       await ctx.answerCbQuery('🔄 Executing trade...');
       
-      // 获取用户数据和访问令牌（一次调用）
+      // Get user data and access token (single call)
       const { userData, accessToken } = await getUserDataAndToken(userId!.toString(), {
         username,
         first_name: ctx.from?.first_name,
@@ -437,16 +437,16 @@ export class LongHandler {
         hasAccessToken: !!accessToken
       });
 
-      // 获取代币价格用于计算size
+      // Get token price for size calculation
       const tokenData = await tokenService.getTokenPrice(symbol);
       const size = parseFloat(amount) / tokenData.price;
       
-      // 调用交易API - 添加内部userId
+      // Call trading API - add internal userId
       const tradingData = {
-        userId: userData.userId,                       // ✅ 使用内部用户ID
+        userId: userData.userId,                       // ✅ Use internal user ID
         symbol: symbol.toUpperCase(),
-        leverage: parseInt(leverage.replace('x', '')), // 转换为数字
-        size: size,                                    // 计算的代币数量
+        leverage: parseInt(leverage.replace('x', '')), // Convert to number
+        size: size,                                    // Calculated token quantity
         orderType: "market"
       };
 
@@ -475,11 +475,11 @@ export class LongHandler {
       
       logger.info(`📥 API Response Success:`, { result });
 
-      // 检查API响应以确定是否真正成功
-      const apiResult = result as any; // 类型断言
+      // Check API response to determine if truly successful
+      const apiResult = result as any; // Type assertion
       let successMessage = '';
       if (apiResult && apiResult.success !== false && !apiResult.error) {
-        // 交易成功日志
+        // Trade success log
         logger.info('🎯 [TRADING SUCCESS] Long position opened', {
           symbol: symbol.toUpperCase(),
           leverage: leverage,
@@ -496,14 +496,14 @@ export class LongHandler {
           `• Use /positions to view positions\n` +
           `• Use /wallet to check balance changes`;
       } else {
-        // 如果响应表明失败，抛出错误
-        throw new Error(apiResult?.message || 'Hyperliquid API返回失败状态');
+        // If response indicates failure, throw error
+        throw new Error(apiResult?.message || 'Hyperliquid API returned failure status');
       }
 
       await ctx.editMessageText(successMessage, { parse_mode: 'HTML' });
 
     } catch (error: any) {
-      // 详细记录API错误信息用于调试
+      // Detailed API error logging for debugging
       logger.error('🚨 Long Trading API Error - Complete Details:', {
         userId,
         symbol: symbol.toUpperCase(),
@@ -519,7 +519,7 @@ export class LongHandler {
       // Parse API error and provide user-friendly error message
       let errorMessage = '❌ <b>Trade Execution Failed</b>\n\n';
       
-      // 检查是否是余额不足错误
+      // Check if it's insufficient balance error
       if (error.response?.status === 400) {
         const responseData = error.response?.data;
         const errorMsg = responseData?.message || error.message || '';
@@ -539,7 +539,7 @@ export class LongHandler {
             `• Price data retrieval failed\n` +
             `• Trading amount too small\n` +
             `• Please try again later or increase trading amount`;
-        } else if (errorMsg.includes('余额不足') || errorMsg.includes('insufficient') || errorMsg.toLowerCase().includes('balance')) {
+        } else if (errorMsg.includes('insufficient') || errorMsg.toLowerCase().includes('balance')) {
           errorMessage = '💰 <b>Insufficient Account Balance</b>\n\n' +
             `Cannot complete $${amount} long trade\n\n` +
             `💡 <b>Solutions:</b>\n` +
@@ -547,7 +547,7 @@ export class LongHandler {
             `• Deposit more USDC to wallet\n` +
             `• Reduce trading amount\n\n` +
             `<i>💸 Note: Hyperliquid minimum trade amount is $10</i>`;
-        } else if (errorMsg.includes('minimum') || errorMsg.includes('最小') || parseFloat(amount) < 10) {
+        } else if (errorMsg.includes('minimum') || parseFloat(amount) < 10) {
           errorMessage = '💰 <b>Trading Amount Requirements Not Met</b>\n\n' +
             `Hyperliquid minimum trade amount is <b>$10</b>\n` +
             `Your amount: <code>$${amount}</code>\n\n` +
@@ -584,7 +584,7 @@ export class LongHandler {
   }
 
   /**
-   * 创建leverage选择键盘
+   * Create leverage selection keyboard
    */
   public createLeverageKeyboard(symbol: string): InlineKeyboardMarkup {
     return {
@@ -613,11 +613,11 @@ export class LongHandler {
   }
 
   /**
-   * 计算强制平仓价格
+   * Calculate liquidation price
    */
   private calculateLiquidationPrice(currentPrice: number, leverage: number, direction: 'long' | 'short'): number {
-    // 简化计算，实际应该更复杂
-    const marginRatio = 0.05; // 5% 维持保证金率
+    // Simplified calculation, should be more complex in practice
+    const marginRatio = 0.05; // 5% maintenance margin ratio
     const liquidationRatio = (leverage - 1) / leverage * (1 - marginRatio);
     
     if (direction === 'long') {
@@ -628,7 +628,7 @@ export class LongHandler {
   }
 
   /**
-   * 获取处理器统计信息
+   * Get handler statistics
    */
   public getStats(): any {
     return {
@@ -649,8 +649,8 @@ export class LongHandler {
   }
 }
 
-// 导出单例实例
+// Export singleton instance
 export const longHandler = new LongHandler();
 
-// 默认导出
+// Default export
 export default longHandler;

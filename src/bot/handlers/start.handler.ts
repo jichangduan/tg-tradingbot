@@ -10,14 +10,14 @@ import { cacheService } from '../../services/cache.service';
 import { config } from '../../config';
 
 /**
- * Start命令处理器
- * 处理 /start 命令的完整流程，包括用户初始化、邀请码解析等
+ * Start command handler
+ * Handles complete /start command flow, including user initialization and invitation code parsing
  */
 export class StartHandler {
   /**
-   * 处理 /start 命令
-   * @param ctx Telegram上下文
-   * @param args 命令参数数组（可能包含邀请码）
+   * Handle /start command
+   * @param ctx Telegram context
+   * @param args Command parameter array (may contain invitation code)
    */
   public async handle(ctx: ExtendedContext, args: string[]): Promise<void> {
     const startTime = Date.now();
@@ -29,23 +29,23 @@ export class StartHandler {
     try {
       logger.logCommand('start', userId!, username, args);
 
-      // 检查是否为群组跳转命令
+      // Check if it's a group redirect command
       if (args.length > 0 && args[0].startsWith('cmd_')) {
         await this.handleGroupRedirectCommand(ctx, args[0]);
         return;
       }
 
-      // 检查是否为群组启动场景（通过startgroup参数识别）
+      // Check if it's a group start scenario (identified by startgroup parameter)
       const isGroupStart = args.length > 0 && args[0] === 'welcome' && chatType !== 'private';
       
       if (isGroupStart) {
-        // 处理群组启动场景
+        // Handle group start scenario
         await this.handleGroupStart(ctx, args);
         return;
       }
 
-      // 1. 发送欢迎消息（立即响应用户）
-      // 检查是否为私聊，只在私聊中显示"添加到群组"按钮
+      // 1. Send welcome message (immediate user response)
+      // Check if it's private chat, only show "Add to Group" button in private chat
       const isPrivateChat = ctx.chat?.type === 'private';
       
       const welcomeMessage = await ctx.reply(
@@ -56,7 +56,7 @@ export class StartHandler {
         }
       );
 
-      // 2. 后台进行用户初始化
+      // 2. Perform user initialization in background
       await this.initializeUserInBackground(ctx, args, requestId);
 
       const duration = Date.now() - startTime;
@@ -79,13 +79,13 @@ export class StartHandler {
         requestId
       });
 
-      // 发送错误消息
+      // Send error message
       await this.sendErrorMessage(ctx, error as Error);
     }
   }
 
   /**
-   * 后台初始化用户（不阻塞用户体验）
+   * Initialize user in background (non-blocking user experience)
    */
   private async initializeUserInBackground(
     ctx: ExtendedContext, 
@@ -99,10 +99,10 @@ export class StartHandler {
         return;
       }
 
-      // 解析邀请码
+      // Parse invitation code
       const invitationCode = this.parseInvitationCodeFromArgs(args);
 
-      // 构建用户初始化请求
+      // Build user initialization request
       const initRequest: UserInitRequest = {
         telegram_id: user.id.toString(),
         username: user.username,
@@ -115,18 +115,18 @@ export class StartHandler {
         telegramId: initRequest.telegram_id,
         username: initRequest.username,
         hasInvitationCode: !!invitationCode,
-        invitationCode: invitationCode || 'none',  // 显示具体邀请码
-        fullInitRequest: JSON.stringify(initRequest, null, 2),  // 完整请求体
+        invitationCode: invitationCode || 'none',  // Show specific invitation code
+        fullInitRequest: JSON.stringify(initRequest, null, 2),  // Complete request body
         requestId
       });
 
-      // 调用用户服务初始化
+      // Call user service initialization
       const userData = await userService.initializeUser(initRequest);
 
-      // 缓存用户的accessToken
+      // Cache user's accessToken
       await this.cacheUserAccessToken(user.id, userData.accessToken, requestId);
 
-      // 发送初始化完成消息
+      // Send initialization completion message
       await this.sendInitializationSuccessMessage(ctx, userData);
 
       logger.info(`User initialization completed [${requestId}]`, {
@@ -143,13 +143,13 @@ export class StartHandler {
         requestId
       });
 
-      // 发送初始化失败消息（友好提示）
+      // Send initialization failure message (friendly hint)
       await this.sendInitializationErrorMessage(ctx, error as DetailedError);
     }
   }
 
   /**
-   * 从命令参数中解析邀请码
+   * Parse invitation code from command parameters
    */
   private parseInvitationCodeFromArgs(args: string[]): string | undefined {
     logger.info('🔍 Parsing invitation code from /start args', {
@@ -163,7 +163,7 @@ export class StartHandler {
       return undefined;
     }
 
-    // 取第一个参数作为潜在的邀请码
+    // Take first parameter as potential invitation code
     const potentialCode = args[0];
     const parsedCode = userService.parseInvitationCode(potentialCode);
     
@@ -177,7 +177,7 @@ export class StartHandler {
   }
 
   /**
-   * 获取欢迎消息
+   * Get welcome message
    */
   private getWelcomeMessage(): string {
     return `
@@ -206,7 +206,7 @@ Initializing your account, please wait...
   }
 
   /**
-   * 创建添加到群组的内联键盘
+   * Create inline keyboard for adding to group
    */
   private createAddToGroupKeyboard(): InlineKeyboardMarkup {
     const botUsername = config.telegram.botUsername || 'aiw3_tradebot';
@@ -230,7 +230,7 @@ Initializing your account, please wait...
   }
 
   /**
-   * 发送用户初始化成功消息
+   * Send user initialization success message
    */
   private async sendInitializationSuccessMessage(
     ctx: Context, 
@@ -249,7 +249,7 @@ Initializing your account, please wait...
   }
 
   /**
-   * 发送用户初始化错误消息
+   * Send user initialization error message
    */
   private async sendInitializationErrorMessage(
     ctx: Context, 
@@ -268,7 +268,7 @@ Initializing your account, please wait...
   }
 
   /**
-   * 发送通用错误消息
+   * Send general error message
    */
   private async sendErrorMessage(ctx: Context, error: Error): Promise<void> {
     const errorMessage = 
@@ -291,8 +291,8 @@ Initializing your account, please wait...
   }
 
   /**
-   * 处理带参数的start命令（邀请链接）
-   * 例如: /start invite_ABC123
+   * Handle start command with parameters (invitation link)
+   * Example: /start invite_ABC123
    */
   public async handleWithInvitation(
     ctx: ExtendedContext, 
@@ -311,11 +311,11 @@ Initializing your account, please wait...
         requestId
       });
 
-      // 发送特殊的邀请欢迎消息
+      // Send special invitation welcome message
       const inviteMessage = this.getInvitationWelcomeMessage(invitationCode);
       await ctx.reply(inviteMessage, { parse_mode: 'HTML' });
 
-      // 使用邀请码进行用户初始化
+      // Use invitation code for user initialization
       await this.initializeUserInBackground(ctx, [invitationCode], requestId);
 
       const duration = Date.now() - startTime;
@@ -398,7 +398,7 @@ Initializing your account and processing invitation rewards...
   }
 
   /**
-   * 处理群组启动场景
+   * Handle group start scenario
    */
   public async handleGroupStart(ctx: ExtendedContext, args: string[]): Promise<void> {
     const startTime = Date.now();
@@ -416,13 +416,13 @@ Initializing your account and processing invitation rewards...
         requestId
       });
 
-      // 发送群组欢迎消息
+      // Send group welcome message
       await ctx.reply(
         this.getGroupWelcomeMessage(),
         { parse_mode: 'HTML' }
       );
 
-      // 后台初始化用户（如果需要）
+      // Initialize user in background (if needed)
       if (userId) {
         await this.initializeUserInBackground(ctx, [], requestId);
       }
@@ -459,7 +459,7 @@ Initializing your account and processing invitation rewards...
   }
 
   /**
-   * 缓存用户的accessToken到Redis
+   * Cache user's accessToken to Redis
    */
   private async cacheUserAccessToken(
     telegramId: number,
@@ -468,7 +468,7 @@ Initializing your account and processing invitation rewards...
   ): Promise<void> {
     try {
       const tokenKey = `user:token:${telegramId}`;
-      const tokenTTL = 24 * 60 * 60; // 24小时过期
+      const tokenTTL = 24 * 60 * 60; // 24 hour expiration
       
       const result = await cacheService.set(tokenKey, accessToken, tokenTTL);
       
@@ -497,7 +497,7 @@ Initializing your account and processing invitation rewards...
   }
 
   /**
-   * 处理群组使用说明回调
+   * Handle group usage guide callback
    */
   public async handleGroupUsageGuide(ctx: any): Promise<void> {
     try {
@@ -546,7 +546,7 @@ Please contact administrator or restart with /start
   }
 
   /**
-   * 处理群组跳转命令
+   * Handle group redirect command
    */
   private async handleGroupRedirectCommand(ctx: ExtendedContext, encodedParam: string): Promise<void> {
     const requestId = ctx.requestId || 'unknown';
@@ -555,12 +555,12 @@ Please contact administrator or restart with /start
     try {
       logger.info(`Processing group redirect command [${requestId}]`, {
         userId,
-        encodedParam: encodedParam.substring(0, 20) + '...', // 截断显示
+        encodedParam: encodedParam.substring(0, 20) + '...', // Truncated display
         requestId
       });
 
-      // 解码命令参数
-      const encodedCommand = encodedParam.substring(4); // 移除'cmd_'前缀
+      // Decode command parameters
+      const encodedCommand = encodedParam.substring(4); // Remove 'cmd_' prefix
       const decoded = Buffer.from(encodedCommand, 'base64').toString('utf-8');
       const commandData = JSON.parse(decoded);
       
@@ -573,10 +573,10 @@ Please contact administrator or restart with /start
         requestId
       });
 
-      // 直接路由到相应的处理器，不显示确认消息
+      // Route directly to corresponding handler, no confirmation message
       switch (command) {
         case '/start':
-          // 避免递归调用，直接执行初始化逻辑
+          // Avoid recursive calls, execute initialization logic directly
           const welcomeMessage = this.getWelcomeMessage();
           await ctx.reply(welcomeMessage, { parse_mode: 'HTML' });
           await this.initializeUserInBackground(ctx, [], requestId);
@@ -670,7 +670,7 @@ Please contact administrator or restart with /start
   }
 
   /**
-   * 获取处理器统计信息
+   * Get handler statistics
    */
   public getStats(): any {
     return {
@@ -691,8 +691,8 @@ Please contact administrator or restart with /start
   }
 }
 
-// 导出单例实例
+// Export singleton instance
 export const startHandler = new StartHandler();
 
-// 默认导出
+// Default export
 export default startHandler;

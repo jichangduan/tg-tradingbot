@@ -140,9 +140,9 @@ export class ShortHandler {
     const amount = parseFloat(amountStr);
     if (isNaN(amount) || amount <= 0) {
       await ctx.reply(
-        `❌ <b>交易金额错误</b>\n\n` +
-        `请输入有效的数字金额\n\n` +
-        `示例: <code>/short BTC 10x 100</code>`,
+        `❌ <b>Trading Amount Error</b>\n\n` +
+        `Please enter a valid numeric amount\n\n` +
+        `Example: <code>/short BTC 10x 100</code>`,
         { parse_mode: 'HTML' }
       );
       return;
@@ -195,9 +195,9 @@ export class ShortHandler {
           ctx.chat?.id,
           loadingMessage.message_id,
           undefined,
-          '❌ <b>交易参数错误</b>\n\n' +
-          '请输入有效的数量\n\n' +
-          '示例: <code>/short BTC 10x 200</code>',
+          '❌ <b>Trading Parameter Error</b>\n\n' +
+          'Please enter a valid amount\n\n' +
+          'Example: <code>/short BTC 10x 200</code>',
           { parse_mode: 'HTML' }
         );
         return;
@@ -363,7 +363,7 @@ export class ShortHandler {
   private async handleLeverageSelection(ctx: ExtendedContext, callbackData: string): Promise<void> {
     const userId = ctx.from?.id?.toString();
     if (!userId) {
-      await ctx.answerCbQuery('❌ Unable to get user information，请重试');
+      await ctx.answerCbQuery('❌ Unable to get user information, please retry');
       return;
     }
     const leverage = callbackData.split('_')[3]; // short_leverage_BTC_3x
@@ -493,7 +493,7 @@ export class ShortHandler {
           `• Use /wallet to check balance changes`;
       } else {
         // 如果响应表明失败，抛出错误
-        throw new Error(apiResult?.message || 'Hyperliquid API返回失败状态');
+        throw new Error(apiResult?.message || 'Hyperliquid API returned failure status');
       }
 
       await ctx.editMessageText(successMessage, { parse_mode: 'HTML' });
@@ -544,7 +544,7 @@ export class ShortHandler {
             `• Price data retrieval failed\n` +
             `• Trading amount too small\n` +
             `• Please try again later or increase trading amount`;
-        } else if (errorMsg.includes('余额不足') || errorMsg.includes('insufficient') || errorMsg.toLowerCase().includes('balance')) {
+        } else if (errorMsg.includes('insufficient') || errorMsg.toLowerCase().includes('balance')) {
           errorMessage = '💰 <b>Insufficient Account Balance</b>\n\n' +
             `Cannot complete $${amount} short trade\n\n` +
             `💡 <b>Solutions:</b>\n` +
@@ -552,7 +552,7 @@ export class ShortHandler {
             `• Deposit more USDC to wallet\n` +
             `• Reduce trading amount\n\n` +
             `<i>💸 Note: Hyperliquid minimum trade amount is $10</i>`;
-        } else if (errorMsg.includes('minimum') || errorMsg.includes('最小') || parseFloat(amount) < 10) {
+        } else if (errorMsg.includes('minimum') || parseFloat(amount) < 10) {
           errorMessage = '💰 <b>Trading Amount Requirements Not Met</b>\n\n' +
             `Hyperliquid minimum trade amount is <b>$10</b>\n` +
             `Your amount: <code>$${amount}</code>\n\n` +
