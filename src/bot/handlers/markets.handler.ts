@@ -142,28 +142,28 @@ export class MarketsHandler {
       const endIndex = startIndex + itemsPerPage;
       const pageData = marketData.slice(startIndex, endIndex);
 
-      // Header with HTML pre tag for perfect alignment without copy button
-      let message = `🏪 <b>PERP MARKETS</b>\n\n<pre>\n`;
+      // Header with code formatting to avoid copy button
+      let message = `🏪 <b>PERP MARKETS</b>\n\n`;
       
-      // Format each coin with precise column alignment
+      // Format each coin with precise column alignment using code tags
       pageData.forEach((coin) => {
         const priceText = this.formatPrice(coin.price);
         const changeText = this.formatChangeText(coin.change);
         
-        // Create precisely aligned columns:
-        // Token name: 20 chars left-aligned
-        // Price: 15 chars right-aligned with $ prefix
-        // Change: 10 chars right-aligned
-        const tokenName = coin.name.padEnd(20);
-        const price = `$${priceText}`.padStart(15);
-        const change = changeText.padStart(10);
+        // Create precisely aligned columns using dots for spacing:
+        // Token name: left-aligned
+        // Price: right-aligned with $ prefix  
+        // Change: right-aligned with percentage
+        const tokenName = coin.name.padEnd(8);
+        const price = `$${priceText}`;
+        const change = changeText;
         
-        // Use exact spacing between columns
-        message += `${tokenName}${price}  ${change}\n`;
+        // Use dots and spaces for better visual alignment without copy button
+        const dots1 = '.'.repeat(Math.max(1, 25 - tokenName.length - price.length));
+        const dots2 = '.'.repeat(Math.max(1, 15 - change.length));
+        
+        message += `<code>${tokenName}${dots1}${price}${dots2}${change}</code>\n`;
       });
-
-      // Close pre tag
-      message += `</pre>`;
 
       return message;
 
