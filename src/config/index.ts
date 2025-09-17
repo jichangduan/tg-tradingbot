@@ -1,6 +1,11 @@
 import dotenv from 'dotenv';
 import path from 'path';
 
+// 统一环境管理: APP_ENV -> NODE_ENV
+if (process.env.APP_ENV) {
+  process.env.NODE_ENV = process.env.APP_ENV;
+}
+
 // 加载环境变量
 dotenv.config({
   path: path.resolve(process.cwd(), `.env.${process.env.NODE_ENV || 'development'}`)

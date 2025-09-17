@@ -12,6 +12,7 @@ services:
     build: .
     container_name: aiw3-tgbot
     environment:
+      - APP_ENV=${APP_ENV:-production}
       - NODE_ENV=${NODE_ENV:-production}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - API_BASE_URL=${API_BASE_URL:-https://api.aiw3.ai}
