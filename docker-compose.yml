@@ -10,15 +10,15 @@ services:
 
   bot:
     build: .
-    container_name: aiw3-tgbot
+    container_name: aiw3-tgbot-test
     environment:
-      - APP_ENV=${APP_ENV:-production}
-      - NODE_ENV=${NODE_ENV:-production}
+      - APP_ENV=${APP_ENV:-test}
+      - NODE_ENV=${NODE_ENV:-test}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-      - API_BASE_URL=${API_BASE_URL:-https://api.aiw3.ai}
+      - API_BASE_URL=${API_BASE_URL:-https://api-test1.aiw3.ai}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - LOG_LEVEL=${LOG_LEVEL:-debug}
       - PORT=3000
       - HEALTH_ENABLED=${HEALTH_ENABLED:-true}
     depends_on:
