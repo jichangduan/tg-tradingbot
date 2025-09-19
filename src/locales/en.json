@@ -22,7 +22,7 @@
   "language.select": "Please select your preferred language:",
   "language.changed": "✅ Language changed to English successfully!",
   "language.button.english": "🇺🇸 English",
-  "language.button.chinese": "🇨🇳 中文",
+  "language.button.chinese": "🇨🇳 简体中文",
   
   "system.processing": "⏳ Processing...",
   "system.error": "❌ System Error",

@@ -22,7 +22,7 @@
   "language.select": "선호하는 언어를 선택해 주세요:",
   "language.changed": "✅ 언어가 한국어로 성공적으로 변경되었습니다!",
   "language.button.english": "🇺🇸 English",
-  "language.button.chinese": "🇨🇳 中文",
+  "language.button.chinese": "🇨🇳 简体中文",
   "language.button.korean": "🇰🇷 한국어",
 
   "system.processing": "⏳ 처리 중...",

@@ -77,11 +77,9 @@ export class LanguageHandler {
             callback_data: 'lang_en'
           },
           {
-            text: `${currentLang === 'zh-CN' ? '✅ ' : ''}🇨🇳 中文`,
+            text: `${currentLang === 'zh-CN' ? '✅ ' : ''}🇨🇳 简体中文`,
             callback_data: 'lang_zh-CN'
-          }
-        ],
-        [
+          },
           {
             text: `${currentLang === 'ko' ? '✅ ' : ''}🇰🇷 한국어`,
             callback_data: 'lang_ko'
