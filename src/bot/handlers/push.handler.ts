@@ -1104,7 +1104,7 @@ ${emoji} <b>${typeName} Push Enabled!</b>
       // Get user's current push settings and push data
       const { settings, pushData } = await this.getUserPushSettings(userId);
 
-      const message = this.formatPushSettingsMessage(settings, pushData);
+      const message = await this.formatPushSettingsMessage(ctx, settings, pushData);
       const keyboard = await this.createPushSettingsKeyboard(ctx, settings);
 
       await ctx.reply(message, {
@@ -1127,11 +1127,11 @@ ${emoji} <b>${typeName} Push Enabled!</b>
         fund_enabled: false
       };
 
-      const message = this.formatPushSettingsMessage(defaultSettings);
+      const message = await this.formatPushSettingsMessage(ctx, defaultSettings);
       const keyboard = await this.createPushSettingsKeyboard(ctx, defaultSettings);
 
       await ctx.reply(
-        `📢 <b>Active Push Notifications</b>\n\n${await ctx.__!('push.error.settingsUnavailable')}\n\n${message}`,
+        `📢 <b>${await ctx.__!('push.settings.active')}</b>\n\n${await ctx.__!('push.error.settingsUnavailable')}\n\n${message}`,
         {
           parse_mode: 'HTML',
           reply_markup: {
@@ -1195,16 +1195,26 @@ ${emoji} <b>${typeName} Push Enabled!</b>
   /**
    * Format push settings message
    */
-  private formatPushSettingsMessage(settings: PushSettings, pushData?: PushData): string {
-    const flashStatus = settings.flash_enabled ? '✅ On' : '❌ Off';
-    const whaleStatus = settings.whale_enabled ? '✅ On' : '❌ Off';
-    const fundStatus = settings.fund_enabled ? '✅ On' : '❌ Off';
+  private async formatPushSettingsMessage(ctx: ExtendedContext, settings: PushSettings, pushData?: PushData): Promise<string> {
+    // Get localized text
+    const activeTitle = await ctx.__!('push.settings.active');
+    const flashNewsLabel = await ctx.__!('push.settings.flashNews');
+    const whaleMovementsLabel = await ctx.__!('push.settings.whaleMovements');
+    const fundFlowsLabel = await ctx.__!('push.settings.fundFlows');
+    const onStatus = await ctx.__!('push.settings.on');
+    const offStatus = await ctx.__!('push.settings.off');
+    const manageInstructions = await ctx.__!('push.settings.manage');
 
-    const message = `📢 <b>Active Push Settings</b>\n\n` +
-                    `🚨 Flash News: ${flashStatus}\n` +
-                    `🐋 Whale Movements: ${whaleStatus}\n` +
-                    `💰 Fund Flows: ${fundStatus}\n\n` +
-                    `Click the buttons below to manage push settings:`;
+    // Build status indicators with localized text
+    const flashStatus = settings.flash_enabled ? `✅ ${onStatus}` : `❌ ${offStatus}`;
+    const whaleStatus = settings.whale_enabled ? `✅ ${onStatus}` : `❌ ${offStatus}`;
+    const fundStatus = settings.fund_enabled ? `✅ ${onStatus}` : `❌ ${offStatus}`;
+
+    const message = `📢 <b>${activeTitle}</b>\n\n` +
+                    `🚨 ${flashNewsLabel}: ${flashStatus}\n` +
+                    `🐋 ${whaleMovementsLabel}: ${whaleStatus}\n` +
+                    `💰 ${fundFlowsLabel}: ${fundStatus}\n\n` +
+                    `${manageInstructions}`;
     
     return message;
   }
@@ -1289,7 +1299,7 @@ ${emoji} <b>${typeName} Push Enabled!</b>
         const { settings: updatedSettings, pushData } = await this.getUserPushSettings(userIdString);
 
         // Update message
-        const message = this.formatPushSettingsMessage(updatedSettings, pushData);
+        const message = await this.formatPushSettingsMessage(ctx, updatedSettings, pushData);
         const keyboard = await this.createPushSettingsKeyboard(ctx, updatedSettings);
 
         await ctx.editMessageText(message, {
