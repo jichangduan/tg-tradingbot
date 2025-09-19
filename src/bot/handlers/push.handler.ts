@@ -484,7 +484,8 @@ ${emoji} <b>${typeName} Push Enabled!</b>
     const requestId = ctx.requestId || 'unknown';
 
     if (!userId || !chatId) {
-      await ctx.reply('❌ Unable to get user or group information');
+      const userInfoError = await ctx.__!('trading.userInfoError');
+      await ctx.reply(userInfoError);
       return;
     }
 
@@ -501,12 +502,8 @@ ${emoji} <b>${typeName} Push Enabled!</b>
       const isCreator = await this.verifyGroupCreator(ctx, userId, chatId);
       
       if (!isCreator) {
-        await ctx.reply(
-          '⚠️ <b>Insufficient Permissions</b>\n\n' +
-          'Only group admin can view and configure group push functions\n\n' +
-          '💡 If you are the group admin, please ensure the bot has permission to read group members',
-          { parse_mode: 'HTML' }
-        );
+        const insufficientPermMsg = await ctx.__!('push.insufficientPermissions');
+        await ctx.reply(insufficientPermMsg, { parse_mode: 'HTML' });
         return;
       }
 
@@ -530,11 +527,8 @@ ${emoji} <b>${typeName} Push Enabled!</b>
         requestId
       });
 
-      await ctx.reply(
-        '❌ Push settings display failed\n\n' +
-        'Please try again later, if the problem persists, please contact administrator',
-        { parse_mode: 'HTML' }
-      );
+      const pushErrorMsg = await ctx.__!('push.error');
+      await ctx.reply(pushErrorMsg, { parse_mode: 'HTML' });
     }
   }
 
@@ -784,12 +778,8 @@ ${emoji} <b>${typeName} Push Enabled!</b>
 
       // 发送错误提示
       try {
-        await ctx.reply(
-          `❌ Test push send failed\n\n` +
-          `Push type: ${this.getTypeName(type)}\n` +
-          `Please try again later or contact administrator`,
-          { parse_mode: 'HTML' }
-        );
+        const testPushErrorMsg = await ctx.__!('push.testPushFailed', this.getTypeName(type));
+        await ctx.reply(testPushErrorMsg, { parse_mode: 'HTML' });
       } catch (replyError) {
         logger.error(`Failed to send error message [${requestId}]`, {
           replyError: (replyError as Error).message,

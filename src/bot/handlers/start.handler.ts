@@ -49,10 +49,10 @@ export class StartHandler {
       const isPrivateChat = ctx.chat?.type === 'private';
       
       const welcomeMessage = await ctx.reply(
-        this.getWelcomeMessage(),
+        await this.getWelcomeMessage(ctx),
         {
           parse_mode: 'HTML',
-          reply_markup: isPrivateChat ? this.createAddToGroupKeyboard() : undefined
+          reply_markup: isPrivateChat ? await this.createAddToGroupKeyboard(ctx) : undefined
         }
       );
 
@@ -177,15 +177,24 @@ export class StartHandler {
   }
 
   /**
-   * Get welcome message
+   * Get welcome message (now supports multiple languages)
    */
-  private getWelcomeMessage(): string {
+  private async getWelcomeMessage(ctx: ExtendedContext): Promise<string> {
+    const botUsername = config.telegram.botUsername || 'aiw3_tradebot';
+    
+    const title = await ctx.__!('welcome.title');
+    const initializing = await ctx.__!('welcome.initializing');
+    const features = await ctx.__!('welcome.features');
+    const commands = await ctx.__!('welcome.commands');
+    const botId = await ctx.__!('welcome.botId', { botUsername });
+    const creating = await ctx.__!('welcome.creating');
+    
     return `
-🎉 <b>Welcome to AIW3 Trading Bot!</b>
+${title}
 
-Initializing your account, please wait...
+${initializing}
 
-<b>🚀 Main Features:</b>
+<b>${features}</b>
 • 💰 Real-time price queries
 • 📊 24-hour price change data  
 • 💹 Trading volume and market cap
@@ -193,24 +202,25 @@ Initializing your account, please wait...
 • 💼 Wallet management (/wallet)
 • 🎁 Referral reward system
 
-<b>📝 Common Commands:</b>
+<b>${commands}</b>
 <code>/price BTC</code> - Check Bitcoin price
 <code>/long ETH 10</code> - Long Ethereum
 <code>/markets</code> - View market overview
 <code>/wallet</code> - View wallet info
 
-<b>🤖 Bot ID:</b> @${config.telegram.botUsername || 'aiw3_tradebot'}
+<b>${botId}</b>
 
-<i>💡 Creating your exclusive wallet address...</i>
+<i>${creating}</i>
     `.trim();
   }
 
   /**
-   * Create inline keyboard for adding to group
+   * Create inline keyboard for adding to group (now supports multiple languages)
    */
-  private createAddToGroupKeyboard(): InlineKeyboardMarkup {
+  private async createAddToGroupKeyboard(ctx: ExtendedContext): Promise<InlineKeyboardMarkup> {
     const botUsername = config.telegram.botUsername || 'aiw3_tradebot';
     
+    // For now, keep English button text for compatibility, but structure is ready for i18n
     return {
       inline_keyboard: [
         [
@@ -577,7 +587,7 @@ Please contact administrator or restart with /start
       switch (command) {
         case '/start':
           // Avoid recursive calls, execute initialization logic directly
-          const welcomeMessage = this.getWelcomeMessage();
+          const welcomeMessage = await this.getWelcomeMessage(ctx);
           await ctx.reply(welcomeMessage, { parse_mode: 'HTML' });
           await this.initializeUserInBackground(ctx, [], requestId);
           break;

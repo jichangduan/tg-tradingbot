@@ -1,4 +1,5 @@
 import { Context } from 'telegraf';
+import { ExtendedContext } from '../index';
 import { accountService } from '../../services/account.service';
 import { messageFormatter } from '../utils/message.formatter';
 import { logger } from '../../utils/logger';
@@ -16,7 +17,7 @@ export class WalletHandler {
    * @param ctx Telegram上下文
    * @param args 命令参数（此命令不需要参数）
    */
-  public async handle(ctx: Context, args: string[]): Promise<void> {
+  public async handle(ctx: ExtendedContext, args: string[]): Promise<void> {
     const startTime = Date.now();
     const telegramId = ctx.from?.id?.toString();
     const username = ctx.from?.username || 'Unknown';
@@ -25,10 +26,11 @@ export class WalletHandler {
     try {
       // 验证用户ID
       if (!telegramId) {
+        const userInfoError = await ctx.__!('trading.userInfoError');
         throw this.createError(
           ApiErrorCode.INVALID_SYMBOL,
           'Unable to identify user',
-          'Unable to identify user, please retry'
+          userInfoError
         );
       }
 
@@ -41,7 +43,7 @@ export class WalletHandler {
       });
 
       // 发送加载消息
-      const loadingMessage = messageFormatter.formatWalletLoadingMessage();
+      const loadingMessage = await ctx.__!('wallet.loading');
       const sentMessage = await ctx.reply(loadingMessage, { 
         parse_mode: 'HTML',
         link_preview_options: { is_disabled: true }
@@ -145,7 +147,8 @@ export class WalletHandler {
         
         // 最后的fallback - 发送简单错误消息
         try {
-          await ctx.reply('❌ Wallet query failed, please try again later');
+          const walletError = await ctx.__!('wallet.error');
+          await ctx.reply(walletError);
         } catch (fallbackError) {
           logger.error('Failed to send fallback error message', {
             telegramId,

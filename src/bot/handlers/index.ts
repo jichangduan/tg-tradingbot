@@ -13,6 +13,7 @@ import { positionsHandler } from './positions.handler';
 // import { ordersHandler } from './orders.handler'; // Temporarily disabled
 import { pnlHandler } from './pnl.handler';
 import { pushHandler } from './push.handler';
+import { languageHandler } from './language.handler';
 import { logger } from '../../utils/logger';
 import { ExtendedContext } from '../index';
 import { tradingStateService, TradingState } from '../../services/trading-state.service';
@@ -467,6 +468,12 @@ Need help? Contact administrator 👨‍💻
     createCommandWrapper('push', pushHandler.handle.bind(pushHandler))
   );
 
+  // /language 命令 - 语言设置（新增）
+  bot.command(
+    'language', 
+    createCommandWrapper('language', languageHandler.handle.bind(languageHandler))
+  );
+
   // /cancel 命令 - 取消当前交易流程
   bot.command('cancel', async (ctx) => {
     const userId = ctx.from?.id?.toString();
@@ -695,6 +702,12 @@ Need help? Send <code>/help</code> to view complete guide 📚
       // 处理群组使用说明回调
       if (typeof callbackData === 'string' && callbackData === 'group_usage_guide') {
         await startHandler.handleGroupUsageGuide(ctx);
+        return;
+      }
+
+      // 路由language相关的回调到languageHandler（新增）
+      if (typeof callbackData === 'string' && callbackData.startsWith('lang_')) {
+        await languageHandler.handleLanguageChange(ctx);
         return;
       }
 

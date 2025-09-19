@@ -31,9 +31,10 @@ export class ShortHandler {
       // Check if user has active trading state
       const activeState = await tradingStateService.getState(userId!.toString());
       if (activeState) {
+        const activeSessionMsg = await ctx.__!('trading.activeSession');
+        const completeOrCancelMsg = await ctx.__!('trading.completeOrCancel');
         await ctx.reply(
-          '⚠️ <b>You have an active trading session</b>\n\n' +
-          'Please complete current trade or send /cancel to cancel current session',
+          `${activeSessionMsg}\n\n${completeOrCancelMsg}`,
           { parse_mode: 'HTML' }
         );
         return;
@@ -73,7 +74,8 @@ export class ShortHandler {
   private async handleGuidedMode(ctx: ExtendedContext, action: 'short', symbol?: string): Promise<void> {
     const userId = ctx.from?.id?.toString();
     if (!userId) {
-      await ctx.reply('❌ Unable to get user information, please retry');
+      const userInfoError = await ctx.__!('trading.userInfoError');
+      await ctx.reply(userInfoError);
       return;
     }
     
@@ -291,7 +293,7 @@ export class ShortHandler {
         liquidationPrice
       );
       
-      const keyboard = this.createConfirmationKeyboard(symbol, leverageStr, amountStr);
+      const keyboard = await this.createConfirmationKeyboard(ctx, symbol, leverageStr, amountStr);
       
       await ctx.telegram.editMessageText(
         ctx.chat?.id,
@@ -338,9 +340,11 @@ export class ShortHandler {
         await this.executeTrading(ctx, 'short', symbol, leverage, amount);
       } else if (callbackData.startsWith('short_cancel_')) {
         // Cancel trade
-        await ctx.answerCbQuery('❌ Trade cancelled');
+        const cancelled = await ctx.__!('trading.cancelled');
+        const restartAnytime = await ctx.__!('trading.restartAnytime');
+        await ctx.answerCbQuery(cancelled);
         await ctx.editMessageText(
-          '❌ <b>Trade Cancelled</b>\n\nYou can restart trading anytime',
+          `${cancelled}\n\n${restartAnytime}`,
           { parse_mode: 'HTML' }
         );
       } else if (callbackData.startsWith('short_leverage_')) {
@@ -484,13 +488,21 @@ export class ShortHandler {
         logger.info('==============================================');
         
         // Only show success message when confirmed successful
-        successMessage = `✅ <b>Short Position Opened Successfully</b>\n\n` +
-          `Token: <code>${symbol.toUpperCase()}</code>\n` +
-          `Leverage: <code>${leverage}</code>\n` +
-          `Amount: <code>$${amount}</code>\n\n` +
-          `🎯 <b>Recommended Actions:</b>\n` +
-          `• Use /positions to view positions\n` +
-          `• Use /wallet to check balance changes`;
+        const shortSuccess = await ctx.__!('trading.short.success');
+        const token = await ctx.__!('trading.preview.token', { symbol: symbol.toUpperCase() });
+        const leverageMsg = await ctx.__!('trading.preview.leverage', { leverage });
+        const amountMsg = await ctx.__!('trading.preview.amount', { amount });
+        const recommendations = await ctx.__!('trading.recommendations');
+        const viewPositions = await ctx.__!('trading.viewPositions');
+        const checkBalance = await ctx.__!('trading.checkBalance');
+        
+        successMessage = `${shortSuccess}\n\n` +
+          `${token}\n` +
+          `${leverageMsg}\n` +
+          `${amountMsg}\n\n` +
+          `${recommendations}\n` +
+          `${viewPositions}\n` +
+          `${checkBalance}`;
       } else {
         // 如果响应表明失败，抛出错误
         throw new Error(apiResult?.message || 'Hyperliquid API returned failure status');
@@ -519,10 +531,12 @@ export class ShortHandler {
         fullError: error.toString()
       });
       
-      await ctx.answerCbQuery('❌ Trade execution failed');
+      const executionFailed = await ctx.__!('trading.executionFailed');
+      await ctx.answerCbQuery(executionFailed);
       
-      // 解析API错误，提供更友好的错误信息
-      let errorMessage = '❌ <b>Trade execution failed</b>\n\n';
+      // Parse API error and provide user-friendly error message
+      const tradeFailed = await ctx.__!('trading.short.failed');
+      let errorMessage = `${tradeFailed}\n\n`;
       
       // 检查是否是余额不足错误
       if (error.response?.status === 400) {
@@ -606,12 +620,15 @@ export class ShortHandler {
   /**
    * Create confirmation keyboard
    */
-  public createConfirmationKeyboard(symbol: string, leverage: string, amount: string): InlineKeyboardMarkup {
+  public async createConfirmationKeyboard(ctx: ExtendedContext, symbol: string, leverage: string, amount: string): Promise<InlineKeyboardMarkup> {
+    const cancel = await ctx.__!('trading.preview.cancel');
+    const confirm = await ctx.__!('trading.preview.confirm');
+    
     return {
       inline_keyboard: [
         [
-          { text: '❌ Cancel', callback_data: `short_cancel_${symbol}_${leverage}_${amount}` },
-          { text: '✅ Confirm', callback_data: `short_confirm_${symbol}_${leverage}_${amount}` }
+          { text: cancel, callback_data: `short_cancel_${symbol}_${leverage}_${amount}` },
+          { text: confirm, callback_data: `short_confirm_${symbol}_${leverage}_${amount}` }
         ]
       ]
     };

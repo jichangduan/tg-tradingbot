@@ -34,12 +34,8 @@ export class ChartHandler {
       }
 
       if (args.length > 2) {
-        await ctx.reply(
-          '⚠️ Too many parameters\n\n' +
-          'Correct format: <code>/chart BTC</code> or <code>/chart BTC 1h</code>\n\n' +
-          'Supported timeframes: 1m, 5m, 15m, 1h, 4h, 1d',
-          { parse_mode: 'HTML' }
-        );
+        const tooManyParamsMsg = await ctx.__!('chart.tooManyParams');
+        await ctx.reply(tooManyParamsMsg, { parse_mode: 'HTML' });
         return;
       }
 
@@ -57,22 +53,16 @@ export class ChartHandler {
       if (args.length === 2) {
         const inputTimeFrame = args[1].toLowerCase();
         if (!chartService.isValidTimeFrame(inputTimeFrame)) {
-          await ctx.reply(
-            `⚠️ <b>Unsupported timeframe: ${args[1]}</b>\n\n` +
-            'Supported timeframes: 1m, 5m, 15m, 1h, 4h, 1d\n\n' +
-            'Example: <code>/chart BTC 1h</code>',
-            { parse_mode: 'HTML' }
-          );
+          const unsupportedTimeframeMsg = await ctx.__!('chart.unsupportedTimeframe', args[1]);
+          await ctx.reply(unsupportedTimeframeMsg, { parse_mode: 'HTML' });
           return;
         }
         timeFrame = inputTimeFrame as TimeFrame;
       }
 
       // 4. Send "Loading..." message
-      const loadingMessage = await ctx.reply(
-        messageFormatter.formatChartLoadingMessage(symbol, timeFrame),
-        { parse_mode: 'HTML' }
-      );
+      const loadingMsg = await ctx.__!('chart.loading');
+      const loadingMessage = await ctx.reply(loadingMsg, { parse_mode: 'HTML' });
 
       // 5. 调用Chart服务获取K线数据 (固定20根K线)
       let candleData;
@@ -187,25 +177,16 @@ export class ChartHandler {
   /**
    * Send help message
    */
-  private async sendHelpMessage(ctx: Context): Promise<void> {
-    const helpMessage = messageFormatter.formatChartHelpMessage();
+  private async sendHelpMessage(ctx: ExtendedContext): Promise<void> {
+    const helpMessage = await ctx.__!('chart.help');
     await ctx.reply(helpMessage, { parse_mode: 'HTML' });
   }
 
   /**
    * Handle parameter validation errors
    */
-  private async handleValidationError(ctx: Context, error: Error, inputSymbol: string): Promise<void> {
-    let errorMessage = `❌ <b>Invalid trading pair symbol: ${inputSymbol}</b>\n\n`;
-    errorMessage += error.message;
-    
-    // Provide suggestions for common trading pairs
-    errorMessage += `\n\n💡 <b>Try these popular trading pairs:</b>\n`;
-    errorMessage += `<code>/chart BTC</code> - Bitcoin\n`;
-    errorMessage += `<code>/chart ETH</code> - Ethereum\n`;
-    errorMessage += `<code>/chart SOL</code> - Solana\n`;
-    errorMessage += `<code>/chart ETC</code> - Ethereum Classic`;
-
+  private async handleValidationError(ctx: ExtendedContext, error: Error, inputSymbol: string): Promise<void> {
+    const errorMessage = await ctx.__!('chart.invalidSymbol', inputSymbol);
     await ctx.reply(errorMessage, { parse_mode: 'HTML' });
   }
 
@@ -213,32 +194,18 @@ export class ChartHandler {
    * Handle service errors
    */
   private async handleServiceError(
-    ctx: Context, 
+    ctx: ExtendedContext, 
     error: DetailedError, 
     loadingMessageId: number
   ): Promise<void> {
     // Special handling for insufficient data errors
     let errorMessage: string;
     if (error.message.includes('Insufficient candle data') || error.message.includes('only') && error.message.includes('candles available')) {
-      errorMessage = 
-        '📊 <b>Insufficient Candlestick Data</b>\n\n' +
-        'This trading pair has limited historical data for this timeframe.\n\n' +
-        '💡 <b>Suggestions:</b>\n' +
-        '• Try shorter timeframes (1h, 5m, 1m)\n' +
-        '• Choose more mainstream trading pairs (BTC, ETH)\n' +
-        '• Retry later, data may be updating\n\n' +
-        '<i>If this issue persists with mainstream coins, please contact administrator</i>';
+      errorMessage = await ctx.__!('chart.insufficientData');
     } else if (error.message.includes('Unable to get candle data') && error.message.includes('in any supported timeframe')) {
-      errorMessage = 
-        '❌ <b>Unable to Get Data</b>\n\n' +
-        'Sorry, unable to get data for any timeframe of this trading pair.\n\n' +
-        '💡 <b>Possible reasons:</b>\n' +
-        '• Trading pair does not exist or has been delisted\n' +
-        '• Data source temporarily unavailable\n' +
-        '• Network connection issues\n\n' +
-        'Please check if the trading pair symbol is correct, or retry later.';
+      errorMessage = await ctx.__!('chart.unableToGetData');
     } else {
-      errorMessage = messageFormatter.formatErrorMessage(error);
+      errorMessage = await ctx.__!('chart.error');
     }
     
     try {
@@ -258,17 +225,8 @@ export class ChartHandler {
   /**
    * Send generic error message
    */
-  private async sendGenericErrorMessage(ctx: Context): Promise<void> {
-    const errorMessage = 
-      '❌ <b>System Error</b>\n\n' +
-      'Sorry, an unexpected error occurred while processing your request.\n\n' +
-      '💡 <b>You can try:</b>\n' +
-      '• Retry later\n' +
-      '• Check if trading pair symbol is correct\n' +
-      '• Use common trading pairs (like BTC, ETH, SOL)\n' +
-      '• Check if timeframe is supported\n\n' +
-      '<i>If the problem persists, please contact administrator</i>';
-
+  private async sendGenericErrorMessage(ctx: ExtendedContext): Promise<void> {
+    const errorMessage = await ctx.__!('chart.systemError');
     await ctx.reply(errorMessage, { parse_mode: 'HTML' });
   }
 

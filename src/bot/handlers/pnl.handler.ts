@@ -101,15 +101,14 @@ export class PnlHandler {
   public async handle(ctx: ExtendedContext, args: string[]): Promise<void> {
     const userId = ctx.from?.id;
     if (!userId) {
-      await ctx.reply('❌ Unable to identify user');
+      const userInfoError = await ctx.__!('trading.userInfoError');
+      await ctx.reply(userInfoError);
       return;
     }
 
     // 发送加载消息
-    const loadingMessage = await ctx.reply(
-      '📊 Generating your PNL analysis report...\n' +
-      '⏳ Please wait, calculating historical data'
-    );
+    const loadingMsg = await ctx.__!('pnl.loading');
+    const loadingMessage = await ctx.reply(loadingMsg);
 
     try {
       // 尝试从缓存获取数据
@@ -169,7 +168,13 @@ export class PnlHandler {
       }
 
     } catch (error) {
-      const errorMessage = this.handleError(error as Error);
+      let errorMessage: string;
+      
+      if ((error as Error).message.includes('未登录') || (error as Error).message.includes('not logged in')) {
+        errorMessage = await ctx.__!('trading.loginRequired');
+      } else {
+        errorMessage = await ctx.__!('pnl.error');
+      }
       
       try {
         await ctx.telegram.editMessageText(
@@ -379,18 +384,6 @@ export class PnlHandler {
   }
 
 
-  /**
-   * 错误处理
-   */
-  private handleError(error: Error): string {
-    logger.error('PNL handler error:', { error: error.message });
-
-    if (error.message.includes('未登录') || error.message.includes('not logged in')) {
-      return '❌ Please use /start to login first';
-    }
-
-    return '❌ Analysis failed, please try again later';
-  }
 
   /**
    * 获取缓存的PNL数据

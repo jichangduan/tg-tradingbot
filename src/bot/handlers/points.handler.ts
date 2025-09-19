@@ -25,12 +25,14 @@ export class PointsHandler {
       logger.logCommand('points', userId!, username, args);
 
       if (!userId) {
-        await ctx.reply('❌ Unable to get user information, please retry');
+        const userInfoError = await ctx.__!('trading.userInfoError');
+        await ctx.reply(userInfoError);
         return;
       }
 
       // Show loading status
-      const loadingMsg = await ctx.reply('⏳ Querying your points information...');
+      const loadingMessage = await ctx.__!('points.loading');
+      const loadingMsg = await ctx.reply(loadingMessage);
 
       // 调用invite服务获取积分数据（积分基于交易量计算）
       logger.info(`Points query started [points_${Date.now()}_${Math.random().toString(36).substr(2, 9)}]`, {
@@ -53,7 +55,12 @@ export class PointsHandler {
       }
 
       // 格式化积分信息
-      const pointsMessage = this.formatPointsMessage(inviteStats);
+      const pointsMessage = await ctx.__!('points.details', 
+        this.formatNumber(inviteStats.currentPoints),
+        this.formatNumber(inviteStats.totalTradingVolume), 
+        inviteStats.inviteeCount,
+        this.formatDateTime(inviteStats.lastUpdated)
+      );
       await ctx.reply(pointsMessage, { parse_mode: 'HTML' });
 
       // 记录成功日志
@@ -89,70 +96,11 @@ export class PointsHandler {
       });
 
       // 处理详细错误并显示用户友好消息
-      const errorMessage = this.handlePointsError(error as DetailedError);
+      const errorMessage = await ctx.__!('points.error');
       await ctx.reply(errorMessage, { parse_mode: 'HTML' });
     }
   }
 
-  /**
-   * 格式化积分信息消息
-   */
-  private formatPointsMessage(inviteStats: any): string {
-    const {
-      currentPoints,
-      totalTradingVolume,
-      inviteeCount,
-      lastUpdated
-    } = inviteStats;
-
-    const messageLines = [
-      '🎯 <b>Your Points Details</b>',
-      '',
-      `💎 <b>Current Points:</b> ${this.formatNumber(currentPoints)} points`,
-      `📊 <b>Total Trading Volume:</b> $${this.formatNumber(totalTradingVolume)}`,
-      `👥 <b>Invitees:</b> ${inviteeCount} people`,
-      '',
-      '📋 <b>Points Rules</b>',
-      '• Every $100 trading volume = 1 point',
-      '• Invite friends to increase trading volume and earn more points',
-      '• Points can be used for platform special benefits and rewards',
-      '',
-      `🕒 <b>Update Time:</b> ${this.formatDateTime(lastUpdated)}`,
-      '',
-      '💡 <b>Tip:</b> Send /invite to view detailed invitation statistics',
-      '',
-      '🆘 <b>Need Help?</b>',
-      '• 📱 Send /help to view usage guide',
-      '• 💰 Send /wallet to check wallet balance',
-      '• 📊 Send /markets to view market trends',
-      '',
-      'If problems persist, please contact administrator'
-    ];
-
-    return messageLines.join('\n');
-  }
-
-  /**
-   * 处理积分查询错误
-   */
-  private handlePointsError(error: DetailedError): string {
-    const baseMessage = [
-      '❌ <b>Points Query Failed</b>',
-      '',
-      error.message || 'Unknown error',
-      '',
-      '💡 <b>Suggestion:</b> Please resend /points command',
-      '',
-      '🆘 <b>Need Help?</b>',
-      '• 📱 Send /help to view usage guide',
-      '• 💰 Send /wallet to check wallet balance',
-      '• 📊 Send /markets to view market trends',
-      '',
-      'If problems persist, please contact administrator'
-    ];
-
-    return baseMessage.join('\n');
-  }
 
   /**
    * 格式化数字显示

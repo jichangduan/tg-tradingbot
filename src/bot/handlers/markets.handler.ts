@@ -2,6 +2,7 @@ import { Context } from 'telegraf';
 import { InlineKeyboardMarkup } from 'telegraf/typings/core/types/typegram';
 import { logger } from '../../utils/logger';
 import { hyperliquidMarketService } from '../../services/hyperliquid-market.service';
+import { ExtendedContext } from '../index';
 
 /**
  * Market data interface response types
@@ -30,7 +31,7 @@ export class MarketsHandler {
   /**
    * Handle /markets command
    */
-  public async handle(ctx: Context, args: string[]): Promise<void> {
+  public async handle(ctx: ExtendedContext, args: string[]): Promise<void> {
     const userId = ctx.from?.id;
     const username = ctx.from?.username;
     
@@ -42,7 +43,8 @@ export class MarketsHandler {
 
     try {
       // Send loading message
-      const loadingMessage = await ctx.reply('📊 Fetching market data...');
+      const loadingMsg = await ctx.__!('markets.loading');
+      const loadingMessage = await ctx.reply(loadingMsg);
       
       // Get market data
       const marketData = await this.fetchMarketData();
@@ -76,11 +78,8 @@ export class MarketsHandler {
       });
 
       // Send user-friendly error message
-      await ctx.reply(
-        '❌ Query Failed\\n\\n' +
-        'Error occurred while fetching market data, please try again later.',
-        { parse_mode: 'HTML' }
-      );
+      const errorMsg = await ctx.__!('markets.error');
+      await ctx.reply(errorMsg, { parse_mode: 'HTML' });
     }
   }
 
@@ -262,7 +261,7 @@ export class MarketsHandler {
   /**
    * Handle markets pagination callback
    */
-  public async handleCallback(ctx: Context): Promise<void> {
+  public async handleCallback(ctx: ExtendedContext): Promise<void> {
     const callbackData = ctx.callbackQuery && 'data' in ctx.callbackQuery ? ctx.callbackQuery.data : undefined;
     if (!callbackData || !callbackData.startsWith('markets_')) return;
 
@@ -289,7 +288,8 @@ export class MarketsHandler {
       }
       
       // Show loading status
-      await ctx.answerCbQuery('🔄 Loading...');
+      const loadingMsg = await ctx.__!('markets.loading');
+      await ctx.answerCbQuery(loadingMsg);
       
       // Get fresh market data
       const marketData = await this.fetchMarketData();
@@ -297,7 +297,8 @@ export class MarketsHandler {
       // Validate page number
       const totalPages = Math.ceil(marketData.length / 10);
       if (page < 1 || page > totalPages) {
-        await ctx.answerCbQuery('❌ Invalid page');
+        const invalidPageMsg = await ctx.__!('errors.invalidPage');
+        await ctx.answerCbQuery(invalidPageMsg);
         return;
       }
       
@@ -317,7 +318,8 @@ export class MarketsHandler {
         callbackData
       });
       
-      await ctx.answerCbQuery('❌ Pagination failed, please retry');
+      const paginationErrorMsg = await ctx.__!('errors.paginationFailed');
+      await ctx.answerCbQuery(paginationErrorMsg);
     }
   }
 

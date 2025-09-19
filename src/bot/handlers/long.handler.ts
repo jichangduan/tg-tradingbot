@@ -31,9 +31,10 @@ export class LongHandler {
       // Check if user has active trading state
       const activeState = await tradingStateService.getState(userId!.toString());
       if (activeState) {
+        const activeSessionMsg = await ctx.__!('trading.activeSession');
+        const completeOrCancelMsg = await ctx.__!('trading.completeOrCancel');
         await ctx.reply(
-          '⚠️ <b>You have an active trading session</b>\n\n' +
-          'Please complete current trade or send /cancel to cancel current session',
+          `${activeSessionMsg}\n\n${completeOrCancelMsg}`,
           { parse_mode: 'HTML' }
         );
         return;
@@ -73,7 +74,8 @@ export class LongHandler {
   private async handleGuidedMode(ctx: ExtendedContext, action: 'long', symbol?: string): Promise<void> {
     const userId = ctx.from?.id?.toString();
     if (!userId) {
-      await ctx.reply('❌ Unable to get user information, please retry');
+      const userInfoError = await ctx.__!('trading.userInfoError');
+      await ctx.reply(userInfoError);
       return;
     }
     
@@ -108,8 +110,10 @@ export class LongHandler {
         });
       } catch (error) {
         await tradingStateService.clearState(userId);
+        const tokenNotFound = await ctx.__!('errors.tokenNotFound');
+        const tryAgainLater = await ctx.__!('trading.errors.tryAgainLater');
         await ctx.reply(
-          `❌ Unable to get ${symbol.toUpperCase()} price information, please retry later`,
+          `❌ ${symbol.toUpperCase()}: ${tokenNotFound}\n\n${tryAgainLater}`,
           { parse_mode: 'HTML' }
         );
       }
@@ -139,9 +143,10 @@ export class LongHandler {
     // Validate trading amount format
     const amount = parseFloat(amountStr);
     if (isNaN(amount) || amount <= 0) {
+      const amountError = await ctx.__!('trading.amountError');
+      const invalidAmount = await ctx.__!('trading.invalidAmount');
       await ctx.reply(
-        `❌ <b>Trading Amount Error</b>\n\n` +
-        `Please enter a valid numeric amount\n\n` +
+        `${amountError}\n\n${invalidAmount}\n\n` +
         `Example: <code>/long BTC 10x 100</code>`,
         { parse_mode: 'HTML' }
       );
@@ -150,11 +155,14 @@ export class LongHandler {
 
     // Validate Hyperliquid minimum trading amount ($10)
     if (amount < 10) {
+      const minimumAmount = await ctx.__!('trading.minimumAmount');
+      const minimumRequired = await ctx.__!('trading.minimumRequired');
+      const adjustAmount = await ctx.__!('trading.adjustAmount');
       await ctx.reply(
-        `💰 <b>Insufficient Trading Amount</b>\n\n` +
-        `Hyperliquid minimum trading amount is <b>$10</b>\n` +
+        `${minimumAmount}\n\n` +
+        `${minimumRequired}\n` +
         `Your amount: <code>$${amount}</code>\n\n` +
-        `💡 <b>Please adjust to at least $10:</b>\n` +
+        `💡 <b>${adjustAmount}</b>\n` +
         `<code>/long ${symbol.toUpperCase()} ${leverageStr} 10</code>`,
         { parse_mode: 'HTML' }
       );
@@ -210,12 +218,13 @@ export class LongHandler {
       // Check if balance is sufficient
       const requiredAmount = parseFloat(amountStr);
       if (isNaN(requiredAmount) || requiredAmount <= 0) {
+        const parameterError = await ctx.__!('trading.parameterError');
+        const validQuantity = await ctx.__!('trading.validQuantity');
         await ctx.telegram.editMessageText(
           ctx.chat?.id,
           loadingMessage.message_id,
           undefined,
-          '❌ <b>Trading Parameter Error</b>\n\n' +
-          'Please enter a valid quantity\n\n' +
+          `${parameterError}\n\n${validQuantity}\n\n` +
           'Example: <code>/long BTC 10x 200</code>',
           { parse_mode: 'HTML' }
         );
@@ -239,34 +248,55 @@ export class LongHandler {
           
           switch (marginCheck.reason) {
             case 'margin_occupied':
-              errorMessage = `💰 <b>Insufficient Available Margin</b>\n\n` +
-                `Contract Account Total Value: <code>$${contractAccountValue.toFixed(2)}</code>\n` +
-                `Available Margin: <code>$${marginCheck.availableMargin.toFixed(2)}</code>\n` +
-                `Required Margin: <code>$${marginCheck.requiredMargin.toFixed(2)}</code>\n\n` +
+              const marginOccupied = await ctx.__!('trading.balance.marginOccupied');
+              const total = await ctx.__!('trading.balance.total', { amount: contractAccountValue.toFixed(2) });
+              const available = await ctx.__!('trading.balance.available', { amount: marginCheck.availableMargin.toFixed(2) });
+              const required = await ctx.__!('trading.balance.required', { amount: marginCheck.requiredMargin.toFixed(2) });
+              const solutions = await ctx.__!('trading.balance.solutions');
+              const closePositions = await ctx.__!('trading.balance.closePositions');
+              const reduceAmount = await ctx.__!('trading.balance.reduceAmount');
+              const reduceLeverage = await ctx.__!('trading.balance.reduceLeverage');
+              const deposit = await ctx.__!('trading.balance.deposit');
+              
+              errorMessage = `${marginOccupied}\n\n` +
+                `${total}\n` +
+                `${available}\n` +
+                `${required}\n\n` +
                 `💡 <b>Cause Analysis:</b>\n` +
                 `• Your funds are occupied by existing positions as margin\n` +
                 `• Leverage trading requires sufficient available margin\n\n` +
-                `🔧 <b>Solutions:</b>\n` +
-                `• Close some positions to release margin\n` +
-                `• Reduce trading amount: <code>/long ${symbol.toUpperCase()} ${leverageStr} ${Math.floor(marginCheck.availableMargin * leverageNum)}</code>\n` +
-                `• Reduce leverage multiplier\n` +
-                `• Deposit more USDC to contract account`;
+                `${solutions}\n` +
+                `${closePositions}\n` +
+                `${reduceAmount}: <code>/long ${symbol.toUpperCase()} ${leverageStr} ${Math.floor(marginCheck.availableMargin * leverageNum)}</code>\n` +
+                `${reduceLeverage}\n` +
+                `${deposit}`;
               break;
             case 'no_funds':
-              errorMessage = `💰 <b>Contract Account No Funds</b>\n\n` +
+              const noFunds = await ctx.__!('trading.balance.noFunds');
+              const depositMsg = await ctx.__!('trading.balance.deposit');
+              const checkWallet = await ctx.__!('trading.balance.checkWallet');
+              const solutionsMsg = await ctx.__!('trading.balance.solutions');
+              
+              errorMessage = `${noFunds}\n\n` +
                 `Leverage trading requires contract account funds\n` +
                 `Current contract account balance: <code>$0</code>\n\n` +
-                `💡 <b>Solutions:</b>\n` +
-                `• Deposit USDC to wallet\n` +
-                `• Use /wallet to check account status`;
+                `💡 ${solutionsMsg}\n` +
+                `${depositMsg}\n` +
+                `${checkWallet}`;
               break;
             default:
-              errorMessage = `💰 <b>Insufficient Margin</b>\n\n` +
-                `Required margin: <code>$${marginCheck.requiredMargin.toFixed(2)}</code>\n` +
-                `Available margin: <code>$${marginCheck.availableMargin.toFixed(2)}</code>\n\n` +
-                `💡 <b>Solutions:</b>\n` +
+              const insufficientMargin = await ctx.__!('trading.balance.insufficient');
+              const requiredMsg = await ctx.__!('trading.balance.required', { amount: marginCheck.requiredMargin.toFixed(2) });
+              const availableMsg = await ctx.__!('trading.balance.available', { amount: marginCheck.availableMargin.toFixed(2) });
+              const solutionsDefault = await ctx.__!('trading.balance.solutions');
+              const depositDefault = await ctx.__!('trading.balance.deposit');
+              
+              errorMessage = `${insufficientMargin}\n\n` +
+                `${requiredMsg}\n` +
+                `${availableMsg}\n\n` +
+                `💡 ${solutionsDefault}\n` +
                 `• Reduce trading amount or leverage multiplier\n` +
-                `• Deposit more USDC to contract account`;
+                `${depositDefault}`;
           }
 
           await ctx.telegram.editMessageText(
@@ -306,7 +336,7 @@ export class LongHandler {
         liquidationPrice
       );
       
-      const keyboard = this.createConfirmationKeyboard(symbol, leverageStr, amountStr);
+      const keyboard = await this.createConfirmationKeyboard(ctx, symbol, leverageStr, amountStr);
       
       await ctx.telegram.editMessageText(
         ctx.chat?.id,
@@ -352,9 +382,11 @@ export class LongHandler {
         await this.executeTrading(ctx, 'long', symbol, leverage, amount);
       } else if (callbackData.startsWith('long_cancel_')) {
         // Cancel trade
-        await ctx.answerCbQuery('❌ Trade cancelled');
+        const cancelled = await ctx.__!('trading.cancelled');
+        const restartAnytime = await ctx.__!('trading.restartAnytime');
+        await ctx.answerCbQuery(cancelled);
         await ctx.editMessageText(
-          '❌ <b>Trade Cancelled</b>\n\nYou can restart trading anytime',
+          `${cancelled}\n\n${restartAnytime}`,
           { parse_mode: 'HTML' }
         );
       } else if (callbackData.startsWith('long_leverage_')) {
@@ -367,7 +399,8 @@ export class LongHandler {
         callbackData,
         userId: ctx.from?.id
       });
-      await ctx.answerCbQuery('❌ Operation failed, please retry');
+      const operationFailed = await ctx.__!('trading.operationFailed');
+      await ctx.answerCbQuery(operationFailed);
     }
   }
 
@@ -377,14 +410,16 @@ export class LongHandler {
   private async handleLeverageSelection(ctx: ExtendedContext, callbackData: string): Promise<void> {
     const userId = ctx.from?.id?.toString();
     if (!userId) {
-      await ctx.answerCbQuery('❌ Unable to get user information, please retry');
+      const userInfoError = await ctx.__!('trading.userInfoError');
+      await ctx.answerCbQuery(userInfoError);
       return;
     }
     const leverage = callbackData.split('_')[3]; // long_leverage_BTC_3x
     
     const state = await tradingStateService.getState(userId);
     if (!state || !state.symbol) {
-      await ctx.answerCbQuery('❌ Session expired, please restart');
+      const sessionExpired = await ctx.__!('trading.sessionExpired');
+      await ctx.answerCbQuery(sessionExpired);
       return;
     }
 
@@ -394,7 +429,8 @@ export class LongHandler {
       step: 'amount'
     });
 
-    await ctx.answerCbQuery(`✅ Selected ${leverage} leverage`);
+    const leverageSelected = await ctx.__!('trading.leverage.selected', { leverage });
+    await ctx.answerCbQuery(leverageSelected);
 
     // Show amount input prompt
     // Get available margin
@@ -419,7 +455,8 @@ export class LongHandler {
     const username = ctx.from?.username || 'unknown';
 
     try {
-      await ctx.answerCbQuery('🔄 Executing trade...');
+      const executingTrade = await ctx.__!('trading.executingTrade');
+      await ctx.answerCbQuery(executingTrade);
       
       // Get user data and access token (single call)
       const { userData, accessToken } = await getUserDataAndToken(userId!.toString(), {
@@ -488,13 +525,21 @@ export class LongHandler {
         });
         
         // Only show success message when confirmed successful
-        successMessage = `✅ <b>Long Position Opened Successfully</b>\n\n` +
-          `Token: <code>${symbol.toUpperCase()}</code>\n` +
-          `Leverage: <code>${leverage}</code>\n` +
-          `Amount: <code>$${amount}</code>\n\n` +
-          `🎯 <b>Recommended Actions:</b>\n` +
-          `• Use /positions to view positions\n` +
-          `• Use /wallet to check balance changes`;
+        const longSuccess = await ctx.__!('trading.long.success');
+        const token = await ctx.__!('trading.preview.token', { symbol: symbol.toUpperCase() });
+        const leverageMsg = await ctx.__!('trading.preview.leverage', { leverage });
+        const amountMsg = await ctx.__!('trading.preview.amount', { amount });
+        const recommendations = await ctx.__!('trading.recommendations');
+        const viewPositions = await ctx.__!('trading.viewPositions');
+        const checkBalance = await ctx.__!('trading.checkBalance');
+        
+        successMessage = `${longSuccess}\n\n` +
+          `${token}\n` +
+          `${leverageMsg}\n` +
+          `${amountMsg}\n\n` +
+          `${recommendations}\n` +
+          `${viewPositions}\n` +
+          `${checkBalance}`;
       } else {
         // If response indicates failure, throw error
         throw new Error(apiResult?.message || 'Hyperliquid API returned failure status');
@@ -514,10 +559,12 @@ export class LongHandler {
         errorMessage: error.message
       });
       
-      await ctx.answerCbQuery('❌ Trade execution failed');
+      const executionFailed = await ctx.__!('trading.executionFailed');
+      await ctx.answerCbQuery(executionFailed);
       
       // Parse API error and provide user-friendly error message
-      let errorMessage = '❌ <b>Trade Execution Failed</b>\n\n';
+      const tradeFailed = await ctx.__!('trading.long.failed');
+      let errorMessage = `${tradeFailed}\n\n`;
       
       // Check if it's insufficient balance error
       if (error.response?.status === 400) {
@@ -526,57 +573,77 @@ export class LongHandler {
         
         // Handle new API error codes
         if (errorMsg.includes('Builder fee has not been approved')) {
-          errorMessage = '🔧 <b>Builder Fee Approval Required</b>\n\n' +
-            `First-time trading requires builder fee approval\n\n` +
-            `💡 <b>Solution:</b>\n` +
-            `• This is a one-time setup, please confirm approval\n` +
+          const builderFee = await ctx.__!('trading.errors.builderFee');
+          const builderFeeDesc = await ctx.__!('trading.errors.builderFeeDesc');
+          const builderFeeSolution = await ctx.__!('trading.errors.builderFeeSolution');
+          const contactSupport = await ctx.__!('trading.errors.contactSupport');
+          
+          errorMessage = `${builderFee}\n\n${builderFeeDesc}\n\n` +
+            `💡 <b>Solution:</b>\n${builderFeeSolution}\n` +
             `• After approval, all trading will work normally\n` +
-            `• If the issue persists, please contact support`;
+            `• If the issue persists, ${contactSupport}`;
         } else if (errorMsg.includes('size must be a positive number')) {
-          errorMessage = '📊 <b>Trading Size Parameter Error</b>\n\n' +
-            `Calculated token amount is invalid\n\n` +
+          const sizeInvalid = await ctx.__!('trading.errors.sizeInvalid');
+          const sizeInvalidDesc = await ctx.__!('trading.errors.sizeInvalidDesc');
+          const tryAgainLater = await ctx.__!('trading.errors.tryAgainLater');
+          
+          errorMessage = `${sizeInvalid}\n\n${sizeInvalidDesc}\n\n` +
             `💡 <b>Possible causes:</b>\n` +
             `• Price data retrieval failed\n` +
             `• Trading amount too small\n` +
-            `• Please try again later or increase trading amount`;
+            `• ${tryAgainLater} or increase trading amount`;
         } else if (errorMsg.includes('insufficient') || errorMsg.toLowerCase().includes('balance')) {
-          errorMessage = '💰 <b>Insufficient Account Balance</b>\n\n' +
+          const insufficient = await ctx.__!('trading.balance.insufficient');
+          const checkWallet = await ctx.__!('trading.balance.checkWallet');
+          const deposit = await ctx.__!('trading.balance.deposit');
+          const minimumRequired = await ctx.__!('trading.minimumRequired');
+          
+          errorMessage = `${insufficient}\n\n` +
             `Cannot complete $${amount} long trade\n\n` +
             `💡 <b>Solutions:</b>\n` +
-            `• Use /wallet to check current balance\n` +
-            `• Deposit more USDC to wallet\n` +
+            `${checkWallet}\n` +
+            `${deposit}\n` +
             `• Reduce trading amount\n\n` +
-            `<i>💸 Note: Hyperliquid minimum trade amount is $10</i>`;
+            `<i>💸 Note: ${minimumRequired}</i>`;
         } else if (errorMsg.includes('minimum') || parseFloat(amount) < 10) {
-          errorMessage = '💰 <b>Trading Amount Requirements Not Met</b>\n\n' +
-            `Hyperliquid minimum trade amount is <b>$10</b>\n` +
+          const minimumAmount = await ctx.__!('trading.minimumAmount');
+          const minimumRequired = await ctx.__!('trading.minimumRequired');
+          const adjustAmount = await ctx.__!('trading.adjustAmount');
+          
+          errorMessage = `${minimumAmount}\n\n` +
+            `${minimumRequired}\n` +
             `Your amount: <code>$${amount}</code>\n\n` +
-            `💡 <b>Please adjust to at least $10:</b>\n` +
+            `💡 <b>${adjustAmount}</b>\n` +
             `<code>/long ${symbol.toUpperCase()} ${leverage} 10</code>`;
         } else {
+          const tryAgainLater = await ctx.__!('trading.errors.tryAgainLater');
           errorMessage += `Parameter error: ${errorMsg}\n\n` +
-            `<i>Please check trading parameters or try again later</i>`;
+            `<i>Please check trading parameters or ${tryAgainLater}</i>`;
         }
       } else if (error.response?.status === 401) {
         const responseData = error.response?.data;
         const errorMsg = responseData?.message || error.message || '';
         
         if (errorMsg.includes('Invalid access token')) {
-          errorMessage = '🔑 <b>Invalid Access Token</b>\n\n' +
-            `Your login session has expired\n\n` +
-            `💡 <b>Solution:</b>\n` +
-            `• Use /start to reinitialize\n` +
+          const authExpired = await ctx.__!('trading.errors.authExpired');
+          const authExpiredDesc = await ctx.__!('trading.errors.authExpiredDesc');
+          const authSolution = await ctx.__!('trading.errors.authSolution');
+          
+          errorMessage = `${authExpired}\n\n${authExpiredDesc}\n\n` +
+            `💡 <b>Solution:</b>\n${authSolution}\n` +
             `• This will automatically refresh your access permissions`;
         } else {
+          const authSolution = await ctx.__!('trading.errors.authSolution');
           errorMessage += `Authentication failed, please log in again\n\n` +
-            `<i>Use /start to restart</i>`;
+            `<i>${authSolution} to restart</i>`;
         }
       } else if (error.response?.status >= 500) {
-        errorMessage += `Server temporarily unavailable\n\n` +
-          `<i>Please try again later</i>`;
+        const serverUnavailable = await ctx.__!('trading.errors.serverUnavailable');
+        const tryAgainLater = await ctx.__!('trading.errors.tryAgainLater');
+        errorMessage += `${serverUnavailable}\n\n<i>${tryAgainLater}</i>`;
       } else {
-        errorMessage += `${error.message}\n\n` +
-          `<i>Please try again later or contact support</i>`;
+        const contactSupport = await ctx.__!('trading.errors.contactSupport');
+        errorMessage += `${error.message}\n\n<i>${contactSupport}</i>`;
       }
       
       await ctx.editMessageText(errorMessage, { parse_mode: 'HTML' });
@@ -601,12 +668,15 @@ export class LongHandler {
   /**
    * Create confirmation keyboard
    */
-  public createConfirmationKeyboard(symbol: string, leverage: string, amount: string): InlineKeyboardMarkup {
+  public async createConfirmationKeyboard(ctx: ExtendedContext, symbol: string, leverage: string, amount: string): Promise<InlineKeyboardMarkup> {
+    const cancel = await ctx.__!('trading.preview.cancel');
+    const confirm = await ctx.__!('trading.preview.confirm');
+    
     return {
       inline_keyboard: [
         [
-          { text: '❌ Cancel', callback_data: `long_cancel_${symbol}_${leverage}_${amount}` },
-          { text: '✅ Confirm', callback_data: `long_confirm_${symbol}_${leverage}_${amount}` }
+          { text: cancel, callback_data: `long_cancel_${symbol}_${leverage}_${amount}` },
+          { text: confirm, callback_data: `long_confirm_${symbol}_${leverage}_${amount}` }
         ]
       ]
     };

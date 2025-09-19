@@ -6,6 +6,7 @@ import { cacheService } from '../services/cache.service';
 import { apiService } from '../services/api.service';
 import { registerCommands } from './handlers';
 import { groupAutoBindingService } from '../services/group-auto-binding.service';
+import { createLanguageMiddleware } from '../middleware/language.middleware';
 
 /**
  * 扩展的Telegram Context，添加自定义属性
@@ -13,6 +14,9 @@ import { groupAutoBindingService } from '../services/group-auto-binding.service'
 export interface ExtendedContext extends Context<Update> {
   startTime?: number;
   requestId?: string;
+  userLanguage?: string;
+  __?: (key: string, params?: any) => Promise<string>;
+  setLanguage?: (locale: string) => Promise<boolean>;
 }
 
 /**
@@ -80,6 +84,9 @@ export class TelegramBot {
         });
       }
     });
+
+    // 语言检测中间件（新增）
+    this.bot.use(createLanguageMiddleware());
 
     // 用户认证和授权中间件（如果需要）
     this.bot.use(async (ctx, next) => {

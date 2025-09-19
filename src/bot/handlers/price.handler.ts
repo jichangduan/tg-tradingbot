@@ -32,8 +32,10 @@ export class PriceHandler {
       }
 
       if (args.length > 1) {
+        const invalidCommand = await ctx.__!('errors.invalidCommand');
         await ctx.reply(
-          '⚠️ Please query only one token at a time\n\n' +
+          `${invalidCommand}\n\n` +
+          'Please query only one token at a time\n\n' +
           'Correct format: <code>/price BTC</code>',
           { parse_mode: 'HTML' }
         );
@@ -50,10 +52,8 @@ export class PriceHandler {
       }
 
       // 3. Send "querying..." message
-      const loadingMessage = await ctx.reply(
-        messageFormatter.formatLoadingMessage(symbol),
-        { parse_mode: 'HTML' }
-      );
+      const loadingMsg = await ctx.__!('price.loading', { symbol: symbol.toUpperCase() });
+      const loadingMessage = await ctx.reply(loadingMsg, { parse_mode: 'HTML' });
 
       // 4. Call Token service to get price data
       let tokenData;

@@ -31,31 +31,22 @@ export class InviteHandler {
       if (args.length > 0) {
         const pageArg = parseInt(args[0]);
         if (isNaN(pageArg) || pageArg < 1) {
-          await ctx.reply(
-            '⚠️ Invalid page number format\n\n' +
-            'Correct format: <code>/invite [page]</code>\n' +
-            'Example: <code>/invite 2</code> to view page 2',
-            { parse_mode: 'HTML' }
-          );
+          const invalidPageMsg = await ctx.__!('invite.invalidPage');
+          await ctx.reply(invalidPageMsg, { parse_mode: 'HTML' });
           return;
         }
         page = pageArg;
       }
 
       if (args.length > 1) {
-        await ctx.reply(
-          '⚠️ Too many parameters\n\n' +
-          'Correct format: <code>/invite [page]</code>',
-          { parse_mode: 'HTML' }
-        );
+        const tooManyParamsMsg = await ctx.__!('invite.tooManyParams');
+        await ctx.reply(tooManyParamsMsg, { parse_mode: 'HTML' });
         return;
       }
 
       // 发送"查询中..."消息
-      const loadingMessage = await ctx.reply(
-        '🔍 Fetching your invitation statistics...',
-        { parse_mode: 'HTML' }
-      );
+      const loadingMsg = await ctx.__!('invite.loading');
+      const loadingMessage = await ctx.reply(loadingMsg, { parse_mode: 'HTML' });
 
       // 调用邀请服务获取统计数据
       let inviteStats;
@@ -99,11 +90,8 @@ export class InviteHandler {
         });
 
         // 如果编辑消息失败，尝试发送新消息
-        await ctx.reply(
-          '❌ Message sending failed, please try again\n\n' +
-          '<i>If the problem persists, please contact administrator</i>',
-          { parse_mode: 'HTML' }
-        );
+        const sendFailedMsg = await ctx.__!('errors.messageSendFailed');
+        await ctx.reply(sendFailedMsg, { parse_mode: 'HTML' });
       }
 
     } catch (error) {
@@ -127,11 +115,11 @@ export class InviteHandler {
    * 处理服务错误
    */
   private async handleServiceError(
-    ctx: Context, 
+    ctx: ExtendedContext, 
     error: DetailedError, 
     loadingMessageId: number
   ): Promise<void> {
-    const errorMessage = messageFormatter.formatInviteErrorMessage(error);
+    const errorMessage = await ctx.__!('invite.error');
     
     try {
       await ctx.telegram.editMessageText(
@@ -150,16 +138,8 @@ export class InviteHandler {
   /**
    * 发送通用错误消息
    */
-  private async sendGenericErrorMessage(ctx: Context): Promise<void> {
-    const errorMessage = 
-      '❌ <b>System Error</b>\n\n' +
-      'Sorry, an unexpected error occurred while processing your invitation query.\n\n' +
-      '💡 <b>You can try:</b>\n' +
-      '• Retry <code>/invite</code> later\n' +
-      '• Check other features <code>/help</code>\n' +
-      '• View wallet balance <code>/wallet</code>\n\n' +
-      '<i>If the problem persists, please contact administrator</i>';
-
+  private async sendGenericErrorMessage(ctx: ExtendedContext): Promise<void> {
+    const errorMessage = await ctx.__!('invite.systemError');
     await ctx.reply(errorMessage, { parse_mode: 'HTML' });
   }
 
@@ -255,19 +235,7 @@ export class InviteHandler {
       const userReferralCode = `USER${userId}`;
       const inviteLink = inviteService.generateInviteLink(userReferralCode);
 
-      const linkMessage = 
-        '🔗 <b>Your Invitation Link</b>\n\n' +
-        `<code>${inviteLink}</code>\n\n` +
-        '💡 <b>How to use:</b>\n' +
-        '• Copy and share the link with friends\n' +
-        '• Friends click the link to start using the Bot\n' +
-        '• You earn points when friends trade\n\n' +
-        '🎁 <b>Reward Rules:</b>\n' +
-        '• Every $100 trading volume = 1 point\n' +
-        '• Points can be redeemed for rewards\n' +
-        '• Real-time statistics, instant crediting\n\n' +
-        'Use <code>/invite</code> to view invitation statistics';
-
+      const linkMessage = await ctx.__!('invite.linkGenerated', inviteLink);
       await ctx.reply(linkMessage, { parse_mode: 'HTML' });
 
       const duration = Date.now() - startTime;
@@ -287,10 +255,8 @@ export class InviteHandler {
         requestId
       });
 
-      await ctx.reply(
-        '❌ Invitation link generation failed\n\nPlease try again later',
-        { parse_mode: 'HTML' }
-      );
+      const linkErrorMsg = await ctx.__!('invite.linkGenerationFailed');
+      await ctx.reply(linkErrorMsg, { parse_mode: 'HTML' });
     }
   }
 

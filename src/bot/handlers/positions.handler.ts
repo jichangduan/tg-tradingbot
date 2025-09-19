@@ -1,9 +1,6 @@
-// import { Context } from 'telegraf'; // 未使用，已注释
 import { logger } from '../../utils/logger';
 import { apiService } from '../../services/api.service';
 import { cacheService } from '../../services/cache.service';
-// import { MessageFormatter } from '../utils/message.formatter'; // 未使用，已注释
-// import { Validator } from '../utils/validator'; // 未使用，已注释
 import { ExtendedContext } from '../index';
 import { getUserAccessToken } from '../../utils/auth';
 import { chartImageService, PositionsChartData, PositionInfo } from '../../services/chart-image.service';
@@ -70,15 +67,14 @@ export class PositionsHandler {
 
     if (!userId) {
       logger.error(`Positions command failed - no userId [${requestId}]`, { requestId });
-      await ctx.reply('❌ Unable to identify user');
+      const userInfoError = await ctx.__!('trading.userInfoError');
+      await ctx.reply(userInfoError);
       return;
     }
 
     // Send loading message
-    const loadingMessage = await ctx.reply(
-      '🔍 Querying your position information...\n' +
-      '⏳ Please wait, fetching latest data'
-    );
+    const loadingMsg = await ctx.__!('positions.loading');
+    const loadingMessage = await ctx.reply(loadingMsg);
 
     try {
       // 尝试从缓存获取数据

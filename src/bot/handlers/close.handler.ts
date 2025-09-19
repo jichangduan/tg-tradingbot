@@ -26,8 +26,9 @@ export class CloseHandler {
 
       // Parameter validation
       if (args.length === 0) {
+        const invalidCommand = await ctx.__!('errors.invalidCommand');
         await ctx.reply(
-          '❌ <b>Insufficient Parameters</b>\n\n' +
+          `${invalidCommand}\n\n` +
           'Correct Format:\n' +
           '• <code>/close &lt;symbol&gt;</code> - Close full position\n' +
           '• <code>/close &lt;symbol&gt; &lt;percentage&gt;</code> - Close partial position\n\n' +
@@ -45,8 +46,9 @@ export class CloseHandler {
 
       // Basic validation
       if (!symbol) {
+        const tokenNotFound = await ctx.__!('errors.tokenNotFound');
         await ctx.reply(
-          '❌ Please provide the token symbol to close\n\n' +
+          `❌ Please provide the token symbol to close\n\n` +
           'Format: <code>/close &lt;symbol&gt; [percentage]</code>',
           { parse_mode: 'HTML' }
         );
