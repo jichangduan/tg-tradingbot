@@ -363,5 +363,14 @@
   
   "trading.tokenLabel": "Token:",
   "trading.leverageLabel": "Leverage:",
-  "trading.amountLabel": "Amount:"
+  "trading.amountLabel": "Amount:",
+
+  "button.addToGroup": "🤖 Add to Group",
+  "button.usageGuide": "⚠️ Usage Guide",
+  "button.flashNews.turnOn": "🚨 Flash News [Turn On]",
+  "button.flashNews.turnOff": "🚨 Flash News [Turn Off]",
+  "button.whaleMovements.turnOn": "🐋 Whale Movements [Turn On]",
+  "button.whaleMovements.turnOff": "🐋 Whale Movements [Turn Off]",
+  "button.fundFlows.turnOn": "💰 Fund Flows [Turn On]",
+  "button.fundFlows.turnOff": "💰 Fund Flows [Turn Off]"
 }

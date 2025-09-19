@@ -364,5 +364,14 @@
   
   "trading.tokenLabel": "토큰:",
   "trading.leverageLabel": "레버리지:",
-  "trading.amountLabel": "금액:"
+  "trading.amountLabel": "금액:",
+
+  "button.addToGroup": "🤖 그룹에 추가",
+  "button.usageGuide": "⚠️ 사용 가이드",
+  "button.flashNews.turnOn": "🚨 플래시 뉴스 [켜기]",
+  "button.flashNews.turnOff": "🚨 플래시 뉴스 [끄기]",
+  "button.whaleMovements.turnOn": "🐋 고래 움직임 [켜기]",
+  "button.whaleMovements.turnOff": "🐋 고래 움직임 [끄기]",
+  "button.fundFlows.turnOn": "💰 자금 흐름 [켜기]",
+  "button.fundFlows.turnOff": "💰 자금 흐름 [끄기]"
 }

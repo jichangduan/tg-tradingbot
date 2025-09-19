@@ -363,5 +363,14 @@
   
   "trading.tokenLabel": "代币：",
   "trading.leverageLabel": "杠杆：",
-  "trading.amountLabel": "金额："
+  "trading.amountLabel": "金额：",
+
+  "button.addToGroup": "🤖 添加到群组",
+  "button.usageGuide": "⚠️ 使用指南",
+  "button.flashNews.turnOn": "🚨 快讯 [开启]",
+  "button.flashNews.turnOff": "🚨 快讯 [关闭]",
+  "button.whaleMovements.turnOn": "🐋 巨鲸动向 [开启]",
+  "button.whaleMovements.turnOff": "🐋 巨鲸动向 [关闭]",
+  "button.fundFlows.turnOn": "💰 资金流向 [开启]",
+  "button.fundFlows.turnOff": "💰 资金流向 [关闭]"
 }

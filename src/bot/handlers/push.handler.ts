@@ -1105,7 +1105,7 @@ ${emoji} <b>${typeName} Push Enabled!</b>
       const { settings, pushData } = await this.getUserPushSettings(userId);
 
       const message = this.formatPushSettingsMessage(settings, pushData);
-      const keyboard = this.createPushSettingsKeyboard(settings);
+      const keyboard = await this.createPushSettingsKeyboard(ctx, settings);
 
       await ctx.reply(message, {
         parse_mode: 'HTML',
@@ -1128,7 +1128,7 @@ ${emoji} <b>${typeName} Push Enabled!</b>
       };
 
       const message = this.formatPushSettingsMessage(defaultSettings);
-      const keyboard = this.createPushSettingsKeyboard(defaultSettings);
+      const keyboard = await this.createPushSettingsKeyboard(ctx, defaultSettings);
 
       await ctx.reply(
         `📢 <b>Active Push Notifications</b>\n\n${await ctx.__!('push.error.settingsUnavailable')}\n\n${message}`,
@@ -1212,23 +1212,31 @@ ${emoji} <b>${typeName} Push Enabled!</b>
   /**
    * Create push settings keyboard
    */
-  private createPushSettingsKeyboard(settings: PushSettings): any[][] {
+  private async createPushSettingsKeyboard(ctx: ExtendedContext, settings: PushSettings): Promise<any[][]> {
+    // Get localized button text
+    const flashNewsOn = await ctx.__!('button.flashNews.turnOn');
+    const flashNewsOff = await ctx.__!('button.flashNews.turnOff');
+    const whaleMovementsOn = await ctx.__!('button.whaleMovements.turnOn');
+    const whaleMovementsOff = await ctx.__!('button.whaleMovements.turnOff');
+    const fundFlowsOn = await ctx.__!('button.fundFlows.turnOn');
+    const fundFlowsOff = await ctx.__!('button.fundFlows.turnOff');
+    
     return [
       [
         {
-          text: settings.flash_enabled ? '🚨 Flash News [Turn Off]' : '🚨 Flash News [Turn On]',
+          text: settings.flash_enabled ? flashNewsOff : flashNewsOn,
           callback_data: `push_toggle_flash_${!settings.flash_enabled}`
         }
       ],
       [
         {
-          text: settings.whale_enabled ? '🐋 Whale Movements [Turn Off]' : '🐋 Whale Movements [Turn On]',
+          text: settings.whale_enabled ? whaleMovementsOff : whaleMovementsOn,
           callback_data: `push_toggle_whale_${!settings.whale_enabled}`
         }
       ],
       [
         {
-          text: settings.fund_enabled ? '💰 Fund Flows [Turn Off]' : '💰 Fund Flows [Turn On]',
+          text: settings.fund_enabled ? fundFlowsOff : fundFlowsOn,
           callback_data: `push_toggle_fund_${!settings.fund_enabled}`
         }
       ]
@@ -1282,7 +1290,7 @@ ${emoji} <b>${typeName} Push Enabled!</b>
 
         // Update message
         const message = this.formatPushSettingsMessage(updatedSettings, pushData);
-        const keyboard = this.createPushSettingsKeyboard(updatedSettings);
+        const keyboard = await this.createPushSettingsKeyboard(ctx, updatedSettings);
 
         await ctx.editMessageText(message, {
           parse_mode: 'HTML',

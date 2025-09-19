@@ -234,18 +234,21 @@ ${walletExample}
   private async createAddToGroupKeyboard(ctx: ExtendedContext): Promise<InlineKeyboardMarkup> {
     const botUsername = config.telegram.botUsername || 'aiw3_tradebot';
     
-    // For now, keep English button text for compatibility, but structure is ready for i18n
+    // Get localized button text
+    const addToGroupText = await ctx.__!('button.addToGroup');
+    const usageGuideText = await ctx.__!('button.usageGuide');
+    
     return {
       inline_keyboard: [
         [
           {
-            text: '🤖 Add to Group',
+            text: addToGroupText,
             url: `tg://resolve?domain=${botUsername}&startgroup=welcome`
           }
         ],
         [
           {
-            text: '⚠️ Usage Guide',
+            text: usageGuideText,
             callback_data: 'group_usage_guide'
           }
         ]
