@@ -55,12 +55,12 @@ export class PointsHandler {
       }
 
       // 格式化积分信息
-      const pointsMessage = await ctx.__!('points.details', 
-        this.formatNumber(inviteStats.currentPoints),
-        this.formatNumber(inviteStats.totalTradingVolume), 
-        inviteStats.inviteeCount,
-        this.formatDateTime(inviteStats.lastUpdated)
-      );
+      const pointsMessage = await ctx.__!('points.details', {
+        currentPoints: this.formatNumber(inviteStats.currentPoints),
+        totalTradingVolume: this.formatNumber(inviteStats.totalTradingVolume), 
+        inviteeCount: inviteStats.inviteeCount,
+        lastUpdated: this.formatDateTime(inviteStats.lastUpdated)
+      });
       await ctx.reply(pointsMessage, { parse_mode: 'HTML' });
 
       // 记录成功日志

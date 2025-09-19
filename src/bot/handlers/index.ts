@@ -110,8 +110,8 @@ async function handleTradingInput(ctx: ExtendedContext, state: TradingState, inp
         );
         
         const keyboard = state.action === 'long'
-          ? longHandler.createConfirmationKeyboard(state.symbol!, state.leverage!, amount.toString())
-          : shortHandler.createConfirmationKeyboard(state.symbol!, state.leverage!, amount.toString());
+          ? await longHandler.createConfirmationKeyboard(ctx, state.symbol!, state.leverage!, amount.toString())
+          : await shortHandler.createConfirmationKeyboard(ctx, state.symbol!, state.leverage!, amount.toString());
         
         await ctx.reply(previewMessage, {
           parse_mode: 'HTML',
