@@ -1131,7 +1131,7 @@ ${emoji} <b>${typeName} Push Enabled!</b>
       const keyboard = this.createPushSettingsKeyboard(defaultSettings);
 
       await ctx.reply(
-        `📢 <b>Active Push Notifications</b>\n\n❌ Unable to get your push settings temporarily, showing default status\n\n${message}`,
+        `📢 <b>Active Push Notifications</b>\n\n${await ctx.__!('push.error.settingsUnavailable')}\n\n${message}`,
         {
           parse_mode: 'HTML',
           reply_markup: {

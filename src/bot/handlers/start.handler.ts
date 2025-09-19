@@ -189,24 +189,38 @@ export class StartHandler {
     const botId = await ctx.__!('welcome.botId', { botUsername });
     const creating = await ctx.__!('welcome.creating');
     
+    // Get feature descriptions
+    const priceQueries = await ctx.__!('welcome.feature.priceQueries');
+    const priceChange = await ctx.__!('welcome.feature.priceChange');
+    const tradingVolume = await ctx.__!('welcome.feature.tradingVolume');
+    const tradeExecution = await ctx.__!('welcome.feature.tradeExecution');
+    const walletManagement = await ctx.__!('welcome.feature.walletManagement');
+    const referralSystem = await ctx.__!('welcome.feature.referralSystem');
+    
+    // Get command examples
+    const priceExample = await ctx.__!('welcome.command.priceExample');
+    const longExample = await ctx.__!('welcome.command.longExample');
+    const marketsExample = await ctx.__!('welcome.command.marketsExample');
+    const walletExample = await ctx.__!('welcome.command.walletExample');
+    
     return `
 ${title}
 
 ${initializing}
 
 <b>${features}</b>
-• 💰 Real-time price queries
-• 📊 24-hour price change data  
-• 💹 Trading volume and market cap
-• 📈 Trade execution (/long, /short)
-• 💼 Wallet management (/wallet)
-• 🎁 Referral reward system
+• ${priceQueries}
+• ${priceChange}
+• ${tradingVolume}
+• ${tradeExecution}
+• ${walletManagement}
+• ${referralSystem}
 
 <b>${commands}</b>
-<code>/price BTC</code> - Check Bitcoin price
-<code>/long ETH 10</code> - Long Ethereum
-<code>/markets</code> - View market overview
-<code>/wallet</code> - View wallet info
+${priceExample}
+${longExample}
+${marketsExample}
+${walletExample}
 
 <b>${botId}</b>
 
@@ -280,15 +294,23 @@ ${initializing}
   /**
    * Send general error message
    */
-  private async sendErrorMessage(ctx: Context, error: Error): Promise<void> {
+  private async sendErrorMessage(ctx: ExtendedContext, error: Error): Promise<void> {
+    const title = await ctx.__!('errors.systemError.title');
+    const description = await ctx.__!('errors.systemError.description');
+    const suggestions = await ctx.__!('errors.systemError.suggestions');
+    const retryStart = await ctx.__!('errors.systemError.retryStart');
+    const checkHelp = await ctx.__!('errors.systemError.checkHelp');
+    const usePrice = await ctx.__!('errors.systemError.usePrice');
+    const contactAdmin = await ctx.__!('errors.systemError.contactAdmin');
+    
     const errorMessage = 
-      '❌ <b>System Error</b>\n\n' +
-      'Sorry, an unexpected error occurred while processing your request.\n\n' +
-      '💡 <b>You can try:</b>\n' +
-      '• Retry /start command later\n' +
-      '• Check help information /help\n' +
-      '• Start using directly /price BTC\n\n' +
-      '<i>If the problem persists, please contact admin</i>';
+      `${title}\n\n` +
+      `${description}\n\n` +
+      `${suggestions}\n` +
+      `${retryStart}\n` +
+      `${checkHelp}\n` +
+      `${usePrice}\n\n` +
+      `${contactAdmin}`;
 
     try {
       await ctx.reply(errorMessage, { parse_mode: 'HTML' });
@@ -322,7 +344,7 @@ ${initializing}
       });
 
       // Send special invitation welcome message
-      const inviteMessage = this.getInvitationWelcomeMessage(invitationCode);
+      const inviteMessage = await this.getInvitationWelcomeMessage(ctx, invitationCode);
       await ctx.reply(inviteMessage, { parse_mode: 'HTML' });
 
       // Use invitation code for user initialization
@@ -353,7 +375,10 @@ ${initializing}
   /**
    * Get invitation link welcome message
    */
-  private getInvitationWelcomeMessage(invitationCode: string): string {
+  private async getInvitationWelcomeMessage(ctx: ExtendedContext, invitationCode: string): Promise<string> {
+    const benefitsTitle = await ctx.__!('invite.benefits.title');
+    const benefitsEnergy = await ctx.__!('invite.benefits.energy');
+    
     return `
 🎁 <b>Welcome to AIW3 TGBot via invitation link!</b>
 
@@ -361,8 +386,8 @@ Invitation code: <code>${invitationCode}</code>
 
 Initializing your account and processing invitation rewards...
 
-<b>🎉 Invitation Benefits:</b>
-• 💰 Extra energy rewards
+${benefitsTitle}
+• ${benefitsEnergy}
 • 🚀 Priority feature access
 • 💎 Exclusive user badge
 
@@ -377,18 +402,25 @@ Initializing your account and processing invitation rewards...
   /**
    * Get group welcome message
    */
-  private getGroupWelcomeMessage(): string {
+  private async getGroupWelcomeMessage(ctx: ExtendedContext): Promise<string> {
+    const priceQueries = await ctx.__!('welcome.commands.priceQueries');
+    const tradeExecution = await ctx.__!('welcome.commands.tradeExecution');
+    const accountInfo = await ctx.__!('welcome.commands.accountInfo');
+    const marketData = await ctx.__!('welcome.commands.marketData');
+    const chartAnalysis = await ctx.__!('welcome.commands.chartAnalysis');
+    const tradingCall = await ctx.__!('welcome.commands.tradingCall');
+    
     return `
 👋 <b>AIW3 Trading Bot added to group!</b>
 
 🤖 I'm @${config.telegram.botUsername || 'aiw3_tradebot'}, your professional crypto trading assistant
 
 <b>🚀 Core Features:</b>
-• 💰 Real-time price queries - <code>/price BTC</code>
-• 📈 Trade execution - <code>/long ETH 10</code> | <code>/short BTC 5</code>
-• 💼 Wallet management - <code>/wallet</code> | <code>/positions</code>
-• 📊 Market data - <code>/markets</code>
-• 📈 Chart analysis - <code>/chart BTC</code>
+• ${priceQueries}
+• ${tradeExecution}
+• ${accountInfo}
+• ${marketData}
+• ${chartAnalysis}
 
 <b>⚠️ Important Notes:</b>
 • This is <b>AIW3 Trading Bot</b>, not a management tool
@@ -403,7 +435,7 @@ Initializing your account and processing invitation rewards...
 
 <b>🤖 Bot Identity Confirmed:</b> @${config.telegram.botUsername || 'aiw3_tradebot'}
 
-<i>🎉 Start your crypto trading journey!</i>
+${tradingCall}
     `.trim();
   }
 
@@ -428,7 +460,7 @@ Initializing your account and processing invitation rewards...
 
       // Send group welcome message
       await ctx.reply(
-        this.getGroupWelcomeMessage(),
+        await this.getGroupWelcomeMessage(ctx),
         { parse_mode: 'HTML' }
       );
 
@@ -551,7 +583,7 @@ Please contact administrator or restart with /start
         error: (error as Error).message,
         userId: ctx.from?.id
       });
-      await ctx.answerCbQuery('❌ Failed to get guide');
+      await ctx.answerCbQuery(await ctx.__!('guide.error.failed'));
     }
   }
 
@@ -597,7 +629,7 @@ Please contact administrator or restart with /start
             await longHandler.handle(ctx, commandArgs);
           } catch (importError) {
             logger.error(`Failed to import long handler [${requestId}]`, { error: (importError as Error).message });
-            await ctx.reply('❌ Long trading feature temporarily unavailable');
+            await ctx.reply(await ctx.__!('errors.feature.longUnavailable'));
           }
           break;
         case '/short':
@@ -606,7 +638,7 @@ Please contact administrator or restart with /start
             await shortHandler.handle(ctx, commandArgs);
           } catch (importError) {
             logger.error(`Failed to import short handler [${requestId}]`, { error: (importError as Error).message });
-            await ctx.reply('❌ Short trading feature temporarily unavailable');
+            await ctx.reply(await ctx.__!('errors.feature.shortUnavailable'));
           }
           break;
         case '/close':
@@ -615,7 +647,7 @@ Please contact administrator or restart with /start
             await closeHandler.handle(ctx, commandArgs);
           } catch (importError) {
             logger.error(`Failed to import close handler [${requestId}]`, { error: (importError as Error).message });
-            await ctx.reply('❌ Position closing feature temporarily unavailable');
+            await ctx.reply(await ctx.__!('errors.feature.closeUnavailable'));
           }
           break;
         case '/positions':
@@ -624,7 +656,7 @@ Please contact administrator or restart with /start
             await positionsHandler.handle(ctx, commandArgs);
           } catch (importError) {
             logger.error(`Failed to import positions handler [${requestId}]`, { error: (importError as Error).message });
-            await ctx.reply('❌ Positions view feature temporarily unavailable');
+            await ctx.reply(await ctx.__!('errors.feature.positionsUnavailable'));
           }
           break;
         case '/wallet':
@@ -633,7 +665,7 @@ Please contact administrator or restart with /start
             await walletHandler.handle(ctx, commandArgs);
           } catch (importError) {
             logger.error(`Failed to import wallet handler [${requestId}]`, { error: (importError as Error).message });
-            await ctx.reply('❌ Wallet feature temporarily unavailable');
+            await ctx.reply(await ctx.__!('errors.feature.walletUnavailable'));
           }
           break;
         case '/pnl':
@@ -642,7 +674,7 @@ Please contact administrator or restart with /start
             await pnlHandler.handle(ctx, commandArgs);
           } catch (importError) {
             logger.error(`Failed to import pnl handler [${requestId}]`, { error: (importError as Error).message });
-            await ctx.reply('❌ PnL analysis feature temporarily unavailable');
+            await ctx.reply(await ctx.__!('errors.feature.pnlUnavailable'));
           }
           break;
         case '/push':
@@ -651,7 +683,7 @@ Please contact administrator or restart with /start
             await pushHandler.handle(ctx, commandArgs);
           } catch (importError) {
             logger.error(`Failed to import push handler [${requestId}]`, { error: (importError as Error).message });
-            await ctx.reply('❌ Push settings feature temporarily unavailable');
+            await ctx.reply(await ctx.__!('errors.feature.pushUnavailable'));
           }
           break;
         default:

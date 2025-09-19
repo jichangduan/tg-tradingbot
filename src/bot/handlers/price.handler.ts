@@ -172,15 +172,23 @@ export class PriceHandler {
   /**
    * 发送通用错误消息
    */
-  private async sendGenericErrorMessage(ctx: Context): Promise<void> {
+  private async sendGenericErrorMessage(ctx: ExtendedContext): Promise<void> {
+    const title = await ctx.__!('errors.systemError.title');
+    const description = await ctx.__!('errors.systemError.description');
+    const suggestions = await ctx.__!('price.error.suggestions');
+    const retryLater = await ctx.__!('price.error.retryLater');
+    const checkSymbol = await ctx.__!('price.error.checkSymbol');
+    const useCommon = await ctx.__!('price.error.useCommon');
+    const contactAdmin = await ctx.__!('errors.systemError.contactAdmin');
+    
     const errorMessage = 
-      '❌ <b>System Error</b>\n\n' +
-      'Sorry, an unexpected error occurred while processing your request.\n\n' +
-      '💡 <b>You can try:</b>\n' +
-      '• Retry later\n' +
-      '• Check if token symbol is correct\n' +
-      '• Use common tokens (like BTC, ETH, SOL)\n\n' +
-      '<i>If the problem persists, please contact admin</i>';
+      `${title}\n\n` +
+      `${description}\n\n` +
+      `${suggestions}\n` +
+      `${retryLater}\n` +
+      `${checkSymbol}\n` +
+      `${useCommon}\n\n` +
+      `${contactAdmin}`;
 
     await ctx.reply(errorMessage, { parse_mode: 'HTML' });
   }

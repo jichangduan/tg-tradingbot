@@ -134,7 +134,7 @@ export class LanguageHandler {
           duration: Date.now() - startTime
         });
       } else {
-        await ctx.answerCbQuery('❌ Failed to change language');
+        await ctx.answerCbQuery(await ctx.__!('language.error.changeFailed'));
         
         logger.error('Failed to change user language', {
           userId,
@@ -159,13 +159,19 @@ export class LanguageHandler {
   /**
    * 发送错误消息
    */
-  private async sendErrorMessage(ctx: Context): Promise<void> {
+  private async sendErrorMessage(ctx: ExtendedContext): Promise<void> {
+    const title = await ctx.__!('language.error.title');
+    const description = await ctx.__!('language.error.description');
+    const suggestions = await ctx.__!('language.error.suggestions');
+    const retryCommand = await ctx.__!('language.error.retryCommand');
+    const contactAdmin = await ctx.__!('language.error.contactAdmin');
+    
     const errorMessage = 
-      '❌ <b>Language Command Error</b>\n\n' +
-      'Sorry, there was an error processing your language settings.\n\n' +
-      '💡 <b>You can try:</b>\n' +
-      '• Retry /language command\n' +
-      '• Contact administrator if the problem persists';
+      `${title}\n\n` +
+      `${description}\n\n` +
+      `${suggestions}\n` +
+      `${retryCommand}\n` +
+      `${contactAdmin}`;
 
     try {
       await ctx.reply(errorMessage, { parse_mode: 'HTML' });
@@ -203,7 +209,7 @@ export class LanguageHandler {
         userId: ctx.from?.id
       });
       
-      await ctx.reply('❌ Failed to get language information');
+      await ctx.reply(await ctx.__!('language.error.getFailed'));
     }
   }
 

@@ -16,6 +16,7 @@ export interface ExtendedContext extends Context<Update> {
   requestId?: string;
   userLanguage?: string;
   __?: (key: string, params?: any) => Promise<string>;
+  '__!'?: (key: string, params?: any) => Promise<string>;
   setLanguage?: (locale: string) => Promise<boolean>;
 }
 

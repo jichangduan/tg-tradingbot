@@ -51,6 +51,11 @@ export function createLanguageMiddleware() {
         return await i18nService.__(key, userLanguage, params);
       };
       
+      // 4a. 添加 __! 函数作为 __ 的别名（用于兼容现有代码）
+      ctx.__! = async (key: string, params?: any) => {
+        return await i18nService.__(key, userLanguage, params);
+      };
+      
       // 5. 添加设置语言的便捷方法
       ctx.setLanguage = async (newLocale: string) => {
         if (telegramId && i18nService.isLocaleSupported(newLocale)) {
@@ -60,6 +65,10 @@ export function createLanguageMiddleware() {
             
             // 更新翻译函数
             ctx.__ = async (key: string, params?: any) => {
+              return await i18nService.__(key, newLocale, params);
+            };
+            
+            ctx.__! = async (key: string, params?: any) => {
               return await i18nService.__(key, newLocale, params);
             };
             
@@ -100,6 +109,9 @@ export function createLanguageMiddleware() {
       ctx.__ = async (key: string, params?: any) => {
         return await i18nService.__(key, 'en', params);
       };
+      ctx.__! = async (key: string, params?: any) => {
+        return await i18nService.__(key, 'en', params);
+      };
       ctx.setLanguage = async () => false;
     }
     
@@ -114,6 +126,7 @@ declare module 'telegraf' {
   interface Context {
     userLanguage?: string;
     __?: (key: string, params?: any) => Promise<string>;
+    '__!'?: (key: string, params?: any) => Promise<string>;
     setLanguage?: (locale: string) => Promise<boolean>;
   }
 }
