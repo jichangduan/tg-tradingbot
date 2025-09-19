@@ -10,6 +10,7 @@ import { ExtendedContext } from '../index';
 import { accountService } from '../../services/account.service';
 import { tradingStateService, TradingState } from '../../services/trading-state.service';
 import { messageFormatter } from '../utils/message.formatter';
+import { i18nService } from '../../services/i18n.service';
 
 /**
  * Short command handler
@@ -55,8 +56,9 @@ export class ShortHandler {
         return;
       } else {
         // Incorrect parameter count
+        const userLanguage = await i18nService.getUserLanguage(ctx.from?.id);
         await ctx.reply(
-          messageFormatter.formatTradingCommandErrorMessage('short'),
+          await messageFormatter.formatTradingCommandErrorMessage('short', userLanguage),
           { parse_mode: 'HTML' }
         );
         return;
@@ -82,7 +84,8 @@ export class ShortHandler {
     if (!symbol) {
       // 第一步：选择代币
       const state = await tradingStateService.createState(userId, action);
-      const message = messageFormatter.formatTradingSymbolPrompt(action);
+      const userLanguage = await i18nService.getUserLanguage(ctx.from?.id);
+      const message = await messageFormatter.formatTradingSymbolPrompt(action, userLanguage);
       
       await ctx.reply(message, { parse_mode: 'HTML' });
     } else {
@@ -95,11 +98,13 @@ export class ShortHandler {
         const accountBalance = await accountService.getAccountBalance(userId!.toString());
         const availableMargin = accountBalance.withdrawableAmount || 0;
         
-        const message = messageFormatter.formatTradingLeveragePrompt(
+        const userLanguage = await i18nService.getUserLanguage(ctx.from?.id);
+        const message = await messageFormatter.formatTradingLeveragePrompt(
           action, 
           symbol.toUpperCase(), 
           tokenData.price, 
-          availableMargin
+          availableMargin,
+          userLanguage
         );
         
         const keyboard = this.createLeverageKeyboard(symbol.toUpperCase());
@@ -131,8 +136,9 @@ export class ShortHandler {
 
     // 基础验证
     if (!symbol || !leverageStr || !amountStr) {
+      const userLanguage = await i18nService.getUserLanguage(ctx.from?.id);
       await ctx.reply(
-        messageFormatter.formatTradingCommandErrorMessage('short'),
+        await messageFormatter.formatTradingCommandErrorMessage('short', userLanguage),
         { parse_mode: 'HTML' }
       );
       return;
@@ -164,8 +170,9 @@ export class ShortHandler {
     }
 
     // 发送处理中消息
+    const userLanguage = await i18nService.getUserLanguage(ctx.from?.id);
     const loadingMessage = await ctx.reply(
-      messageFormatter.formatTradingProcessingMessage('short', symbol, leverageStr, amountStr),
+      await messageFormatter.formatTradingProcessingMessage('short', symbol, leverageStr, amountStr, userLanguage),
       { parse_mode: 'HTML' }
     );
 
@@ -283,14 +290,15 @@ export class ShortHandler {
       const orderSize = parseFloat(amountStr) / tokenData.price;
       const liquidationPrice = this.calculateLiquidationPrice(tokenData.price, parseFloat(leverageStr.replace('x', '')), 'short');
       
-      const previewMessage = messageFormatter.formatTradingOrderPreview(
+      const previewMessage = await messageFormatter.formatTradingOrderPreview(
         'short',
         symbol.toUpperCase(),
         leverageStr,
         amountStr,
         tokenData.price,
         orderSize,
-        liquidationPrice
+        liquidationPrice,
+        userLanguage
       );
       
       const keyboard = await this.createConfirmationKeyboard(ctx, symbol, leverageStr, amountStr);
@@ -391,11 +399,13 @@ export class ShortHandler {
     const accountBalance = await accountService.getAccountBalance(userId);
     const availableMargin = accountBalance.withdrawableAmount || 0;
     
-    const message = messageFormatter.formatTradingAmountPrompt(
+    const userLanguage = await i18nService.getUserLanguage(ctx.from?.id);
+    const message = await messageFormatter.formatTradingAmountPrompt(
       'short',
       state.symbol,
       leverage,
-      availableMargin
+      availableMargin,
+      userLanguage
     );
 
     await ctx.editMessageText(message, { parse_mode: 'HTML' });

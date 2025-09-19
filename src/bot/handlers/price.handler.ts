@@ -5,6 +5,7 @@ import { validateSymbol } from '../utils/validator';
 import { logger } from '../../utils/logger';
 import { DetailedError } from '../../types/api.types';
 import { ExtendedContext } from '../index';
+import { i18nService } from '../../services/i18n.service';
 
 /**
  * Price命令处理器
@@ -66,7 +67,9 @@ export class PriceHandler {
 
       // 5. 格式化并发送响应消息
       try {
-        const responseMessage = messageFormatter.formatPriceMessage(tokenData);
+        // Get user language preference
+        const userLanguage = await i18nService.getUserLanguage(ctx.from?.id);
+        const responseMessage = await messageFormatter.formatPriceMessage(tokenData, undefined, userLanguage);
         
         await ctx.telegram.editMessageText(
           ctx.chat?.id,
@@ -124,7 +127,8 @@ export class PriceHandler {
    * 发送帮助消息
    */
   private async sendHelpMessage(ctx: Context): Promise<void> {
-    const helpMessage = messageFormatter.formatHelpMessage();
+    const userLanguage = await i18nService.getUserLanguage(ctx.from?.id);
+    const helpMessage = await messageFormatter.formatHelpMessage(userLanguage);
     await ctx.reply(helpMessage, { parse_mode: 'HTML' });
   }
 
@@ -153,7 +157,8 @@ export class PriceHandler {
     error: DetailedError, 
     loadingMessageId: number
   ): Promise<void> {
-    const errorMessage = messageFormatter.formatErrorMessage(error);
+    const userLanguage = await i18nService.getUserLanguage(ctx.from?.id);
+    const errorMessage = await messageFormatter.formatErrorMessage(error, userLanguage);
     
     try {
       await ctx.telegram.editMessageText(
@@ -243,7 +248,8 @@ export class PriceHandler {
       }
 
       // 格式化批量响应消息
-      const responseMessage = messageFormatter.formatMultiTokenMessage(results);
+      const userLanguage = await i18nService.getUserLanguage(ctx.from?.id);
+      const responseMessage = await messageFormatter.formatMultiTokenMessage(results, userLanguage);
 
       await ctx.telegram.editMessageText(
         ctx.chat?.id,

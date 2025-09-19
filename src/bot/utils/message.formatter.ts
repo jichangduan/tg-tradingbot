@@ -12,6 +12,7 @@ import {
   TimeFrame,
   CandleData
 } from '../../types/api.types';
+import { i18nService } from '../../services/i18n.service';
 
 /**
  * Telegram Message Formatter Utility Class
@@ -28,7 +29,7 @@ export class MessageFormatter {
   /**
    * Format token price message
    */
-  public formatPriceMessage(tokenData: CachedTokenData, options?: Partial<FormatOptions>): string {
+  public async formatPriceMessage(tokenData: CachedTokenData, options?: Partial<FormatOptions>, locale: string = 'en'): Promise<string> {
     const opts = { ...this.defaultOptions, ...options };
     const { symbol, name, price, change24h, volume24h, marketCap, high24h, low24h, isCached } = tokenData;
     
@@ -44,36 +45,48 @@ export class MessageFormatter {
     const volumeText = this.formatLargeNumber(volume24h);
     const marketCapText = this.formatLargeNumber(marketCap);
     
+    // Get translated labels
+    const priceInfoLabel = await i18nService.__('price.priceInfoWithTrend', locale, { symbol });
+    const currentPriceLabel = await i18nService.__('price.currentPrice', locale);
+    const change24hLabel = await i18nService.__('price.change24hLabel', locale);
+    const high24hLabel = await i18nService.__('price.high24hLabel', locale);
+    const low24hLabel = await i18nService.__('price.low24hLabel', locale);
+    const volumeLabel = await i18nService.__('price.volumeLabel', locale);
+    const marketCapLabel = await i18nService.__('price.marketCapLabel', locale);
+    const updatedLabel = await i18nService.__('price.updatedLabel', locale);
+    const cachedDataNote = await i18nService.__('price.cachedDataNote', locale);
+    const dataSource = await i18nService.__('price.dataSource', locale);
+    
     // Build complete message
     let message = `<b>💰 ${symbol}`;
     if (name && name !== symbol) {
       message += ` (${name})`;
     }
-    message += ` Price Info</b> ${trendEmoji}\n\n`;
+    message += ` ${priceInfoLabel}</b> ${trendEmoji}\n\n`;
     
-    message += `🏷️ <b>Current Price:</b> ${priceText}\n`;
-    message += `📊 <b>24h Change:</b> ${changeText}\n`;
+    message += `🏷️ <b>${currentPriceLabel}</b> ${priceText}\n`;
+    message += `📊 <b>${change24hLabel}</b> ${changeText}\n`;
     
     // Show 24h high/low if available
     if (high24h && low24h && high24h > 0 && low24h > 0) {
-      message += `📈 <b>24h High:</b> ${this.formatPrice(high24h, opts)}\n`;
-      message += `📉 <b>24h Low:</b> ${this.formatPrice(low24h, opts)}\n`;
+      message += `📈 <b>${high24hLabel}</b> ${this.formatPrice(high24h, opts)}\n`;
+      message += `📉 <b>${low24hLabel}</b> ${this.formatPrice(low24h, opts)}\n`;
     }
     
-    message += `📈 <b>24h Volume:</b> $${volumeText}\n`;
+    message += `📈 <b>${volumeLabel}</b> $${volumeText}\n`;
     
     if (marketCap > 0) {
-      message += `💎 <b>Market Cap:</b> $${marketCapText}\n`;
+      message += `💎 <b>${marketCapLabel}</b> $${marketCapText}\n`;
     }
     
     // Add data source information
-    message += `\n<i>🕐 Updated: ${this.formatTimestamp(tokenData.updatedAt)}</i>\n`;
+    message += `\n<i>🕐 ${updatedLabel} ${this.formatTimestamp(tokenData.updatedAt)}</i>\n`;
     
     if (isCached) {
-      message += `<i>⚡ Cached data (refresh every 5 minutes)</i>\n`;
+      message += `<i>⚡ ${cachedDataNote}</i>\n`;
     }
     
-    message += `<i>📡 Data source: AIW3</i>`;
+    message += `<i>📡 ${dataSource}</i>`;
     
     return message;
   }
@@ -81,32 +94,41 @@ export class MessageFormatter {
   /**
    * Format error message
    */
-  public formatErrorMessage(error: DetailedError | Error): string {
-    let message = `❌ <b>Query Failed</b>\n\n`;
+  public async formatErrorMessage(error: DetailedError | Error, locale: string = 'en'): Promise<string> {
+    const queryFailedLabel = await i18nService.__('price.queryFailed', locale);
+    let message = `❌ <b>${queryFailedLabel}</b>\n\n`;
     
     if ('code' in error && error.context) {
       // DetailedError - Provide more detailed error information
       message += error.message;
       
       if (error.retryable) {
-        message += `\n\n💡 <i>Please retry later</i>`;
+        const retryLater = await i18nService.__('price.retryLater', locale);
+        message += `\n\n💡 <i>${retryLater}</i>`;
       }
       
       // Provide specific suggestions based on error type
       switch (error.code) {
         case 'TOKEN_NOT_FOUND':
-          message += `\n\n📝 <b>Suggestions:</b>\n`;
-          message += `• Check if the token symbol is correct\n`;
-          message += `• Try common tokens: BTC, ETH, SOL\n`;
-          message += `• Ensure token symbol is in uppercase`;
+          const suggestionsLabel = await i18nService.__('price.suggestions', locale);
+          const checkTokenSymbol = await i18nService.__('price.checkTokenSymbol', locale);
+          const tryCommonTokens = await i18nService.__('price.tryCommonTokens', locale);
+          const ensureUppercase = await i18nService.__('price.ensureUppercase', locale);
+          
+          message += `\n\n📝 <b>${suggestionsLabel}</b>\n`;
+          message += `${checkTokenSymbol}\n`;
+          message += `${tryCommonTokens}\n`;
+          message += `${ensureUppercase}`;
           break;
           
         case 'RATE_LIMIT_EXCEEDED':
-          message += `\n\n⏰ <i>Please wait 30-60 seconds before retrying</i>`;
+          const waitAndRetry = await i18nService.__('price.waitAndRetry', locale);
+          message += `\n\n⏰ <i>${waitAndRetry}</i>`;
           break;
           
         case 'NETWORK_ERROR':
-          message += `\n\n🌐 <i>Please check your connection and try again later</i>`;
+          const checkConnection = await i18nService.__('price.checkConnection', locale);
+          message += `\n\n🌐 <i>${checkConnection}</i>`;
           break;
       }
     } else {
@@ -114,7 +136,8 @@ export class MessageFormatter {
       message += error.message;
     }
     
-    message += `\n\n<i>If the problem persists, please contact administrator</i>`;
+    const contactAdmin = await i18nService.__('price.contactAdmin', locale);
+    message += `\n\n<i>${contactAdmin}</i>`;
     
     return message;
   }
@@ -122,33 +145,49 @@ export class MessageFormatter {
   /**
    * Format help message
    */
-  public formatHelpMessage(): string {
+  public async formatHelpMessage(locale: string = 'en'): Promise<string> {
+    const helpTitle = await i18nService.__('price.helpTitle', locale);
+    const examples = await i18nService.__('price.helpExamples', locale);
+    const getBtc = await i18nService.__('price.helpGetBtc', locale);
+    const getEth = await i18nService.__('price.helpGetEth', locale);
+    const getSol = await i18nService.__('price.helpGetSol', locale);
+    const supportedTokens = await i18nService.__('price.helpSupportedTokens', locale);
+    const supportedList = await i18nService.__('price.helpSupportedList', locale);
+    const features = await i18nService.__('price.helpFeatures', locale);
+    const realtimeData = await i18nService.__('price.helpRealtimeData', locale);
+    const priceChanges = await i18nService.__('price.helpPriceChanges', locale);
+    const volumeMarketcap = await i18nService.__('price.helpVolumeMarketcap', locale);
+    const smartCaching = await i18nService.__('price.helpSmartCaching', locale);
+    const fastResponse = await i18nService.__('price.helpFastResponse', locale);
+    const caseInsensitive = await i18nService.__('price.helpCaseInsensitive', locale);
+    
     return `
-💡 <b>Price Query Usage</b>
+💡 <b>${helpTitle}</b>
 
-<code>/price BTC</code> - Get BTC price
-<code>/price ETH</code> - Get ETH price  
-<code>/price SOL</code> - Get SOL price
+<b>${examples}</b>
+<code>/price BTC</code> ${getBtc}
+<code>/price ETH</code> ${getEth}  
+<code>/price SOL</code> ${getSol}
 
-<b>Supported Major Tokens:</b>
-BTC, ETH, SOL, USDT, USDC, BNB, ADA, DOT, LINK, MATIC, AVAX, UNI
+<b>${supportedTokens}</b>
+${supportedList}
 
-<b>Features:</b>
-• 🚀 Real-time price data
-• 📊 24-hour price changes
-• 💹 Trading volume and market cap
-• ⚡ 5-minute smart caching
-• 🎯 Lightning-fast response
+<b>${features}</b>
+${realtimeData}
+${priceChanges}
+${volumeMarketcap}
+${smartCaching}
+${fastResponse}
 
-<i>💡 Tip: Token symbols are case insensitive</i>
+<i>${caseInsensitive}</i>
     `.trim();
   }
 
   /**
    * Format "querying" message
    */
-  public formatLoadingMessage(symbol: string): string {
-    return `🔍 Querying ${symbol.toUpperCase()} price information...`;
+  public async formatLoadingMessage(symbol: string, locale: string = 'en'): Promise<string> {
+    return await i18nService.__('price.loading', locale, { symbol: symbol.toUpperCase() });
   }
 
   /**
@@ -280,30 +319,40 @@ BTC, ETH, SOL, USDT, USDC, BNB, ADA, DOT, LINK, MATIC, AVAX, UNI
   /**
    * Format compact price message (for batch queries)
    */
-  public formatCompactPriceMessage(tokenData: TokenData): string {
+  public async formatCompactPriceMessage(tokenData: TokenData, locale: string = 'en'): Promise<string> {
     const { symbol, price, change24h } = tokenData;
     const changeText = this.formatPercentage(change24h);
     const emoji = change24h >= 0 ? '🟢' : '🔴';
     
-    return `${emoji} <b>${symbol}</b>: ${this.formatPrice(price, this.defaultOptions)} (${changeText})`;
+    const template = await i18nService.__('price.compactPriceFormat', locale);
+    return template.replace('{emoji}', emoji)
+                   .replace('{symbol}', `<b>${symbol}</b>`)
+                   .replace('{price}', this.formatPrice(price, this.defaultOptions))
+                   .replace('{change}', changeText);
   }
 
   /**
    * Format multi-token price message
    */
-  public formatMultiTokenMessage(tokens: CachedTokenData[]): string {
+  public async formatMultiTokenMessage(tokens: CachedTokenData[], locale: string = 'en'): Promise<string> {
     if (tokens.length === 0) {
-      return '❌ <b>No token price information found</b>';
+      const noTokensFound = await i18nService.__('price.noTokensFound', locale);
+      return `❌ <b>${noTokensFound}</b>`;
     }
     
-    let message = `📈 <b>Token Price Overview</b> (${tokens.length} tokens)\n\n`;
+    const titleTemplate = await i18nService.__('price.multiTokenTitle', locale, { count: tokens.length });
+    let message = `📈 <b>${titleTemplate}</b>\n\n`;
     
-    tokens.forEach(token => {
-      message += this.formatCompactPriceMessage(token) + '\n';
-    });
+    for (const token of tokens) {
+      const compactMessage = await this.formatCompactPriceMessage(token, locale);
+      message += compactMessage + '\n';
+    }
     
-    message += `\n<i>🕐 Updated: ${this.formatTimestamp(new Date())}</i>`;
-    message += `\n<i>📡 Data source: AIW3</i>`;
+    const updatedLabel = await i18nService.__('price.updatedLabel', locale);
+    const dataSource = await i18nService.__('price.dataSource', locale);
+    
+    message += `\n<i>🕐 ${updatedLabel} ${this.formatTimestamp(new Date())}</i>`;
+    message += `\n<i>📡 ${dataSource}</i>`;
     
     return message;
   }
@@ -515,66 +564,85 @@ BTC, ETH, SOL, USDT, USDC, BNB, ADA, DOT, LINK, MATIC, AVAX, UNI
   /**
    * Format wallet balance message (supports new on-chain wallet and legacy exchange account)
    */
-  public formatWalletBalanceMessage(balance: FormattedWalletBalance | FormattedAccountBalance, warnings?: string[]): string {
+  public async formatWalletBalanceMessage(
+    balance: FormattedWalletBalance | FormattedAccountBalance, 
+    warnings?: string[], 
+    locale: string = 'en'
+  ): Promise<string> {
     // Check if it's new on-chain wallet format
     if ('address' in balance && 'network' in balance) {
-      return this.formatOnChainWalletMessage(balance as FormattedWalletBalance, warnings);
+      return await this.formatOnChainWalletMessage(balance as FormattedWalletBalance, warnings, locale);
     } else {
       // Legacy exchange account format (backward compatibility)
-      return this.formatExchangeAccountMessage(balance as FormattedAccountBalance, warnings);
+      return await this.formatExchangeAccountMessage(balance as FormattedAccountBalance, warnings, locale);
     }
   }
 
   /**
    * Format on-chain wallet balance message
    */
-  private formatOnChainWalletMessage(balance: FormattedWalletBalance, warnings?: string[]): string {
+  private async formatOnChainWalletMessage(balance: FormattedWalletBalance, warnings?: string[], locale: string = 'en'): Promise<string> {
     // Determine wallet name based on network type
-    const walletName = balance.network.toLowerCase() === 'arbitrum' ? 'Hyperliquid Wallet' : 'Solana Wallet';
+    const walletNameKey = balance.network.toLowerCase() === 'arbitrum' ? 'wallet.hyperliquidWallet' : 'wallet.solanaWallet';
+    const walletName = await i18nService.__(walletNameKey, locale);
     let message = `💰 <b>${walletName}</b>\n\n`;
     
     // Wallet address information
-    message += `📍 <b>Wallet Address:</b> <code>${this.truncateAddress(balance.address)}</code>\n`;
-    message += `🌐 <b>Network:</b> ${balance.network.toUpperCase()}\n\n`;
+    const addressLabel = await i18nService.__('wallet.address', locale);
+    const networkLabel = await i18nService.__('wallet.network', locale);
+    message += `${addressLabel} <code>${this.truncateAddress(balance.address)}</code>\n`;
+    message += `${networkLabel} ${balance.network.toUpperCase()}\n\n`;
     
     // Special display for Hyperliquid wallet
     if (balance.network.toLowerCase() === 'arbitrum') {
       // Contract account balance (main funds)
-      message += `💎 <b>Contract Account Value:</b> ${balance.nativeBalance.toFixed(2)} ${balance.nativeSymbol} ($${this.formatCurrency(balance.nativeBalance)})\n`;
+      const contractAccountValueLabel = await i18nService.__('wallet.contractAccountValue', locale);
+      message += `${contractAccountValueLabel} ${balance.nativeBalance.toFixed(2)} ${balance.nativeSymbol} ($${this.formatCurrency(balance.nativeBalance)})\n`;
       
       // Withdrawable amount (available margin)
       if (balance.withdrawableAmount !== undefined) {
         const occupiedMargin = balance.nativeBalance - balance.withdrawableAmount;
-        message += `💸 <b>Available Margin:</b> ${balance.withdrawableAmount.toFixed(2)} ${balance.nativeSymbol} ($${this.formatCurrency(balance.withdrawableAmount)})\n`;
+        const availableMarginLabel = await i18nService.__('wallet.availableMargin', locale);
+        message += `${availableMarginLabel} ${balance.withdrawableAmount.toFixed(2)} ${balance.nativeSymbol} ($${this.formatCurrency(balance.withdrawableAmount)})\n`;
         if (occupiedMargin > 0) {
-          message += `🔒 <b>Used Margin:</b> ${occupiedMargin.toFixed(2)} ${balance.nativeSymbol} ($${this.formatCurrency(occupiedMargin)})\n`;
+          const usedMarginLabel = await i18nService.__('wallet.usedMargin', locale);
+          message += `${usedMarginLabel} ${occupiedMargin.toFixed(2)} ${balance.nativeSymbol} ($${this.formatCurrency(occupiedMargin)})\n`;
         }
       }
       
       // Fund usage description
-      message += `\n📝 <b>Fund Usage Description:</b>\n`;
-      message += `• <b>Contract Account:</b> Used for >1x leverage trading\n`;
-      message += `• <b>Available Margin:</b> Available funds for new leverage trades\n`;
-      message += `• <b>Used Margin:</b> Margin locked by current positions\n`;
+      const fundUsageLabel = await i18nService.__('wallet.fundUsageDescription', locale);
+      const contractAccountDesc = await i18nService.__('wallet.contractAccountDesc', locale);
+      const availableMarginDesc = await i18nService.__('wallet.availableMarginDesc', locale);
+      const usedMarginDesc = await i18nService.__('wallet.usedMarginDesc', locale);
+      message += `\n${fundUsageLabel}\n`;
+      message += `${contractAccountDesc}\n`;
+      message += `${availableMarginDesc}\n`;
+      message += `${usedMarginDesc}\n`;
     } else {
       // Original display for other networks (contract account only)
-      message += `💎 <b>Contract Account Balance:</b> ${balance.nativeBalance.toFixed(6)} ${balance.nativeSymbol}\n`;
+      const contractAccountBalanceLabel = await i18nService.__('wallet.contractAccountBalance', locale);
+      message += `${contractAccountBalanceLabel} ${balance.nativeBalance.toFixed(6)} ${balance.nativeSymbol}\n`;
     }
     
     // Total value - always display, even if 0
-    message += `\n📈 <b>Total Value:</b> $${this.formatCurrency(balance.totalUsdValue)}\n`;
+    const totalValueLabel = await i18nService.__('wallet.totalValue', locale);
+    message += `\n${totalValueLabel} $${this.formatCurrency(balance.totalUsdValue)}\n`;
     
     // Add notification if total value is 0
     if (balance.totalUsdValue === 0) {
-      message += `\n💡 <b>Note:</b> Wallet has no assets, please deposit USDC to trading wallet address first\n`;
+      const noAssetsNote = await i18nService.__('wallet.noAssetsNote', locale);
+      message += `\n${noAssetsNote}\n`;
     }
     
     // Last update time
-    message += `🕐 <b>Updated:</b> ${this.formatTimestamp(balance.lastUpdated)}\n`;
+    const lastUpdatedLabel = await i18nService.__('wallet.lastUpdated', locale);
+    message += `${lastUpdatedLabel} ${this.formatTimestamp(balance.lastUpdated)}\n`;
 
     // Warning information
     if (warnings && warnings.length > 0) {
-      message += `\n<b>⚠️ Warnings:</b>\n`;
+      const warningsLabel = await i18nService.__('wallet.warnings', locale);
+      message += `\n<b>${warningsLabel}</b>\n`;
       warnings.forEach(warning => {
         message += `• ${warning}\n`;
       });
@@ -584,19 +652,26 @@ BTC, ETH, SOL, USDT, USDC, BNB, ADA, DOT, LINK, MATIC, AVAX, UNI
     message += `\n━━━━━━━━━━━━━━━━━━━━━━━\n`;
     
     // Related operation suggestions
-    message += `🔧 <b>Available Actions:</b>\n`;
+    const availableActionsLabel = await i18nService.__('wallet.availableActions', locale);
+    message += `<b>${availableActionsLabel}</b>\n`;
     if (balance.nativeBalance > 0.01) {
-      message += `• Send tokens to other addresses\n`;
-      message += `• Participate in DeFi protocols\n`;
+      const sendTokensLabel = await i18nService.__('wallet.sendTokens', locale);
+      const participateDefiLabel = await i18nService.__('wallet.participateDefi', locale);
+      message += `${sendTokensLabel}\n`;
+      message += `${participateDefiLabel}\n`;
     }
-    message += `• <code>/price SOL</code> - Check SOL price\n`;
-    message += `• <code>/price USDT</code> - Check USDT price\n`;
+    const checkSolPrice = await i18nService.__('wallet.checkSolPrice', locale);
+    const checkUsdtPrice = await i18nService.__('wallet.checkUsdtPrice', locale);
+    message += `${checkSolPrice}\n`;
+    message += `${checkUsdtPrice}\n`;
     
     if (balance.nativeBalance < 0.001) {
-      message += `\n💡 <i>SOL balance too low, may affect transaction fee payment</i>`;
+      const balanceTooLow = await i18nService.__('wallet.balanceTooLow', locale);
+      message += `\n${balanceTooLow}`;
     }
 
-    message += `\n\n⚡ <i>Real-time on-chain data</i>`;
+    const realTimeData = await i18nService.__('wallet.realTimeData', locale);
+    message += `\n\n⚡ <i>${realTimeData}</i>`;
 
     return message;
   }
@@ -604,10 +679,12 @@ BTC, ETH, SOL, USDT, USDC, BNB, ADA, DOT, LINK, MATIC, AVAX, UNI
   /**
    * Format exchange account balance message (legacy compatibility)
    */
-  private formatExchangeAccountMessage(balance: FormattedAccountBalance, warnings?: string[]): string {
-    let message = `💰 <b>Wallet Balance</b>\n\n`;
+  private async formatExchangeAccountMessage(balance: FormattedAccountBalance, warnings?: string[], locale: string = 'en'): Promise<string> {
+    const titleLabel = await i18nService.__('wallet.title', locale);
+    let message = `💰 <b>${titleLabel}</b>\n\n`;
     
     // Main balance information
+    const totalAssetsLabel = await i18nService.__('wallet.totalAssets', locale, { amount: this.formatCurrency(balance.totalEquity) });
     message += `📈 <b>Total Assets:</b> $${this.formatCurrency(balance.totalEquity)} ${balance.currency}\n`;
     message += `💳 <b>Available Balance:</b> $${this.formatCurrency(balance.availableEquity)} ${balance.currency}\n`;
     
@@ -624,7 +701,8 @@ BTC, ETH, SOL, USDT, USDC, BNB, ADA, DOT, LINK, MATIC, AVAX, UNI
     message += `\n💡 <b>Fund Utilization:</b> ${utilizationEmoji} ${balance.utilizationRate}%\n`;
     
     // Last update time
-    message += `🕐 <b>Updated:</b> ${this.formatTimestamp(balance.lastUpdated)}\n`;
+    const lastUpdatedLabel = await i18nService.__('wallet.lastUpdated', locale);
+    message += `${lastUpdatedLabel} ${this.formatTimestamp(balance.lastUpdated)}\n`;
 
     // Warning information
     if (warnings && warnings.length > 0) {
@@ -638,7 +716,8 @@ BTC, ETH, SOL, USDT, USDC, BNB, ADA, DOT, LINK, MATIC, AVAX, UNI
     message += `\n━━━━━━━━━━━━━━━━━━━━━━━\n`;
     
     // Related operation suggestions
-    message += `💹 <b>Available Actions:</b>\n`;
+    const availableActionsLabel = await i18nService.__('wallet.availableActions', locale);
+    message += `💹 <b>${availableActionsLabel}</b>\n`;
     if (balance.availableEquity >= 100) {
       message += `• <code>/long BTC</code> - Open long position\n`;
       message += `• <code>/short ETH</code> - Open short position\n`;
@@ -698,7 +777,7 @@ BTC, ETH, SOL, USDT, USDC, BNB, ADA, DOT, LINK, MATIC, AVAX, UNI
   /**
    * Format wallet balance error message
    */
-  public formatWalletErrorMessage(error: DetailedError): string {
+  public async formatWalletErrorMessage(error: DetailedError, locale: string = 'en'): Promise<string> {
     let message = `❌ <b>Wallet Balance Query Failed</b>\n\n`;
     
     // Provide specific error information based on error type
@@ -1100,18 +1179,26 @@ BTC, ETH, SOL, ETC, LINK, AVAX, UNI and other major cryptocurrencies
   /**
    * Format trading guidance message - Select token
    */
-  public formatTradingSymbolPrompt(action: 'long' | 'short'): string {
-    const actionText = action === 'long' ? 'Long' : 'Short';
+  public async formatTradingSymbolPrompt(action: 'long' | 'short', locale: string = 'en'): Promise<string> {
+    const symbolPrompt = await i18nService.__('trading.symbolPrompt', locale, { action });
+    const replyWithSymbol = await i18nService.__('trading.replyWithSymbol', locale, { action });
+    const examples = await i18nService.__('trading.examples', locale);
+    const supportedTokens = await i18nService.__('trading.supportedTokens', locale);
+    const majorTokens = await i18nService.__('trading.majorTokens', locale);
+    const popularTokens = await i18nService.__('trading.popularTokens', locale);
+    const defiTokens = await i18nService.__('trading.defiTokens', locale);
+    const replyWithSymbolNote = await i18nService.__('trading.replyWithSymbolNote', locale);
+    
     const actionEmoji = action === 'long' ? '📈' : '📉';
     
-    let message = `${actionEmoji} <b>Start ${actionText} Trading</b>\n\n`;
-    message += `Please reply with the token symbol you want to ${actionText.toLowerCase()}\n\n`;
-    message += `💡 <b>Examples:</b> HYPE, BTC, ETH, SOL\n\n`;
-    message += `<b>Supported Tokens:</b>\n`;
-    message += `• Major: BTC, ETH, SOL, BNB\n`;
-    message += `• Popular: HYPE, PEPE, DOGE\n`;
-    message += `• DeFi: UNI, LINK, AAVE\n\n`;
-    message += `<i>💬 Simply reply with token symbol, case insensitive</i>`;
+    let message = `${actionEmoji} <b>${symbolPrompt}</b>\n\n`;
+    message += `${replyWithSymbol}\n\n`;
+    message += `💡 <b>${examples}</b> HYPE, BTC, ETH, SOL\n\n`;
+    message += `<b>${supportedTokens}</b>\n`;
+    message += `${majorTokens}\n`;
+    message += `${popularTokens}\n`;
+    message += `${defiTokens}\n\n`;
+    message += `<i>💬 ${replyWithSymbolNote}</i>`;
     
     return message;
   }
@@ -1119,16 +1206,21 @@ BTC, ETH, SOL, ETC, LINK, AVAX, UNI and other major cryptocurrencies
   /**
    * Format trading guidance message - Select leverage
    */
-  public formatTradingLeveragePrompt(action: 'long' | 'short', symbol: string, currentPrice: number, availableMargin: number): string {
-    const actionText = action === 'long' ? 'Long' : 'Short';
+  public async formatTradingLeveragePrompt(action: 'long' | 'short', symbol: string, currentPrice: number, availableMargin: number, locale: string = 'en'): Promise<string> {
+    const leveragePrompt = await i18nService.__('trading.leveragePrompt', locale, { action, symbol });
+    const selectLeverage = await i18nService.__('trading.selectLeverage', locale);
+    const availableMarginLabel = await i18nService.__('trading.availableMarginLabel', locale);
+    const maxLeverageLabel = await i18nService.__('trading.maxLeverageLabel', locale);
+    const currentPriceLabel = await i18nService.__('trading.currentPriceLabel', locale);
+    
     const actionEmoji = action === 'long' ? '📈' : '📉';
     
-    let message = `${actionEmoji} <b>${actionText} ${symbol}</b>\n`;
-    message += `Current Price: <b>${this.formatPrice(currentPrice, this.defaultOptions)}</b>\n\n`;
+    let message = `${actionEmoji} <b>${leveragePrompt}</b>\n`;
+    message += `${currentPriceLabel} <b>${this.formatPrice(currentPrice, this.defaultOptions)}</b>\n\n`;
     
-    message += `<b>Select Your Leverage:</b>\n`;
-    message += `Available Margin: <b>${this.formatPrice(availableMargin, this.defaultOptions)}</b>\n`;
-    message += `Max Leverage: <b>3x</b>\n\n`;
+    message += `<b>${selectLeverage}</b>\n`;
+    message += `${availableMarginLabel} <b>${this.formatPrice(availableMargin, this.defaultOptions)}</b>\n`;
+    message += `${maxLeverageLabel} <b>3x</b>\n\n`;
     
     return message;
   }
@@ -1136,17 +1228,23 @@ BTC, ETH, SOL, ETC, LINK, AVAX, UNI and other major cryptocurrencies
   /**
    * Format trading guidance message - Enter amount
    */
-  public formatTradingAmountPrompt(action: 'long' | 'short', symbol: string, leverage: string, availableMargin: number): string {
-    const actionText = action === 'long' ? 'Long' : 'Short';
+  public async formatTradingAmountPrompt(action: 'long' | 'short', symbol: string, leverage: string, availableMargin: number, locale: string = 'en'): Promise<string> {
+    const amountPrompt = await i18nService.__('trading.amountPrompt', locale, { action, symbol });
+    const leverageSelected = await i18nService.__('trading.leverageSelected', locale, { leverage });
+    const selectPositionSize = await i18nService.__('trading.selectPositionSize', locale);
+    const availableMarginLabel = await i18nService.__('trading.availableMarginLabel', locale);
+    const enterMarginAmount = await i18nService.__('trading.enterMarginAmount', locale, { action, symbol });
+    const replyWithNumber = await i18nService.__('trading.replyWithNumber', locale);
+    
     const actionEmoji = action === 'long' ? '📈' : '📉';
     
-    let message = `${actionEmoji} <b>${actionText} ${symbol}</b>\n`;
-    message += `Leverage: <b>${leverage}</b>\n\n`;
+    let message = `${actionEmoji} <b>${amountPrompt}</b>\n`;
+    message += `${leverageSelected}\n\n`;
     
-    message += `<b>Select Position Size</b>\n\n`;
-    message += `Available Margin: <b>${this.formatPrice(availableMargin, this.defaultOptions)}</b>\n\n`;
-    message += `Please reply with the margin amount ($) for ${actionText.toLowerCase()} ${symbol}\n\n`;
-    message += `<i>💡 Simply reply with number, e.g.: 30</i>`;
+    message += `<b>${selectPositionSize}</b>\n\n`;
+    message += `${availableMarginLabel} <b>${this.formatPrice(availableMargin, this.defaultOptions)}</b>\n\n`;
+    message += `${enterMarginAmount}\n\n`;
+    message += `<i>${replyWithNumber}</i>`;
     
     return message;
   }
@@ -1154,27 +1252,36 @@ BTC, ETH, SOL, ETC, LINK, AVAX, UNI and other major cryptocurrencies
   /**
    * Format trading order preview
    */
-  public formatTradingOrderPreview(
+  public async formatTradingOrderPreview(
     action: 'long' | 'short', 
     symbol: string, 
     leverage: string, 
     amount: string,
     currentPrice: number,
     orderSize: number,
-    liquidationPrice: number
-  ): string {
+    liquidationPrice: number,
+    locale: string = 'en'
+  ): Promise<string> {
+    const orderPreview = await i18nService.__('trading.orderPreview', locale);
+    const market = await i18nService.__('trading.market', locale);
+    const leverageLabel = await i18nService.__('trading.leverage', locale);
+    const orderSizeLabel = await i18nService.__('trading.orderSize', locale);
+    const currentPriceLabel = await i18nService.__('trading.currentPriceLabel', locale);
+    const liquidationPriceLabel = await i18nService.__('trading.liquidationPrice', locale);
+    const confirmTrade = await i18nService.__('trading.confirmTrade', locale);
+    
     const actionText = action === 'long' ? 'LONG' : 'SHORT';
     const actionEmoji = action === 'long' ? '📈' : '📉';
     const leverageNum = parseFloat(leverage.replace('x', ''));
     const positionValue = parseFloat(amount) * leverageNum;
     
-    let message = `💰 <b>Order Preview</b>\n\n`;
-    message += `Market: <b>${actionText} ${symbol}</b> ${actionEmoji}\n`;
-    message += `Leverage: <b>${leverage}</b>\n`;
-    message += `Order Size: <b>${orderSize.toFixed(6)} ${symbol} / $${this.formatCurrency(parseFloat(amount))}</b>\n`;
-    message += `Current Price: <b>$${this.formatCurrency(currentPrice)}</b>\n`;
-    message += `Forced Liquidation Price: <b>$${this.formatCurrency(liquidationPrice)}</b>\n\n`;
-    message += `Click the button below to confirm your trade`;
+    let message = `💰 <b>${orderPreview}</b>\n\n`;
+    message += `${market} <b>${actionText} ${symbol}</b> ${actionEmoji}\n`;
+    message += `${leverageLabel} <b>${leverage}</b>\n`;
+    message += `${orderSizeLabel} <b>${orderSize.toFixed(6)} ${symbol} / $${this.formatCurrency(parseFloat(amount))}</b>\n`;
+    message += `${currentPriceLabel} <b>$${this.formatCurrency(currentPrice)}</b>\n`;
+    message += `${liquidationPriceLabel} <b>$${this.formatCurrency(liquidationPrice)}</b>\n\n`;
+    message += `${confirmTrade}`;
     
     return message;
   }
@@ -1182,13 +1289,20 @@ BTC, ETH, SOL, ETC, LINK, AVAX, UNI and other major cryptocurrencies
   /**
    * Format trading insufficient funds error message
    */
-  public formatTradingInsufficientFundsMessage(): string {
-    let message = `💰 <b>Insufficient Account Balance</b>\n\n`;
-    message += `Your account cannot currently trade. You may need to deposit funds first.\n\n`;
-    message += `💡 <b>Solutions:</b>\n`;
-    message += `• Use /wallet to check current balance\n`;
-    message += `• Deposit more funds to wallet\n`;
-    message += `• Reduce trading amount`;
+  public async formatTradingInsufficientFundsMessage(locale: string = 'en'): Promise<string> {
+    const insufficientBalance = await i18nService.__('trading.insufficientBalance', locale);
+    const cannotTrade = await i18nService.__('trading.cannotTrade', locale);
+    const solutions = await i18nService.__('trading.solutions', locale);
+    const useWalletCheck = await i18nService.__('trading.useWalletCheck', locale);
+    const depositFunds = await i18nService.__('trading.depositFunds', locale);
+    const reduceAmount = await i18nService.__('trading.reduceAmount', locale);
+    
+    let message = `💰 <b>${insufficientBalance}</b>\n\n`;
+    message += `${cannotTrade}\n\n`;
+    message += `💡 <b>${solutions}</b>\n`;
+    message += `${useWalletCheck}\n`;
+    message += `${depositFunds}\n`;
+    message += `${reduceAmount}`;
     
     return message;
   }
@@ -1196,21 +1310,32 @@ BTC, ETH, SOL, ETC, LINK, AVAX, UNI and other major cryptocurrencies
   /**
    * Format trading command format error message
    */
-  public formatTradingCommandErrorMessage(action: 'long' | 'short'): string {
-    const actionText = action === 'long' ? 'Long' : 'Short';
+  public async formatTradingCommandErrorMessage(action: 'long' | 'short', locale: string = 'en'): Promise<string> {
+    const commandError = await i18nService.__('trading.commandError', locale);
+    const correctFormat = await i18nService.__('trading.correctFormat', locale);
+    const commandTemplate = await i18nService.__('trading.commandTemplate', locale, { action });
+    const examples = await i18nService.__('trading.examples', locale);
+    const exampleFormat1 = await i18nService.__('trading.exampleFormat', locale, { action, token: 'BTC', leverage: '10x', amount: '100' });
+    const exampleFormat2 = await i18nService.__('trading.exampleFormat', locale, { action, token: 'ETH', leverage: '5x', amount: '50' });
+    const importantNotes = await i18nService.__('trading.importantNotes', locale);
+    const minimumTrade = await i18nService.__('trading.minimumTrade', locale);
+    const supportedLeverage = await i18nService.__('trading.supportedLeverage', locale);
+    const supportedTokensNote = await i18nService.__('trading.supportedTokensNote', locale);
+    const testSmallAmounts = await i18nService.__('trading.testSmallAmounts', locale);
+    
     const actionLower = action.toLowerCase();
     
-    let message = `❌ <b>Command Format Error</b>\n\n`;
-    message += `<b>Correct Format:</b>\n`;
-    message += `<code>/${actionLower} &lt;token&gt; &lt;leverage&gt; &lt;amount&gt;</code>\n\n`;
-    message += `<b>Examples:</b>\n`;
-    message += `<code>/${actionLower} BTC 10x 100</code> - ${actionText} BTC, 10x leverage, $100\n`;
-    message += `<code>/${actionLower} ETH 5x 50</code> - ${actionText} ETH, 5x leverage, $50\n\n`;
-    message += `<b>⚠️ Important Notes:</b>\n`;
-    message += `• Minimum trade amount: $10\n`;
-    message += `• Supported leverage: 1x-20x\n`;
-    message += `• Supported tokens: BTC, ETH, SOL and other major coins\n\n`;
-    message += `💡 First-time traders should test with small amounts`;
+    let message = `❌ <b>${commandError}</b>\n\n`;
+    message += `<b>${correctFormat}</b>\n`;
+    message += `<code>${commandTemplate}</code>\n\n`;
+    message += `<b>${examples}</b>\n`;
+    message += `<code>/${actionLower} BTC 10x 100</code> - ${exampleFormat1}\n`;
+    message += `<code>/${actionLower} ETH 5x 50</code> - ${exampleFormat2}\n\n`;
+    message += `<b>${importantNotes}</b>\n`;
+    message += `${minimumTrade}\n`;
+    message += `${supportedLeverage}\n`;
+    message += `${supportedTokensNote}\n\n`;
+    message += `💡 ${testSmallAmounts}`;
     
     return message;
   }
@@ -1218,14 +1343,18 @@ BTC, ETH, SOL, ETC, LINK, AVAX, UNI and other major cryptocurrencies
   /**
    * Format trading processing message
    */
-  public formatTradingProcessingMessage(action: 'long' | 'short', symbol: string, leverage: string, amount: string): string {
-    const actionText = action === 'long' ? 'Long' : 'Short';
+  public async formatTradingProcessingMessage(action: 'long' | 'short', symbol: string, leverage: string, amount: string, locale: string = 'en'): Promise<string> {
+    const processing = await i18nService.__('trading.processing', locale, { action });
+    const tokenLabel = await i18nService.__('trading.tokenLabel', locale);
+    const leverageLabel = await i18nService.__('trading.leverageLabel', locale);
+    const amountLabel = await i18nService.__('trading.amountLabel', locale);
+    
     const actionEmoji = action === 'long' ? '📈' : '📉';
     
-    let message = `🔄 <b>Processing ${actionText} Trade...</b>\n\n`;
-    message += `${actionEmoji} Token: <code>${symbol.toUpperCase()}</code>\n`;
-    message += `📊 Leverage: <code>${leverage}</code>\n`;
-    message += `💰 Amount: <code>${amount}</code>`;
+    let message = `🔄 <b>${processing}</b>\n\n`;
+    message += `${actionEmoji} ${tokenLabel} <code>${symbol.toUpperCase()}</code>\n`;
+    message += `📊 ${leverageLabel} <code>${leverage}</code>\n`;
+    message += `💰 ${amountLabel} <code>${amount}</code>`;
     
     return message;
   }

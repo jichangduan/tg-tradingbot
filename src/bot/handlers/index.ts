@@ -20,6 +20,7 @@ import { tradingStateService, TradingState } from '../../services/trading-state.
 import { tokenService } from '../../services/token.service';
 import { accountService } from '../../services/account.service';
 import { messageFormatter } from '../utils/message.formatter';
+import { i18nService } from '../../services/i18n.service';
 
 /**
  * 命令处理器注册系统
@@ -50,11 +51,13 @@ async function handleTradingInput(ctx: ExtendedContext, state: TradingState, inp
           step: 'leverage'
         });
         
-        const message = messageFormatter.formatTradingLeveragePrompt(
+        const userLanguage = await i18nService.getUserLanguage(ctx.from?.id);
+        const message = await messageFormatter.formatTradingLeveragePrompt(
           state.action,
           symbol,
           tokenData.price,
-          availableMargin
+          availableMargin,
+          userLanguage
         );
         
         const keyboard = state.action === 'long' 
@@ -99,14 +102,16 @@ async function handleTradingInput(ctx: ExtendedContext, state: TradingState, inp
         const orderSize = amount / tokenData.price * parseFloat(state.leverage!.replace('x', ''));
         const liquidationPrice = calculateLiquidationPrice(tokenData.price, parseFloat(state.leverage!.replace('x', '')), state.action);
         
-        const previewMessage = messageFormatter.formatTradingOrderPreview(
+        const userLanguage = await i18nService.getUserLanguage(ctx.from?.id);
+        const previewMessage = await messageFormatter.formatTradingOrderPreview(
           state.action,
           state.symbol!,
           state.leverage!,
           amount.toString(),
           tokenData.price,
           orderSize,
-          liquidationPrice
+          liquidationPrice,
+          userLanguage
         );
         
         const keyboard = state.action === 'long'

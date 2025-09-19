@@ -4,6 +4,7 @@ import { accountService } from '../../services/account.service';
 import { messageFormatter } from '../utils/message.formatter';
 import { logger } from '../../utils/logger';
 import { DetailedError, ApiErrorCode, FormattedWalletBalance } from '../../types/api.types';
+import { i18nService } from '../../services/i18n.service';
 
 /**
  * WalletHandler - 处理/wallet命令
@@ -50,6 +51,9 @@ export class WalletHandler {
       });
 
       try {
+        // 获取用户语言偏好
+        const userLanguage = await i18nService.getUserLanguage(parseInt(telegramId));
+        
         // 调用账户服务获取余额
         const balance = await accountService.getAccountBalance(telegramId);
         
@@ -57,7 +61,7 @@ export class WalletHandler {
         const warnings = accountService.getBalanceWarnings(balance);
         
         // 格式化钱包余额消息
-        const balanceMessage = messageFormatter.formatWalletBalanceMessage(balance, warnings);
+        const balanceMessage = await messageFormatter.formatWalletBalanceMessage(balance, warnings, userLanguage);
         
         // 更新消息内容
         await ctx.telegram.editMessageText(
@@ -90,9 +94,17 @@ export class WalletHandler {
         });
 
       } catch (serviceError) {
+        // 获取用户语言偏好（错误情况下也需要）
+        let userLanguage = 'en';
+        try {
+          userLanguage = await i18nService.getUserLanguage(parseInt(telegramId));
+        } catch (langError) {
+          logger.warn('Failed to get user language for error message, using default', { telegramId });
+        }
+        
         // 处理服务层错误
         const detailedError = this.handleServiceError(serviceError);
-        const errorMessage = messageFormatter.formatWalletErrorMessage(detailedError);
+        const errorMessage = await messageFormatter.formatWalletErrorMessage(detailedError, userLanguage);
         
         // 更新消息为错误内容
         await ctx.telegram.editMessageText(
@@ -133,7 +145,15 @@ export class WalletHandler {
 
       // 尝试发送错误消息
       try {
-        const errorMessage = messageFormatter.formatWalletErrorMessage(detailedError);
+        // 获取用户语言偏好
+        let userLanguage = 'en';
+        try {
+          userLanguage = await i18nService.getUserLanguage(parseInt(telegramId || '0'));
+        } catch (langError) {
+          logger.warn('Failed to get user language for error message, using default');
+        }
+        
+        const errorMessage = await messageFormatter.formatWalletErrorMessage(detailedError, userLanguage);
         await ctx.reply(errorMessage, { 
           parse_mode: 'HTML',
           link_preview_options: { is_disabled: true }

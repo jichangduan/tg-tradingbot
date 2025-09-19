@@ -10,6 +10,7 @@ import { ExtendedContext } from '../index';
 import { accountService } from '../../services/account.service';
 import { tradingStateService, TradingState } from '../../services/trading-state.service';
 import { messageFormatter } from '../utils/message.formatter';
+import { i18nService } from '../../services/i18n.service';
 
 /**
  * Long command handler
@@ -55,8 +56,9 @@ export class LongHandler {
         return;
       } else {
         // Incorrect parameter count
+        const userLanguage = await i18nService.getUserLanguage(ctx.from?.id);
         await ctx.reply(
-          messageFormatter.formatTradingCommandErrorMessage('long'),
+          await messageFormatter.formatTradingCommandErrorMessage('long', userLanguage),
           { parse_mode: 'HTML' }
         );
         return;
@@ -82,7 +84,8 @@ export class LongHandler {
     if (!symbol) {
       // Step 1: Select token
       const state = await tradingStateService.createState(userId, action);
-      const message = messageFormatter.formatTradingSymbolPrompt(action);
+      const userLanguage = await i18nService.getUserLanguage(ctx.from?.id);
+      const message = await messageFormatter.formatTradingSymbolPrompt(action, userLanguage);
       
       await ctx.reply(message, { parse_mode: 'HTML' });
     } else {
@@ -95,11 +98,13 @@ export class LongHandler {
         const accountBalance = await accountService.getAccountBalance(userId!.toString());
         const availableMargin = accountBalance.withdrawableAmount || 0;
         
-        const message = messageFormatter.formatTradingLeveragePrompt(
+        const userLanguage = await i18nService.getUserLanguage(ctx.from?.id);
+        const message = await messageFormatter.formatTradingLeveragePrompt(
           action, 
           symbol.toUpperCase(), 
           tokenData.price, 
-          availableMargin
+          availableMargin,
+          userLanguage
         );
         
         const keyboard = this.createLeverageKeyboard(symbol.toUpperCase());
@@ -133,8 +138,9 @@ export class LongHandler {
 
     // Basic validation
     if (!symbol || !leverageStr || !amountStr) {
+      const userLanguage = await i18nService.getUserLanguage(ctx.from?.id);
       await ctx.reply(
-        messageFormatter.formatTradingCommandErrorMessage('long'),
+        await messageFormatter.formatTradingCommandErrorMessage('long', userLanguage),
         { parse_mode: 'HTML' }
       );
       return;
@@ -170,8 +176,9 @@ export class LongHandler {
     }
 
     // Send processing message
+    const userLanguage = await i18nService.getUserLanguage(ctx.from?.id);
     const loadingMessage = await ctx.reply(
-      messageFormatter.formatTradingProcessingMessage('long', symbol, leverageStr, amountStr),
+      await messageFormatter.formatTradingProcessingMessage('long', symbol, leverageStr, amountStr, userLanguage),
       { parse_mode: 'HTML' }
     );
 
@@ -326,14 +333,15 @@ export class LongHandler {
       const orderSize = parseFloat(amountStr) / tokenData.price;
       const liquidationPrice = this.calculateLiquidationPrice(tokenData.price, parseFloat(leverageStr.replace('x', '')), 'long');
       
-      const previewMessage = messageFormatter.formatTradingOrderPreview(
+      const previewMessage = await messageFormatter.formatTradingOrderPreview(
         'long',
         symbol.toUpperCase(),
         leverageStr,
         amountStr,
         tokenData.price,
         orderSize,
-        liquidationPrice
+        liquidationPrice,
+        userLanguage
       );
       
       const keyboard = await this.createConfirmationKeyboard(ctx, symbol, leverageStr, amountStr);
@@ -437,11 +445,13 @@ export class LongHandler {
     const accountBalance = await accountService.getAccountBalance(userId);
     const availableMargin = accountBalance.withdrawableAmount || 0;
     
-    const message = messageFormatter.formatTradingAmountPrompt(
+    const userLanguage = await i18nService.getUserLanguage(ctx.from?.id);
+    const message = await messageFormatter.formatTradingAmountPrompt(
       'long',
       state.symbol,
       leverage,
-      availableMargin
+      availableMargin,
+      userLanguage
     );
 
     await ctx.editMessageText(message, { parse_mode: 'HTML' });
