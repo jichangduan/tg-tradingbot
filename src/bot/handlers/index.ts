@@ -14,6 +14,7 @@ import { positionsHandler } from './positions.handler';
 import { pnlHandler } from './pnl.handler';
 import { pushHandler } from './push.handler';
 import { languageHandler } from './language.handler';
+import { withdrawHandler } from './withdraw.handler';
 import { logger } from '../../utils/logger';
 import { ExtendedContext } from '../index';
 import { tradingStateService, TradingState } from '../../services/trading-state.service';
@@ -363,6 +364,7 @@ Examples: <code>/long BTC 10x 200</code>, <code>/short ETH 5x 100</code>, <code>
 
 <b>💰 Account Management:</b>
 <code>/wallet</code> - View wallet balance
+<code>/withdraw</code> - Withdraw funds to external wallet
 
 <b>📢 Push Notifications:</b>
 <code>/push</code> - Manage push notification settings
@@ -479,6 +481,12 @@ Need help? Contact administrator 👨‍💻
     createCommandWrapper('language', languageHandler.handle.bind(languageHandler))
   );
 
+  // /withdraw 命令 - 提现操作
+  bot.command(
+    'withdraw', 
+    createCommandWrapper('withdraw', withdrawHandler.handle.bind(withdrawHandler))
+  );
+
   // /cancel 命令 - 取消当前交易流程
   bot.command('cancel', async (ctx) => {
     const userId = ctx.from?.id?.toString();
@@ -567,6 +575,14 @@ Need help? Contact administrator 👨‍💻
       await handleTradingInput(ctx, tradingState, messageText);
       return;
     }
+
+    // 检查用户是否在提现流程中
+    if (!messageText.startsWith('/')) {
+      const handled = await withdrawHandler.handleUserInput(ctx);
+      if (handled) {
+        return;
+      }
+    }
     
     // 检查是否为命令格式
     if (messageText.startsWith('/')) {
@@ -598,6 +614,7 @@ I don't recognize this command. Try these available commands:
 
 <b>💰 Account Management:</b>
 <code>/wallet</code> - View wallet balance
+<code>/withdraw</code> - Withdraw funds to external wallet
 <!-- <code>/invite</code> - View invitation stats -->
 <!-- <code>/points</code> - View points details -->
 
@@ -716,6 +733,12 @@ Need help? Send <code>/help</code> to view complete guide 📚
         return;
       }
 
+      // 路由withdraw相关的回调到withdrawHandler（新增）
+      if (typeof callbackData === 'string' && callbackData.startsWith('withdraw_')) {
+        await withdrawHandler.handleCallback(ctx);
+        return;
+      }
+
       // 其他未处理的回调
       await ctx.answerCbQuery('功能开发中...');
       
@@ -766,6 +789,7 @@ export function getRegisteredCommands(): Array<{ command: string; description: s
     { command: '/pnl', description: 'Profit & Loss analysis report' },
     { command: '/markets', description: 'View market data' },
     { command: '/wallet', description: 'View wallet balance' },
+    { command: '/withdraw', description: 'Withdraw funds to external wallet' },
     // { command: '/invite', description: 'View invitation stats and points' }, // temporarily disabled
     // { command: '/points', description: 'View your earned points' }, // temporarily disabled
     { command: '/push', description: 'Manage push notification settings' },
@@ -790,6 +814,7 @@ export async function setBotCommands(bot: Telegraf<ExtendedContext>): Promise<vo
     { command: 'pnl', description: 'Profit & Loss analysis' },
     { command: 'markets', description: 'View market data' },
     { command: 'wallet', description: 'View wallet balance' },
+    { command: 'withdraw', description: 'Withdraw funds to external wallet' },
     { command: 'push', description: 'Manage push settings' },
     { command: 'status', description: 'View system status' }
   ];
