@@ -78,7 +78,7 @@ export class PositionsHandler {
 
     try {
       // 获取用户语言偏好
-      const userLanguage = ctx.session?.language || ctx.from?.language_code || 'en';
+      const userLanguage = ctx.userLanguage || 'en';
       
       // 尝试从缓存获取数据
       logger.info(`Checking cache for positions [${requestId}]`, {
