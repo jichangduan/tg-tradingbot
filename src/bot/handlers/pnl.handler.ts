@@ -111,8 +111,11 @@ export class PnlHandler {
     const loadingMessage = await ctx.reply(loadingMsg);
 
     try {
+      // 获取用户语言偏好
+      const userLanguage = ctx.session?.language || ctx.from?.language_code || 'en';
+      
       // 尝试从缓存获取数据
-      const cachedData = await this.getCachedPnl(userId);
+      const cachedData = await this.getCachedPnl(userId, userLanguage);
       if (cachedData) {
         await ctx.telegram.editMessageText(
           ctx.chat!.id,
@@ -129,7 +132,7 @@ export class PnlHandler {
       const formattedMessage = await this.formatPnlMessage(pnlData, ctx);
       
       // 缓存结果
-      await this.cachePnl(userId, formattedMessage);
+      await this.cachePnl(userId, formattedMessage, userLanguage);
 
       // 更新消息
       await ctx.telegram.editMessageText(
@@ -416,16 +419,16 @@ export class PnlHandler {
   /**
    * 获取缓存的PNL数据
    */
-  private async getCachedPnl(userId: number): Promise<string | null> {
+  private async getCachedPnl(userId: number, userLanguage: string): Promise<string | null> {
     try {
-      const key = `${this.cacheKey}${userId}`;
+      const key = `${this.cacheKey}${userId}:${userLanguage}`;
       const result = await cacheService.get<string>(key);
       if (result.success && result.data) {
         return result.data;
       }
       return null;
     } catch (error) {
-      logger.warn('Failed to get cached pnl', { error: (error as Error).message, userId });
+      logger.warn('Failed to get cached pnl', { error: (error as Error).message, userId, userLanguage });
       return null;
     }
   }
@@ -433,12 +436,12 @@ export class PnlHandler {
   /**
    * 缓存PNL数据
    */
-  private async cachePnl(userId: number, data: string): Promise<void> {
+  private async cachePnl(userId: number, data: string, userLanguage: string): Promise<void> {
     try {
-      const key = `${this.cacheKey}${userId}`;
+      const key = `${this.cacheKey}${userId}:${userLanguage}`;
       await cacheService.set(key, data, this.cacheTTL);
     } catch (error) {
-      logger.warn('Failed to cache pnl', { error: (error as Error).message, userId });
+      logger.warn('Failed to cache pnl', { error: (error as Error).message, userId, userLanguage });
     }
   }
 

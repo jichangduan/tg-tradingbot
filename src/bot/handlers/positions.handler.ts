@@ -77,17 +77,22 @@ export class PositionsHandler {
     const loadingMessage = await ctx.reply(loadingMsg);
 
     try {
+      // 获取用户语言偏好
+      const userLanguage = ctx.session?.language || ctx.from?.language_code || 'en';
+      
       // 尝试从缓存获取数据
       logger.info(`Checking cache for positions [${requestId}]`, {
         userId,
-        cacheKey: `${this.cacheKey}${userId}`,
+        userLanguage,
+        cacheKey: `${this.cacheKey}${userId}:${userLanguage}`,
         requestId
       });
       
-      const cachedData = await this.getCachedPositions(userId);
+      const cachedData = await this.getCachedPositions(userId, userLanguage);
       if (cachedData) {
         logger.info(`Using cached positions data [${requestId}]`, {
           userId,
+          userLanguage,
           cachedDataLength: cachedData.length,
           requestId
         });
@@ -103,6 +108,7 @@ export class PositionsHandler {
       } else {
         logger.info(`No cached positions data found [${requestId}]`, {
           userId,
+          userLanguage,
           requestId
         });
       }
@@ -127,7 +133,7 @@ export class PositionsHandler {
       const formattedMessage = await this.formatPositionsMessage(positionsData, ctx);
       
       // 缓存结果
-      await this.cachePositions(userId, formattedMessage);
+      await this.cachePositions(userId, formattedMessage, userLanguage);
 
       // 更新消息
       await ctx.telegram.editMessageText(
@@ -698,12 +704,13 @@ ${description}
   /**
    * 获取缓存的仓位数据
    */
-  private async getCachedPositions(userId: number): Promise<string | null> {
+  private async getCachedPositions(userId: number, userLanguage: string): Promise<string | null> {
     try {
-      const key = `${this.cacheKey}${userId}`;
+      const key = `${this.cacheKey}${userId}:${userLanguage}`;
       
       logger.debug('Getting cached positions', {
         userId,
+        userLanguage,
         cacheKey: key
       });
       
@@ -712,6 +719,7 @@ ${description}
       if (result.success && result.data) {
         logger.debug('Found cached positions data', {
           userId,
+          userLanguage,
           cacheKey: key,
           dataLength: result.data.length
         });
@@ -720,6 +728,7 @@ ${description}
       
       logger.debug('No cached positions data found', {
         userId,
+        userLanguage,
         cacheKey: key,
         cacheResult: result
       });
@@ -729,7 +738,8 @@ ${description}
       logger.warn('Failed to get cached positions', { 
         error: (error as Error).message, 
         userId,
-        cacheKey: `${this.cacheKey}${userId}`
+        userLanguage,
+        cacheKey: `${this.cacheKey}${userId}:${userLanguage}`
       });
       return null;
     }
@@ -738,12 +748,13 @@ ${description}
   /**
    * 缓存仓位数据
    */
-  private async cachePositions(userId: number, data: string): Promise<void> {
+  private async cachePositions(userId: number, data: string, userLanguage: string): Promise<void> {
     try {
-      const key = `${this.cacheKey}${userId}`;
+      const key = `${this.cacheKey}${userId}:${userLanguage}`;
       
       logger.debug('Caching positions data', {
         userId,
+        userLanguage,
         cacheKey: key,
         dataLength: data.length,
         cacheTTL: this.cacheTTL
@@ -754,6 +765,7 @@ ${description}
       if (result.success) {
         logger.debug('Positions data cached successfully', {
           userId,
+          userLanguage,
           cacheKey: key,
           cacheTTL: this.cacheTTL
         });
@@ -765,6 +777,7 @@ ${description}
         } else {
           logger.warn('Failed to cache positions data', {
             userId,
+            userLanguage,
             cacheKey: key,
             cacheError: errorMessage
           });
@@ -774,7 +787,8 @@ ${description}
       logger.warn('Failed to cache positions', { 
         error: (error as Error).message, 
         userId,
-        cacheKey: `${this.cacheKey}${userId}`
+        userLanguage,
+        cacheKey: `${this.cacheKey}${userId}:${userLanguage}`
       });
     }
   }
