@@ -17,7 +17,7 @@ export class WithdrawHandler {
     address?: string;
     amount?: string;
     step: 'address' | 'amount' | 'confirm';
-    messageId?: number;
+    messageIds: number[]; // 跟踪所有需要删除的消息ID
   }>();
 
   /**
@@ -70,49 +70,25 @@ export class WithdrawHandler {
   }
 
   /**
-   * 显示输入界面
+   * 显示输入界面 - 第一步：询问钱包地址
    */
   private async showInputInterface(ctx: ExtendedContext, userId: string): Promise<void> {
     // 初始化用户状态
     this.userStates.set(userId, {
-      step: 'address'
+      step: 'address',
+      messageIds: []
     });
 
-    const message = `💸 <b>/Withdraw</b>
-
-📝 <b>Please enter your withdrawal details:</b>
-
-<i>Please enter your Arbitrum wallet address for withdrawal</i>
-<code>Enter wallet address...</code>
-
-<i>Please enter your withdrawal amount (USDT)</i>  
-<code>Enter amount...</code>
-
-💡 <i>Instructions:</i>
-• First reply with your Arbitrum wallet address
-• Then reply with the withdrawal amount
-• Make sure your address starts with 0x`;
-
-    const keyboard = {
-      inline_keyboard: [
-        [
-          { text: 'Max', callback_data: 'withdraw_max' }
-        ],
-        [
-          { text: 'Cancel', callback_data: 'withdraw_cancel' }
-        ]
-      ]
-    };
+    const message = `Please enter your Arbitrum wallet address for withdrawal`;
 
     const sentMessage = await ctx.reply(message, {
-      parse_mode: 'HTML',
-      reply_markup: keyboard
+      parse_mode: 'HTML'
     });
 
-    // 更新用户状态，保存消息ID
+    // 保存消息ID到状态中
     const currentState = this.userStates.get(userId);
     if (currentState) {
-      currentState.messageId = sentMessage.message_id;
+      currentState.messageIds.push(sentMessage.message_id);
       this.userStates.set(userId, currentState);
     }
   }
@@ -138,24 +114,26 @@ export class WithdrawHandler {
         // 处理地址输入
         const validation = this.validateAddress(userInput);
         if (!validation.isValid) {
-          await ctx.reply(`❌ ${validation.error}`, { parse_mode: 'HTML' });
+          const errorMessage = await ctx.reply(`❌ ${validation.error}`, { parse_mode: 'HTML' });
+          userState.messageIds.push(errorMessage.message_id);
+          this.userStates.set(userId, userState);
           return true;
         }
 
         userState.address = userInput;
         userState.step = 'amount';
-        this.userStates.set(userId, userState);
-
-        await ctx.reply(`✅ Address saved: <code>${userInput}</code>
-
-Now please enter the withdrawal amount (USDT):`, { parse_mode: 'HTML' });
+        
+        // 显示金额询问界面，带Max按钮
+        await this.showAmountInterface(ctx, userId);
         return true;
 
       } else if (userState.step === 'amount') {
         // 处理金额输入
         const validation = this.validateAmount(userInput);
         if (!validation.isValid) {
-          await ctx.reply(`❌ ${validation.error}`, { parse_mode: 'HTML' });
+          const errorMessage = await ctx.reply(`❌ ${validation.error}`, { parse_mode: 'HTML' });
+          userState.messageIds.push(errorMessage.message_id);
+          this.userStates.set(userId, userState);
           return true;
         }
 
@@ -180,7 +158,34 @@ Now please enter the withdrawal amount (USDT):`, { parse_mode: 'HTML' });
   }
 
   /**
-   * 显示确认界面
+   * 显示金额输入界面 - 第二步：询问提现金额
+   */
+  private async showAmountInterface(ctx: ExtendedContext, userId: string): Promise<void> {
+    const message = `Please enter your withdrawal amount (USDT)`;
+
+    const keyboard = {
+      inline_keyboard: [
+        [
+          { text: 'Max', callback_data: 'withdraw_max' }
+        ]
+      ]
+    };
+
+    const sentMessage = await ctx.reply(message, {
+      parse_mode: 'HTML',
+      reply_markup: keyboard
+    });
+
+    // 保存消息ID到状态中
+    const currentState = this.userStates.get(userId);
+    if (currentState) {
+      currentState.messageIds.push(sentMessage.message_id);
+      this.userStates.set(userId, currentState);
+    }
+  }
+
+  /**
+   * 显示确认界面 - 第三步：确认提现详情
    */
   private async showConfirmInterface(ctx: ExtendedContext, userId: string, address: string, amount: string): Promise<void> {
     const shortAddress = `${address.slice(0, 6)}...${address.slice(-4)}`;
@@ -205,10 +210,17 @@ Please verify the information and click confirm`;
       ]
     };
 
-    await ctx.reply(message, {
+    const sentMessage = await ctx.reply(message, {
       parse_mode: 'HTML',
       reply_markup: keyboard
     });
+
+    // 保存消息ID到状态中
+    const currentState = this.userStates.get(userId);
+    if (currentState) {
+      currentState.messageIds.push(sentMessage.message_id);
+      this.userStates.set(userId, currentState);
+    }
   }
 
   /**
@@ -244,14 +256,35 @@ Please verify the information and click confirm`;
   }
 
   /**
-   * 处理取消操作
+   * 处理取消操作 - 删除所有相关消息并清理状态
    */
   private async handleCancel(ctx: ExtendedContext, userId: string): Promise<void> {
+    const userState = this.userStates.get(userId);
+    
+    // 删除所有相关消息
+    if (userState && userState.messageIds.length > 0 && ctx.chat?.id) {
+      for (const messageId of userState.messageIds) {
+        try {
+          await ctx.telegram.deleteMessage(ctx.chat.id, messageId);
+        } catch (error) {
+          // 消息可能已经被删除，忽略错误
+          logger.debug('Failed to delete message', { messageId, error: (error as Error).message });
+        }
+      }
+    }
+
+    // 清除用户状态
     this.userStates.delete(userId);
     
-    await ctx.editMessageText('❌ Withdrawal cancelled', {
-      parse_mode: 'HTML'
-    });
+    // 删除当前回调消息
+    try {
+      await ctx.deleteMessage();
+    } catch (error) {
+      // 如果无法删除，则编辑消息
+      await ctx.editMessageText('❌ Withdrawal cancelled', {
+        parse_mode: 'HTML'
+      });
+    }
   }
 
   /**
@@ -278,8 +311,7 @@ Please verify the information and click confirm`;
     const encodedAddress = parts.slice(1).join('_');
     const address = decodeURIComponent(encodedAddress);
 
-    // 清除用户状态
-    this.userStates.delete(userId);
+    const userState = this.userStates.get(userId);
 
     // 显示处理中消息
     await ctx.editMessageText('🔄 Processing withdrawal request...', {
@@ -291,6 +323,20 @@ Please verify the information and click confirm`;
       const result = await this.processWithdrawal(userId, amount, address);
       
       if (result.success) {
+        // 清理所有之前的消息
+        if (userState && userState.messageIds.length > 0 && ctx.chat?.id) {
+          for (const messageId of userState.messageIds) {
+            try {
+              await ctx.telegram.deleteMessage(ctx.chat.id, messageId);
+            } catch (error) {
+              logger.debug('Failed to delete message', { messageId, error: (error as Error).message });
+            }
+          }
+        }
+
+        // 清除用户状态
+        this.userStates.delete(userId);
+
         // 显示成功界面
         await this.showSuccessInterface(ctx, amount);
       } else {
@@ -314,7 +360,7 @@ Please verify the information and click confirm`;
   }
 
   /**
-   * 显示成功界面
+   * 显示成功界面 - 独立的成功通知
    */
   private async showSuccessInterface(ctx: ExtendedContext, amount: string): Promise<void> {
     const message = `✅ <b>Withdrawal Submitted</b>
@@ -325,9 +371,17 @@ Your request will be processed within 24 hours.
 
 Transaction details will be sent once confirmed.`;
 
-    await ctx.editMessageText(message, {
+    // 发送新的成功消息，不是编辑之前的消息
+    await ctx.reply(message, {
       parse_mode: 'HTML'
     });
+
+    // 删除确认消息
+    try {
+      await ctx.deleteMessage();
+    } catch (error) {
+      logger.debug('Failed to delete confirmation message', { error: (error as Error).message });
+    }
   }
 
   /**
