@@ -372,5 +372,29 @@
   "button.whaleMovements.turnOn": "🐋 巨鲸动向 [开启]",
   "button.whaleMovements.turnOff": "🐋 巨鲸动向 [关闭]",
   "button.fundFlows.turnOn": "💰 资金流向 [开启]",
-  "button.fundFlows.turnOff": "💰 资金流向 [关闭]"
+  "button.fundFlows.turnOff": "💰 资金流向 [关闭]",
+
+  "invite.welcome.title": "🎁 通过邀请链接欢迎使用AIW3交易机器人！",
+  "invite.welcome.code": "邀请码：",
+  "invite.welcome.initializing": "正在初始化您的账户并处理邀请奖励...",
+  "invite.welcome.priorityAccess": "🚀 优先功能访问权限",
+  "invite.welcome.exclusiveBadge": "💎 专属用户徽章",
+  "invite.welcome.quickStart": "📝 快速开始：",
+  "invite.welcome.checkPrices": "查看价格",
+  "invite.welcome.viewFeatures": "查看更多功能",
+  "invite.welcome.creating": "💡 正在创建您的专属钱包并处理邀请奖励...",
+
+  "group.welcome.title": "👋 AIW3交易机器人已加入群组！",
+  "group.welcome.introduction": "🤖 我是@{botUsername}，您的专业加密货币交易助手",
+  "group.welcome.coreFeatures": "🚀 核心功能：",
+  "group.welcome.importantNotes": "⚠️ 重要提醒：",
+  "group.welcome.tradingBot": "这是AIW3交易机器人，不是管理工具",
+  "group.welcome.realTrading": "支持真实交易功能，使用时请谨慎",
+  "group.welcome.walletRequired": "所有交易都需要钱包初始化和资金",
+  "group.welcome.quickStart": "📝 快速开始：",
+  "group.welcome.initializeAccount": "初始化您的交易账户",
+  "group.welcome.checkBitcoin": "查看比特币价格",
+  "group.welcome.viewWallet": "查看钱包状态",
+  "group.welcome.getCommands": "获取完整命令列表",
+  "group.welcome.botConfirmed": "🤖 机器人身份确认："
 }

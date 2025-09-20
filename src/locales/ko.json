@@ -373,5 +373,29 @@
   "button.whaleMovements.turnOn": "🐋 고래 움직임 [켜기]",
   "button.whaleMovements.turnOff": "🐋 고래 움직임 [끄기]",
   "button.fundFlows.turnOn": "💰 자금 흐름 [켜기]",
-  "button.fundFlows.turnOff": "💰 자금 흐름 [끄기]"
+  "button.fundFlows.turnOff": "💰 자금 흐름 [끄기]",
+
+  "invite.welcome.title": "🎁 초대 링크를 통해 AIW3 TGBot에 오신 것을 환영합니다!",
+  "invite.welcome.code": "초대 코드:",
+  "invite.welcome.initializing": "계정을 초기화하고 초대 보상을 처리하는 중...",
+  "invite.welcome.priorityAccess": "🚀 우선 기능 액세스",
+  "invite.welcome.exclusiveBadge": "💎 독점 사용자 배지",
+  "invite.welcome.quickStart": "📝 빠른 시작:",
+  "invite.welcome.checkPrices": "가격 확인",
+  "invite.welcome.viewFeatures": "더 많은 기능 보기",
+  "invite.welcome.creating": "💡 전용 지갑을 생성하고 초대 보상을 처리하는 중...",
+
+  "group.welcome.title": "👋 AIW3 거래 봇이 그룹에 추가되었습니다!",
+  "group.welcome.introduction": "🤖 저는 @{botUsername}, 여러분의 전문 암호화폐 거래 어시스턴트입니다",
+  "group.welcome.coreFeatures": "🚀 핵심 기능:",
+  "group.welcome.importantNotes": "⚠️ 중요 사항:",
+  "group.welcome.tradingBot": "이것은 AIW3 거래 봇이며, 관리 도구가 아닙니다",
+  "group.welcome.realTrading": "실제 거래 기능을 지원하므로 주의해서 사용하세요",
+  "group.welcome.walletRequired": "모든 거래는 지갑 초기화와 자금이 필요합니다",
+  "group.welcome.quickStart": "📝 빠른 시작:",
+  "group.welcome.initializeAccount": "거래 계정 초기화",
+  "group.welcome.checkBitcoin": "비트코인 가격 확인",
+  "group.welcome.viewWallet": "지갑 상태 보기",
+  "group.welcome.getCommands": "전체 명령어 목록 얻기",
+  "group.welcome.botConfirmed": "🤖 봇 신원 확인됨:"
 }

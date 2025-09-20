@@ -372,5 +372,29 @@
   "button.whaleMovements.turnOn": "🐋 Whale Movements [Turn On]",
   "button.whaleMovements.turnOff": "🐋 Whale Movements [Turn Off]",
   "button.fundFlows.turnOn": "💰 Fund Flows [Turn On]",
-  "button.fundFlows.turnOff": "💰 Fund Flows [Turn Off]"
+  "button.fundFlows.turnOff": "💰 Fund Flows [Turn Off]",
+
+  "invite.welcome.title": "🎁 Welcome to AIW3 TGBot via invitation link!",
+  "invite.welcome.code": "Invitation code:",
+  "invite.welcome.initializing": "Initializing your account and processing invitation rewards...",
+  "invite.welcome.priorityAccess": "🚀 Priority feature access",
+  "invite.welcome.exclusiveBadge": "💎 Exclusive user badge",
+  "invite.welcome.quickStart": "📝 Quick Start:",
+  "invite.welcome.checkPrices": "Check prices",
+  "invite.welcome.viewFeatures": "View more features",
+  "invite.welcome.creating": "💡 Creating your exclusive wallet and processing invitation rewards...",
+
+  "group.welcome.title": "👋 AIW3 Trading Bot added to group!",
+  "group.welcome.introduction": "🤖 I'm @{botUsername}, your professional crypto trading assistant",
+  "group.welcome.coreFeatures": "🚀 Core Features:",
+  "group.welcome.importantNotes": "⚠️ Important Notes:",
+  "group.welcome.tradingBot": "This is AIW3 Trading Bot, not a management tool",
+  "group.welcome.realTrading": "Supports real trading functions, use with caution",
+  "group.welcome.walletRequired": "All trades require wallet initialization and funding",
+  "group.welcome.quickStart": "📝 Quick Start:",
+  "group.welcome.initializeAccount": "Initialize your trading account",
+  "group.welcome.checkBitcoin": "Check Bitcoin price",
+  "group.welcome.viewWallet": "View wallet status",
+  "group.welcome.getCommands": "Get complete command list",
+  "group.welcome.botConfirmed": "🤖 Bot Identity Confirmed:"
 }

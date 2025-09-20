@@ -379,26 +379,35 @@ ${walletExample}
    * Get invitation link welcome message
    */
   private async getInvitationWelcomeMessage(ctx: ExtendedContext, invitationCode: string): Promise<string> {
+    const title = await ctx.__!('invite.welcome.title');
+    const codeLabel = await ctx.__!('invite.welcome.code');
+    const initializing = await ctx.__!('invite.welcome.initializing');
     const benefitsTitle = await ctx.__!('invite.benefits.title');
     const benefitsEnergy = await ctx.__!('invite.benefits.energy');
+    const priorityAccess = await ctx.__!('invite.welcome.priorityAccess');
+    const exclusiveBadge = await ctx.__!('invite.welcome.exclusiveBadge');
+    const quickStart = await ctx.__!('invite.welcome.quickStart');
+    const checkPrices = await ctx.__!('invite.welcome.checkPrices');
+    const viewFeatures = await ctx.__!('invite.welcome.viewFeatures');
+    const creating = await ctx.__!('invite.welcome.creating');
     
     return `
-🎁 <b>Welcome to AIW3 TGBot via invitation link!</b>
+<b>${title}</b>
 
-Invitation code: <code>${invitationCode}</code>
+${codeLabel} <code>${invitationCode}</code>
 
-Initializing your account and processing invitation rewards...
+${initializing}
 
 ${benefitsTitle}
 • ${benefitsEnergy}
-• 🚀 Priority feature access
-• 💎 Exclusive user badge
+• ${priorityAccess}
+• ${exclusiveBadge}
 
-<b>📝 Quick Start:</b>
-<code>/price BTC</code> - Check prices
-<code>/help</code> - View more features
+<b>${quickStart}</b>
+<code>/price BTC</code> - ${checkPrices}
+<code>/help</code> - ${viewFeatures}
 
-<i>💡 Creating your exclusive wallet and processing invitation rewards...</i>
+<i>${creating}</i>
     `.trim();
   }
 
@@ -406,37 +415,52 @@ ${benefitsTitle}
    * Get group welcome message
    */
   private async getGroupWelcomeMessage(ctx: ExtendedContext): Promise<string> {
+    const botUsername = config.telegram.botUsername || 'aiw3_tradebot';
+    
+    const title = await ctx.__!('group.welcome.title');
+    const introduction = await ctx.__!('group.welcome.introduction', { botUsername });
+    const coreFeatures = await ctx.__!('group.welcome.coreFeatures');
     const priceQueries = await ctx.__!('welcome.commands.priceQueries');
     const tradeExecution = await ctx.__!('welcome.commands.tradeExecution');
     const accountInfo = await ctx.__!('welcome.commands.accountInfo');
     const marketData = await ctx.__!('welcome.commands.marketData');
     const chartAnalysis = await ctx.__!('welcome.commands.chartAnalysis');
+    const importantNotes = await ctx.__!('group.welcome.importantNotes');
+    const tradingBot = await ctx.__!('group.welcome.tradingBot');
+    const realTrading = await ctx.__!('group.welcome.realTrading');
+    const walletRequired = await ctx.__!('group.welcome.walletRequired');
+    const quickStart = await ctx.__!('group.welcome.quickStart');
+    const initializeAccount = await ctx.__!('group.welcome.initializeAccount');
+    const checkBitcoin = await ctx.__!('group.welcome.checkBitcoin');
+    const viewWallet = await ctx.__!('group.welcome.viewWallet');
+    const getCommands = await ctx.__!('group.welcome.getCommands');
+    const botConfirmed = await ctx.__!('group.welcome.botConfirmed');
     const tradingCall = await ctx.__!('welcome.commands.tradingCall');
     
     return `
-👋 <b>AIW3 Trading Bot added to group!</b>
+<b>${title}</b>
 
-🤖 I'm @${config.telegram.botUsername || 'aiw3_tradebot'}, your professional crypto trading assistant
+${introduction}
 
-<b>🚀 Core Features:</b>
+<b>${coreFeatures}</b>
 • ${priceQueries}
 • ${tradeExecution}
 • ${accountInfo}
 • ${marketData}
 • ${chartAnalysis}
 
-<b>⚠️ Important Notes:</b>
-• This is <b>AIW3 Trading Bot</b>, not a management tool
-• Supports real trading functions, use with caution
-• All trades require wallet initialization and funding
+<b>${importantNotes}</b>
+• ${tradingBot}
+• ${realTrading}
+• ${walletRequired}
 
-<b>📝 Quick Start:</b>
-1. <code>/start</code> - Initialize your trading account
-2. <code>/price BTC</code> - Check Bitcoin price  
-3. <code>/wallet</code> - View wallet status
-4. <code>/help</code> - Get complete command list
+<b>${quickStart}</b>
+1. <code>/start</code> - ${initializeAccount}
+2. <code>/price BTC</code> - ${checkBitcoin}
+3. <code>/wallet</code> - ${viewWallet}
+4. <code>/help</code> - ${getCommands}
 
-<b>🤖 Bot Identity Confirmed:</b> @${config.telegram.botUsername || 'aiw3_tradebot'}
+<b>${botConfirmed}</b> @${botUsername}
 
 ${tradingCall}
     `.trim();
