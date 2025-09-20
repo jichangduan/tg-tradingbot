@@ -126,7 +126,7 @@ export class PnlHandler {
 
       // 从API获取数据
       const pnlData = await this.fetchPnlFromAPI(userId, ctx);
-      const formattedMessage = this.formatPnlMessage(pnlData);
+      const formattedMessage = await this.formatPnlMessage(pnlData, ctx);
       
       // 缓存结果
       await this.cachePnl(userId, formattedMessage);
@@ -147,8 +147,9 @@ export class PnlHandler {
           const chartImage = await chartImageService.generatePnlChart(chartData);
           
           // 发送图表图片
+          const chartCaption = await ctx.__!('pnl.chartCaption');
           await ctx.replyWithPhoto({ source: chartImage.imageBuffer }, {
-            caption: '📈 Realized PNL Trend Chart',
+            caption: chartCaption,
             parse_mode: 'HTML'
           });
           
@@ -275,7 +276,7 @@ export class PnlHandler {
   /**
    * 格式化PNL分析消息
    */
-  private formatPnlMessage(data: PnlResponse): string {
+  private async formatPnlMessage(data: PnlResponse, ctx: ExtendedContext): Promise<string> {
     const { 
       trades, 
       totalTrades, 
@@ -318,41 +319,68 @@ export class PnlHandler {
 
     // If no trading records
     if (totalTrades === 0) {
+      const title = await ctx.__!('pnl.noRecords.title');
+      const summary = await ctx.__!('pnl.noRecords.summary');
+      const totalPnl = await ctx.__!('pnl.noRecords.totalPnl');
+      const winRate = await ctx.__!('pnl.noRecords.winRate');
+      const totalTradesText = await ctx.__!('pnl.noRecords.totalTrades');
+      const statistics = await ctx.__!('pnl.noRecords.statistics');
+      const volume = await ctx.__!('pnl.noRecords.volume');
+      const fees = await ctx.__!('pnl.noRecords.fees');
+      const days = await ctx.__!('pnl.noRecords.days');
+      const dataSource = await ctx.__!('pnl.dataSource');
+      const realPnlSource = await ctx.__!('pnl.realPnlSource');
+      const analysisTime = await ctx.__!('pnl.analysisTime');
+      
       return `
-📊 <b>PNL Analysis Report</b>
+<b>${title}</b>
 
-💰 <b>Realized PnL Summary:</b>
-• Total Realized PnL: $0.00
-• Win Rate: 0%
-• Total Trades: 0
+<b>${summary}</b>
+• ${totalPnl}
+• ${winRate}
+• ${totalTradesText}
 
-📈 <b>Trading Statistics:</b>
-• Volume: $0.00
-• Fees: $0.00
-• Trading Days: 0
+<b>${statistics}</b>
+• ${volume}
+• ${fees}
+• ${days}
 
-<i>📊 Data Source: Real PnL from trading history</i>
-<i>🕐 Analysis time: ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Shanghai' })}</i>
+<i>${dataSource} ${realPnlSource}</i>
+<i>${analysisTime} ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Shanghai' })}</i>
       `.trim();
     }
 
     // Generate enhanced PNL analysis report with real realized PnL data
+    const reportTitle = await ctx.__!('pnl.analysisReport');
+    const realizedSummary = await ctx.__!('pnl.realizedSummary');
+    const totalRealizedLabel = await ctx.__!('pnl.totalRealized');
+    const winRateLabel = await ctx.__!('pnl.winRate');
+    const profitableTradesLabel = await ctx.__!('pnl.profitableTrades');
+    const losingTradesLabel = await ctx.__!('pnl.losingTrades');
+    const tradingStatistics = await ctx.__!('pnl.tradingStatistics');
+    const totalVolumeLabel = await ctx.__!('pnl.totalVolume');
+    const totalFeesLabel = await ctx.__!('pnl.totalFees');
+    const tradingDaysLabel = await ctx.__!('pnl.tradingDays');
+    const dataSourceLabel = await ctx.__!('pnl.dataSource');
+    const realPnlSource = await ctx.__!('pnl.realPnlSource');
+    const analysisTimeLabel = await ctx.__!('pnl.analysisTime');
+    
     let analysisMessage = `
-📊 <b>PNL Analysis Report</b>
+<b>${reportTitle}</b>
 
-💰 <b>Realized PnL Summary:</b>
-• Total Realized PnL: $${this.formatNumber(totalRealizedPnl)}
-• Win Rate: ${calculatedWinRate}
-• Profitable Trades: ${calculatedProfitableTrades}/${totalTrades}
-• Losing Trades: ${calculatedLosingTrades}/${totalTrades}
+<b>${realizedSummary}</b>
+• ${totalRealizedLabel} $${this.formatNumber(totalRealizedPnl)}
+• ${winRateLabel} ${calculatedWinRate}
+• ${profitableTradesLabel} ${calculatedProfitableTrades}/${totalTrades}
+• ${losingTradesLabel} ${calculatedLosingTrades}/${totalTrades}
 
-📈 <b>Trading Statistics:</b>
-• Total Volume: $${this.formatNumber(statistics.totalVolume)}
-• Total Fees: $${this.formatNumber(statistics.totalFees)}
-• Trading Days: ${statistics.tradingDays} days
+<b>${tradingStatistics}</b>
+• ${totalVolumeLabel} $${this.formatNumber(statistics.totalVolume)}
+• ${totalFeesLabel} $${this.formatNumber(statistics.totalFees)}
+• ${tradingDaysLabel} ${statistics.tradingDays} days
 
-<i>📊 Data Source: ${dataSource || 'Real PnL from trading history'}</i>
-<i>🕐 Analysis time: ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Shanghai' })}</i>
+<i>${dataSourceLabel} ${dataSource || realPnlSource}</i>
+<i>${analysisTimeLabel} ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Shanghai' })}</i>
     `.trim();
 
     return analysisMessage;

@@ -124,7 +124,7 @@ export class PositionsHandler {
         requestId
       });
       
-      const formattedMessage = this.formatPositionsMessage(positionsData);
+      const formattedMessage = await this.formatPositionsMessage(positionsData, ctx);
       
       // 缓存结果
       await this.cachePositions(userId, formattedMessage);
@@ -144,8 +144,9 @@ export class PositionsHandler {
         const chartImage = await chartImageService.generatePositionsChart(chartData);
         
         // 发送图表图片
+        const chartCaption = await ctx.__!('positions.chartCaption');
         await ctx.replyWithPhoto({ source: chartImage.imageBuffer }, {
-          caption: '📊 Positions Overview Chart',
+          caption: chartCaption,
           parse_mode: 'HTML'
         });
         
@@ -172,7 +173,7 @@ export class PositionsHandler {
         requestId
       });
       
-      const errorMessage = this.handleError(error as Error, requestId);
+      const errorMessage = await this.handleError(error as Error, ctx, requestId);
       
       try {
         await ctx.telegram.editMessageText(
@@ -437,35 +438,58 @@ export class PositionsHandler {
   /**
    * Format positions information message
    */
-  private formatPositionsMessage(data: PositionsResponse): string {
+  private async formatPositionsMessage(data: PositionsResponse, ctx: ExtendedContext): Promise<string> {
     const { positions, totalPositions, totalPnl, accountValue, availableBalance } = data.data;
 
     if (totalPositions === 0) {
+      const overview = await ctx.__!('positions.overview');
+      const accountInfo = await ctx.__!('positions.accountInfo');
+      const accountValueLabel = await ctx.__!('positions.accountValue');
+      const availableBalanceLabel = await ctx.__!('positions.availableBalance');
+      const totalPnlLabel = await ctx.__!('positions.totalPnl');
+      const positionCountLabel = await ctx.__!('positions.positionCount');
+      const currentPositions = await ctx.__!('positions.currentPositions');
+      const noPositions = await ctx.__!('positions.noPositions');
+      const managePositions = await ctx.__!('positions.managePositions');
+      const openLong = await ctx.__!('positions.manage.openLong');
+      const openShort = await ctx.__!('positions.manage.openShort');
+      const markets = await ctx.__!('positions.manage.markets');
+      const queryTime = await ctx.__!('positions.queryTime');
+      
       return `
-📊 <b>Positions Overview</b>
+<b>${overview}</b>
 
-💰 <b>Account Information:</b>
-• Account Value    : $${parseFloat(accountValue).toFixed(2)}
-• Available Balance: $${parseFloat(availableBalance).toFixed(2)}
-• Total PNL        : 🔘 $0.00
-• Position Count   : 0
+<b>${accountInfo}</b>
+• ${accountValueLabel}    : $${parseFloat(accountValue).toFixed(2)}
+• ${availableBalanceLabel}: $${parseFloat(availableBalance).toFixed(2)}
+• ${totalPnlLabel}        : 🔘 $0.00
+• ${positionCountLabel}   : 0
 
-📈 <b>Current Positions:</b>
-No positions
+<b>${currentPositions}</b>
+${noPositions}
 
-💡 <b>Manage Positions:</b>
-• <code>/long BTC 10x 100</code> - Open long position
-• <code>/short ETH 5x 50</code> - Open short position  
-• <code>/markets</code> - View market data
+<b>${managePositions}</b>
+• ${openLong}
+• ${openShort}
+• ${markets}
 
-<i>🕐 Query time: ${new Date().toLocaleString('en-US', { timeZone: 'UTC' })}</i>
+<i>${queryTime} ${new Date().toLocaleString('en-US', { timeZone: 'UTC' })}</i>
       `.trim();
     }
 
+    // Get translation labels for position details
+    const longText = await ctx.__!('positions.long');
+    const shortText = await ctx.__!('positions.short');
+    const positionSizeLabel = await ctx.__!('positions.positionSize');
+    const entryPriceLabel = await ctx.__!('positions.entryPrice');
+    const markPriceLabel = await ctx.__!('positions.markPrice');
+    const unrealizedPnlLabel = await ctx.__!('positions.unrealizedPnl');
+    const marginUsedLabel = await ctx.__!('positions.marginUsed');
+    
     let positionsText = '';
     positions.forEach((position, index) => {
       const sideIcon = position.side === 'long' ? '📈' : '📉';
-      const sideText = position.side === 'long' ? 'Long' : 'Short';
+      const sideText = position.side === 'long' ? longText : shortText;
       const pnlColor = parseFloat(position.pnl) >= 0 ? '🟢' : '🔴';
       const pnlPrefix = parseFloat(position.pnl) >= 0 ? '+' : '';
       
@@ -476,42 +500,56 @@ No positions
       positionsText += `
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ${sideIcon} <b>${position.symbol} ${sideText}</b>
-• Position Size    : ${formattedSize} ${position.symbol}
-• Entry Price      : $${parseFloat(position.entryPrice).toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
-• Mark Price       : $${parseFloat(position.markPrice).toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
-• Unrealized PNL   : ${pnlColor} ${pnlPrefix}$${Math.abs(parseFloat(position.pnl)).toFixed(2)} (${pnlPrefix}${parseFloat(position.pnlPercentage).toFixed(2)}%)
-• Margin Used      : $${parseFloat(position.marginUsed).toFixed(2)}
+• ${positionSizeLabel}    : ${formattedSize} ${position.symbol}
+• ${entryPriceLabel}      : $${parseFloat(position.entryPrice).toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
+• ${markPriceLabel}       : $${parseFloat(position.markPrice).toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
+• ${unrealizedPnlLabel}   : ${pnlColor} ${pnlPrefix}$${Math.abs(parseFloat(position.pnl)).toFixed(2)} (${pnlPrefix}${parseFloat(position.pnlPercentage).toFixed(2)}%)
+• ${marginUsedLabel}      : $${parseFloat(position.marginUsed).toFixed(2)}
       `;
     });
 
     const totalPnlColor = parseFloat(totalPnl) >= 0 ? '🟢' : '🔴';
     const totalPnlPrefix = parseFloat(totalPnl) >= 0 ? '+' : '';
 
+    // Get translation labels for the overview
+    const overview = await ctx.__!('positions.overview');
+    const accountInfo = await ctx.__!('positions.accountInfo');
+    const accountValueLabel = await ctx.__!('positions.accountValue');
+    const availableBalanceLabel = await ctx.__!('positions.availableBalance');
+    const totalPnlLabel = await ctx.__!('positions.totalPnl');
+    const positionCountLabel = await ctx.__!('positions.positionCount');
+    const currentPositions = await ctx.__!('positions.currentPositions');
+    const managePositions = await ctx.__!('positions.managePositions');
+    const closePosition = await ctx.__!('positions.manage.close');
+    const checkPrice = await ctx.__!('positions.manage.price');
+    const viewChart = await ctx.__!('positions.manage.chart');
+    const queryTime = await ctx.__!('positions.queryTime');
+
     return `
-📊 <b>Positions Overview</b>
+<b>${overview}</b>
 
-💰 <b>Account Information:</b>
-• Account Value    : $${parseFloat(accountValue).toFixed(2)}
-• Available Balance: $${parseFloat(availableBalance).toFixed(2)}
-• Total PNL        : ${totalPnlColor} ${totalPnlPrefix}$${Math.abs(parseFloat(totalPnl)).toFixed(2)}
-• Position Count   : ${totalPositions}
+<b>${accountInfo}</b>
+• ${accountValueLabel}    : $${parseFloat(accountValue).toFixed(2)}
+• ${availableBalanceLabel}: $${parseFloat(availableBalance).toFixed(2)}
+• ${totalPnlLabel}        : ${totalPnlColor} ${totalPnlPrefix}$${Math.abs(parseFloat(totalPnl)).toFixed(2)}
+• ${positionCountLabel}   : ${totalPositions}
 
-📈 <b>Current Positions:</b>
+<b>${currentPositions}</b>
 ${positionsText}
 
-💡 <b>Manage Positions:</b>
-• <code>/close symbol</code> - Close specified position
-• <code>/price symbol</code> - Check real-time price
-• <code>/chart symbol</code> - View candlestick chart
+<b>${managePositions}</b>
+• ${closePosition}
+• ${checkPrice}
+• ${viewChart}
 
-<i>🕐 Query time: ${new Date().toLocaleString('en-US', { timeZone: 'UTC' })}</i>
+<i>${queryTime} ${new Date().toLocaleString('en-US', { timeZone: 'UTC' })}</i>
     `.trim();
   }
 
   /**
    * Error handling
    */
-  private handleError(error: Error, requestId?: string): string {
+  private async handleError(error: Error, ctx: ExtendedContext, requestId?: string): Promise<string> {
     const reqId = requestId || `error_${Date.now()}`;
     
     logger.error(`Handling positions error [${reqId}]`, { 
@@ -523,23 +561,31 @@ ${positionsText}
 
     if (error.message.includes('not logged in')) {
       logger.info(`Authentication error detected [${reqId}]`, { requestId: reqId });
+      const title = await ctx.__!('positions.errors.notLoggedIn.title');
+      const description = await ctx.__!('positions.errors.notLoggedIn.description');
+      const note = await ctx.__!('positions.errors.notLoggedIn.note');
+      
       return `
-❌ <b>User Not Logged In</b>
+<b>${title}</b>
 
-Please use /start command to login first before querying position information.
+${description}
 
-<i>If you are already logged in but still see this error, please contact administrator.</i>
+<i>${note}</i>
       `.trim();
     }
 
     if (error.message.includes('network') || error.message.includes('ECONNREFUSED') || error.message.includes('ENOTFOUND')) {
       logger.info(`Network error detected [${reqId}]`, { requestId: reqId });
+      const title = await ctx.__!('positions.errors.network.title');
+      const description = await ctx.__!('positions.errors.network.description');
+      const note = await ctx.__!('positions.errors.network.note');
+      
       return `
-❌ <b>Network Connection Failed</b>
+<b>${title}</b>
 
-Please check your network connection and retry, or try again later.
+${description}
 
-<i>If the problem persists, please contact administrator.</i>
+<i>${note}</i>
       `.trim();
     }
 
@@ -551,19 +597,28 @@ Please check your network connection and retry, or try again later.
         requestId: reqId
       });
       
+      const title = await ctx.__!('positions.errors.api400.title');
+      const description = await ctx.__!('positions.errors.api400.description');
+      const suggestions = await ctx.__!('positions.errors.api400.suggestions');
+      const retry = await ctx.__!('positions.errors.api400.retry');
+      const contact = await ctx.__!('positions.errors.api400.contact');
+      const useWallet = await ctx.__!('positions.errors.api400.useWallet');
+      const note = await ctx.__!('positions.errors.api400.note');
+      const technical = await ctx.__!('positions.errors.api400.technical');
+      
       return `
-❌ <b>External Interface Error (400)</b>
+<b>${title}</b>
 
-Positions query interface temporarily unavailable, this is a backend API issue.
+${description}
 
-💡 <b>Suggested Actions:</b>
-• Retry this command later
-• Contact administrator to report interface failure
-• Use other commands like /wallet to check account information
+<b>${suggestions}</b>
+${retry}
+${contact}
+${useWallet}
 
-⚠️ <i>This is not your operation error, but a system interface that needs repair.</i>
+${note}
 
-<b>Technical Details:</b> ${error.message}
+<b>${technical}</b> ${error.message}
       `.trim();
     }
 
@@ -575,47 +630,68 @@ Positions query interface temporarily unavailable, this is a backend API issue.
         requestId: reqId
       });
       
+      const title = await ctx.__!('positions.errors.server.title');
+      const description = await ctx.__!('positions.errors.server.description');
+      const suggestions = await ctx.__!('positions.errors.server.suggestions');
+      const wait = await ctx.__!('positions.errors.server.wait');
+      const checkOthers = await ctx.__!('positions.errors.server.checkOthers');
+      const contactAdmin = await ctx.__!('positions.errors.server.contactAdmin');
+      const note = await ctx.__!('positions.errors.server.note');
+      
       return `
-❌ <b>Server Error</b>
+<b>${title}</b>
 
-Backend service temporarily unavailable, please retry later.
+${description}
 
-💡 <b>Suggested Actions:</b>
-• Wait 5-10 minutes and retry
-• Check if other commands work normally
-• Contact administrator to confirm service status
+<b>${suggestions}</b>
+${wait}
+${checkOthers}
+${contactAdmin}
 
-⚠️ <i>This is a temporary service issue that usually recovers automatically.</i>
+${note}
       `.trim();
     }
 
     // Timeout error
     if (error.message.includes('timeout') || error.message.includes('ECONNABORTED')) {
       logger.info(`Timeout error detected [${reqId}]`, { requestId: reqId });
+      const title = await ctx.__!('positions.errors.timeout.title');
+      const description = await ctx.__!('positions.errors.timeout.description');
+      const suggestions = await ctx.__!('positions.errors.timeout.suggestions');
+      const retry = await ctx.__!('positions.errors.timeout.retry');
+      const network = await ctx.__!('positions.errors.timeout.network');
+      const note = await ctx.__!('positions.errors.timeout.note');
+      
       return `
-❌ <b>Request Timeout</b>
+<b>${title}</b>
 
-Positions query timed out, possibly due to slow network or server response.
+${description}
 
-💡 <b>Suggested Actions:</b>
-• Retry this command later
-• Check network connection status
+<b>${suggestions}</b>
+${retry}
+${network}
 
-<i>If the problem persists, please contact administrator.</i>
+<i>${note}</i>
       `.trim();
     }
 
     logger.info(`Generic error, returning default message [${reqId}]`, { requestId: reqId });
     
+    const title = await ctx.__!('positions.errors.generic.title');
+    const description = await ctx.__!('positions.errors.generic.description');
+    const details = await ctx.__!('positions.errors.generic.details');
+    const requestIdLabel = await ctx.__!('positions.errors.generic.requestId');
+    const note = await ctx.__!('positions.errors.generic.note');
+    
     return `
-❌ <b>Query Failed</b>
+<b>${title}</b>
 
-An error occurred while fetching position information, please try again later.
+${description}
 
-<b>Error Details:</b> ${error.message}
-<b>Request ID:</b> ${reqId}
+<b>${details}</b> ${error.message}
+<b>${requestIdLabel}</b> ${reqId}
 
-<i>If the problem persists, please contact administrator.</i>
+<i>${note}</i>
     `.trim();
   }
 
