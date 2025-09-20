@@ -19,19 +19,38 @@ export function createLanguageMiddleware() {
       
       if (telegramId) {
         // 1. 尝试获取用户已设置的语言偏好
-        userLanguage = await i18nService.getUserLanguage(telegramId);
+        const storedLanguage = await i18nService.getUserLanguage(telegramId);
         
-        // 2. 如果是默认语言（意味着可能是新用户），尝试基于 Telegram 语言检测
-        if (userLanguage === 'en' && telegramLangCode) {
+        // 2. 检查是否是真正的新用户（没有任何语言设置记录）
+        const isNewUser = await isNewUserCheck(telegramId);
+        
+        logger.debug('🔍 Language detection process', {
+          telegramId,
+          username,
+          storedLanguage,
+          telegramLangCode,
+          isNewUser,
+          requestId: (ctx as any).requestId
+        });
+        
+        if (isNewUser && telegramLangCode) {
+          // 只对真正的新用户进行自动语言检测
           const detectedLang = i18nService.detectLanguageFromTelegram(telegramLangCode);
           
-          // 如果检测到非英语语言，自动为用户设置
+          logger.info('🌍 Auto-detecting language for new user', {
+            telegramId,
+            username,
+            telegramLangCode,
+            detectedLanguage: detectedLang,
+            willSetLanguage: detectedLang !== 'en'
+          });
+          
           if (detectedLang !== 'en') {
             const saved = await i18nService.setUserLanguage(telegramId, detectedLang);
             if (saved) {
               userLanguage = detectedLang;
               
-              logger.info('Auto-detected and set user language', {
+              logger.info('✅ Auto-detected and set user language for new user', {
                 telegramId,
                 username,
                 telegramLangCode,
@@ -39,7 +58,28 @@ export function createLanguageMiddleware() {
                 previousLanguage: 'en'
               });
             }
+          } else {
+            // 新用户但检测为英文，显式设置为英文以标记非新用户
+            await i18nService.setUserLanguage(telegramId, 'en');
+            userLanguage = 'en';
+            
+            logger.info('✅ Set English for new English-speaking user', {
+              telegramId,
+              username,
+              telegramLangCode
+            });
           }
+        } else {
+          // 现有用户，尊重已存储的语言选择，绝不覆盖
+          userLanguage = storedLanguage;
+          
+          logger.debug('✅ Using stored language preference for existing user', {
+            telegramId,
+            username,
+            storedLanguage,
+            telegramLangCode,
+            willNotOverride: true
+          });
         }
       }
       
@@ -117,6 +157,37 @@ export function createLanguageMiddleware() {
     
     return next();
   };
+}
+
+/**
+ * 检查是否为新用户（没有语言偏好记录）
+ */
+async function isNewUserCheck(telegramId: number): Promise<boolean> {
+  try {
+    const cacheKey = `user:lang:${telegramId}`;
+    const result = await import('../services/cache.service').then(m => m.cacheService.get(cacheKey));
+    
+    // 如果缓存中没有记录，说明是新用户
+    const isNew = !result.success || !result.data;
+    
+    logger.debug('🔍 New user check result', {
+      telegramId,
+      cacheKey,
+      cacheSuccess: result.success,
+      hasData: !!result.data,
+      storedValue: result.data,
+      isNewUser: isNew
+    });
+    
+    return isNew;
+  } catch (error) {
+    logger.error('Error checking if user is new', {
+      telegramId,
+      error: (error as Error).message
+    });
+    // 出错时保守处理，认为是新用户
+    return true;
+  }
 }
 
 /**
