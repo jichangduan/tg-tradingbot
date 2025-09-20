@@ -30,35 +30,113 @@ export class I18nService {
     try {
       const localesDir = path.join(__dirname, '../locales');
       
+      logger.info('🌍 Starting translation file loading', {
+        localesDir,
+        supportedLocales: this.supportedLocales,
+        defaultLocale: this.defaultLocale,
+        directoryExists: fs.existsSync(localesDir)
+      });
+      
       if (fs.existsSync(localesDir)) {
         const files = fs.readdirSync(localesDir);
+        logger.info('📁 Found files in locales directory', { files });
         
         for (const file of files) {
           if (file.endsWith('.json')) {
             const locale = file.replace('.json', '');
             
+            logger.info(`🔍 Processing locale file: ${file}`, {
+              file,
+              locale,
+              isSupported: this.supportedLocales.includes(locale)
+            });
+            
             // 只加载支持的语言
             if (this.supportedLocales.includes(locale)) {
               const filePath = path.join(localesDir, file);
-              const content = fs.readFileSync(filePath, 'utf8');
-              this.translationCache[locale] = JSON.parse(content);
+              
+              try {
+                const content = fs.readFileSync(filePath, 'utf8');
+                const parsedContent = JSON.parse(content);
+                this.translationCache[locale] = parsedContent;
+                
+                const keyCount = Object.keys(parsedContent).length;
+                
+                logger.info(`✅ Successfully loaded ${locale} translations`, {
+                  locale,
+                  filePath,
+                  keyCount,
+                  sampleKeys: Object.keys(parsedContent).slice(0, 5),
+                  hasPositionsOverview: !!parsedContent['positions.overview'],
+                  hasPnlAnalysisReport: !!parsedContent['pnl.analysisReport']
+                });
+                
+              } catch (fileError) {
+                logger.error(`❌ Failed to load ${locale} translation file`, {
+                  locale,
+                  filePath,
+                  error: (fileError as Error).message,
+                  stack: (fileError as Error).stack
+                });
+              }
+            } else {
+              logger.warn(`⚠️ Skipping unsupported locale: ${locale}`, {
+                file,
+                locale,
+                supportedLocales: this.supportedLocales
+              });
             }
           }
         }
         
         this.cacheLoaded = true;
         
-        logger.info('Translation files loaded successfully', {
-          locales: Object.keys(this.translationCache),
-          totalKeys: Object.keys(this.translationCache[this.defaultLocale] || {}).length
-        });
+        // 详细记录加载结果
+        const loadingSummary = {
+          success: true,
+          loadedLocales: Object.keys(this.translationCache),
+          translationCounts: Object.fromEntries(
+            Object.entries(this.translationCache).map(([locale, translations]) => [
+              locale,
+              Object.keys(translations).length
+            ])
+          ),
+          defaultLocaleKeys: Object.keys(this.translationCache[this.defaultLocale] || {}).length,
+          criticalKeysCheck: {
+            english: {
+              'positions.overview': this.translationCache['en']?.['positions.overview'] || 'MISSING',
+              'pnl.analysisReport': this.translationCache['en']?.['pnl.analysisReport'] || 'MISSING'
+            },
+            chinese: {
+              'positions.overview': this.translationCache['zh-CN']?.['positions.overview'] || 'MISSING',
+              'pnl.analysisReport': this.translationCache['zh-CN']?.['pnl.analysisReport'] || 'MISSING'
+            }
+          }
+        };
+        
+        logger.info('🎉 Translation loading completed', loadingSummary);
+        
+        // 启动时验证英文翻译
+        await this.validateEnglishTranslations();
+        
+        // 如果英文翻译缺失，尝试强制重新加载
+        if (!this.translationCache['en'] || Object.keys(this.translationCache['en']).length === 0) {
+          logger.warn('⚠️ English translations missing, attempting force reload');
+          await this.forceReloadEnglishTranslations();
+        }
+        
       } else {
-        logger.error('Locales directory not found', { localesDir });
+        logger.error('❌ Locales directory not found', { 
+          localesDir,
+          currentWorkingDir: process.cwd(),
+          __dirname
+        });
       }
     } catch (error) {
-      logger.error('Failed to load translation files', { 
+      logger.error('💥 Critical error loading translation files', { 
         error: (error as Error).message,
-        stack: (error as Error).stack
+        stack: (error as Error).stack,
+        localesDir: path.join(__dirname, '../locales')
       });
     }
   }
@@ -72,34 +150,83 @@ export class I18nService {
   public async __(key: string, locale: string = 'en', params?: any): Promise<string> {
     await this.loadTranslations();
     
+    // 🔍 详细调试翻译查找过程
+    const debugInfo = {
+      key,
+      requestedLocale: locale,
+      defaultLocale: this.defaultLocale,
+      cacheLoaded: this.cacheLoaded,
+      availableLocales: Object.keys(this.translationCache),
+      localeHasTranslations: !!this.translationCache[locale],
+      keyExistsInLocale: !!this.translationCache[locale]?.[key],
+      keyExistsInDefault: !!this.translationCache[this.defaultLocale]?.[key]
+    };
+    
     // 1. 尝试获取指定语言的翻译
     let translation = this.translationCache[locale]?.[key];
+    
+    if (translation) {
+      logger.debug('✅ Translation found in requested locale', {
+        ...debugInfo,
+        translationFound: true,
+        translationValue: translation
+      });
+    } else {
+      logger.info('⚠️ Translation not found in requested locale', debugInfo);
+    }
     
     // 2. 如果没有找到，回退到默认语言（英文）
     if (!translation && locale !== this.defaultLocale) {
       translation = this.translationCache[this.defaultLocale]?.[key];
       
-      logger.warn('Translation fallback to default locale', { 
-        key, 
-        requestedLocale: locale, 
-        fallbackLocale: this.defaultLocale 
-      });
+      if (translation) {
+        logger.warn('🔄 Translation fallback to default locale successful', { 
+          ...debugInfo,
+          fallbackSuccessful: true,
+          translationValue: translation
+        });
+      } else {
+        logger.error('❌ Translation fallback to default locale failed', {
+          ...debugInfo,
+          fallbackFailed: true,
+          defaultLocaleTranslations: Object.keys(this.translationCache[this.defaultLocale] || {}).length
+        });
+      }
     }
     
     // 3. 如果还是没有，返回原始key
     if (!translation) {
-      logger.warn('Translation not found', { 
-        key, 
-        locale, 
-        availableKeys: Object.keys(this.translationCache[this.defaultLocale] || {}).slice(0, 5)
+      logger.error('💥 Translation completely missing', { 
+        ...debugInfo,
+        returnedKey: key,
+        availableKeysInDefault: Object.keys(this.translationCache[this.defaultLocale] || {}).slice(0, 10),
+        translationCacheDump: {
+          en: Object.keys(this.translationCache['en'] || {}).length,
+          'zh-CN': Object.keys(this.translationCache['zh-CN'] || {}).length,
+          ko: Object.keys(this.translationCache['ko'] || {}).length
+        }
       });
       return key;
     }
     
     // 4. 参数替换 - 支持对象参数 {symbol: 'BTC', price: '50000'} 
     if (params) {
-      return this.interpolateParams(translation, params);
+      const interpolated = this.interpolateParams(translation, params);
+      logger.debug('🔧 Translation interpolated with params', {
+        key,
+        locale,
+        originalTranslation: translation,
+        interpolatedTranslation: interpolated,
+        params
+      });
+      return interpolated;
     }
+    
+    logger.debug('✅ Translation returned successfully', {
+      key,
+      locale,
+      translation
+    });
     
     return translation;
   }
@@ -244,10 +371,15 @@ export class I18nService {
    * 重新加载翻译文件（热更新，用于开发调试）
    */
   public async reloadTranslations(): Promise<void> {
+    logger.info('🔄 Starting translation reload');
     this.cacheLoaded = false;
     this.translationCache = {};
     await this.loadTranslations();
-    logger.info('Translation files reloaded');
+    
+    // 重新加载后验证英文翻译
+    await this.validateEnglishTranslations();
+    
+    logger.info('✅ Translation files reloaded successfully');
   }
 
   /**
@@ -265,6 +397,94 @@ export class I18nService {
         ])
       )
     };
+  }
+
+  /**
+   * 验证英文翻译是否正确加载（专门用于调试英文问题）
+   */
+  public async validateEnglishTranslations(): Promise<any> {
+    await this.loadTranslations();
+    
+    const criticalKeys = [
+      'positions.overview',
+      'positions.accountInfo', 
+      'positions.currentPositions',
+      'pnl.analysisReport',
+      'pnl.realizedSummary',
+      'pnl.tradingStatistics'
+    ];
+    
+    const englishCache = this.translationCache['en'] || {};
+    const validation = {
+      englishCacheExists: !!this.translationCache['en'],
+      englishKeyCount: Object.keys(englishCache).length,
+      criticalKeysValidation: {} as Record<string, any>,
+      firstTenKeys: Object.keys(englishCache).slice(0, 10),
+      sampleTranslations: {} as Record<string, string>
+    };
+    
+    // 验证关键翻译键
+    for (const key of criticalKeys) {
+      const translation = englishCache[key];
+      validation.criticalKeysValidation[key] = {
+        exists: !!translation,
+        value: translation || 'MISSING',
+        type: typeof translation
+      };
+      
+      if (translation) {
+        validation.sampleTranslations[key] = translation;
+      }
+    }
+    
+    logger.info('🔍 English translation validation results', validation);
+    
+    return validation;
+  }
+
+  /**
+   * 强制重新加载英文翻译（应急修复方法）
+   */
+  public async forceReloadEnglishTranslations(): Promise<boolean> {
+    try {
+      const localesDir = path.join(__dirname, '../locales');
+      const englishFilePath = path.join(localesDir, 'en.json');
+      
+      logger.info('🔄 Force reloading English translations', {
+        localesDir,
+        englishFilePath,
+        fileExists: fs.existsSync(englishFilePath)
+      });
+      
+      if (fs.existsSync(englishFilePath)) {
+        const content = fs.readFileSync(englishFilePath, 'utf8');
+        const parsedContent = JSON.parse(content);
+        
+        // 强制更新英文缓存
+        this.translationCache['en'] = parsedContent;
+        
+        const keyCount = Object.keys(parsedContent).length;
+        logger.info('✅ English translations force reloaded successfully', {
+          keyCount,
+          hasPositionsOverview: !!parsedContent['positions.overview'],
+          hasPnlAnalysisReport: !!parsedContent['pnl.analysisReport'],
+          sampleKeys: Object.keys(parsedContent).slice(0, 5)
+        });
+        
+        return true;
+      } else {
+        logger.error('❌ English translation file not found for force reload', {
+          englishFilePath
+        });
+        return false;
+      }
+    } catch (error) {
+      logger.error('❌ Force reload of English translations failed', {
+        error: (error as Error).message,
+        stack: (error as Error).stack
+      });
+      return false;
+    }
   }
 }
 
