@@ -105,7 +105,20 @@ export class WithdrawHandler {
     }
 
     const userState = this.userStates.get(userId);
+    
+    logger.debug('Withdraw handleUserInput called', {
+      telegramId: parseInt(userId),
+      userInput: userInput.substring(0, 50),
+      hasUserState: !!userState,
+      userStateStep: userState?.step,
+      messageIdsCount: userState?.messageIds?.length || 0
+    });
+    
     if (!userState) {
+      logger.debug('No withdraw state found for user', {
+        telegramId: parseInt(userId),
+        userInput: userInput.substring(0, 50)
+      });
       return false; // 用户没有在提现流程中
     }
 
@@ -230,12 +243,28 @@ Please verify the information and click confirm`;
     const callbackData = ctx.callbackQuery && 'data' in ctx.callbackQuery ? ctx.callbackQuery.data : '';
     const userId = ctx.from?.id?.toString();
 
+    logger.debug('Withdraw callback received', {
+      telegramId: userId ? parseInt(userId) : 0,
+      callbackData,
+      startsWithWithdraw: callbackData.startsWith('withdraw_')
+    });
+
     if (!userId || !callbackData.startsWith('withdraw_')) {
+      logger.debug('Invalid withdraw callback', {
+        hasUserId: !!userId,
+        callbackData,
+        startsWithWithdraw: callbackData.startsWith('withdraw_')
+      });
       return;
     }
 
     try {
       await ctx.answerCbQuery(); // 确认回调
+
+      logger.info('Processing withdraw callback', {
+        telegramId: parseInt(userId),
+        callbackData
+      });
 
       if (callbackData === 'withdraw_cancel') {
         await this.handleCancel(ctx, userId);
@@ -243,6 +272,11 @@ Please verify the information and click confirm`;
         await this.handleMaxAmount(ctx, userId);
       } else if (callbackData.startsWith('withdraw_confirm_')) {
         await this.handleConfirm(ctx, userId, callbackData);
+      } else {
+        logger.warn('Unknown withdraw callback', {
+          telegramId: parseInt(userId),
+          callbackData
+        });
       }
 
     } catch (error) {
@@ -291,13 +325,27 @@ Please verify the information and click confirm`;
    * 处理Max按钮
    */
   private async handleMaxAmount(ctx: ExtendedContext, userId: string): Promise<void> {
+    logger.debug('Max button clicked', {
+      telegramId: parseInt(userId),
+      callbackData: ctx.callbackQuery && 'data' in ctx.callbackQuery ? ctx.callbackQuery.data : 'unknown'
+    });
+    
     try {
       // 获取用户余额
       const balance = await this.getUserBalance(userId);
       
+      logger.info('Max balance retrieved', {
+        telegramId: parseInt(userId),
+        balance: balance
+      });
+      
       await ctx.answerCbQuery(`💰 Max available: $${balance} USDT`);
       
     } catch (error) {
+      logger.error('Failed to get max balance', {
+        telegramId: parseInt(userId),
+        error: (error as Error).message
+      });
       await ctx.answerCbQuery('❌ Unable to get balance info');
     }
   }
@@ -442,21 +490,28 @@ Transaction details will be sent once confirmed.`;
       // 获取用户钱包余额信息
       const balance = await accountService.getAccountBalance(userId);
       
-      // 优先使用withdrawableAmount，如果没有则使用totalUsdValue
-      const availableBalance = balance.withdrawableAmount ?? balance.totalUsdValue ?? 0;
+      // 尝试多个字段来获取可提现余额
+      const availableBalance = balance.withdrawableAmount ?? balance.totalUsdValue ?? balance.nativeBalance ?? 0;
       
-      logger.debug('User balance retrieved for withdraw', {
+      logger.info('User balance retrieved for withdraw', {
         telegramId: parseInt(userId),
         withdrawableAmount: balance.withdrawableAmount,
         totalUsdValue: balance.totalUsdValue,
-        availableBalance
+        nativeBalance: balance.nativeBalance,
+        availableBalance,
+        balanceStructure: {
+          address: balance.address,
+          network: balance.network,
+          tokenBalances: balance.tokenBalances?.map(t => ({ symbol: t.symbol, balance: t.balance }))
+        }
       });
       
       return availableBalance.toFixed(2);
     } catch (error) {
       logger.error('Failed to get user balance', {
         telegramId: parseInt(userId),
-        error: (error as Error).message
+        error: (error as Error).message,
+        stack: (error as Error).stack
       });
       return "0.00";
     }

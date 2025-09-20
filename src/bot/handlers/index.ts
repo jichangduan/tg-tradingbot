@@ -578,9 +578,22 @@ Need help? Contact administrator 👨‍💻
 
     // 检查用户是否在提现流程中
     if (!messageText.startsWith('/')) {
-      const handled = await withdrawHandler.handleUserInput(ctx);
-      if (handled) {
-        return;
+      try {
+        const handled = await withdrawHandler.handleUserInput(ctx);
+        if (handled) {
+          logger.debug('Withdraw handler processed user input', {
+            userId: ctx.from?.id,
+            messageText: messageText.substring(0, 50),
+            requestId: ctx.requestId
+          });
+          return;
+        }
+      } catch (error) {
+        logger.error('Error in withdraw handler input processing', {
+          error: (error as Error).message,
+          userId: ctx.from?.id,
+          requestId: ctx.requestId
+        });
       }
     }
     
