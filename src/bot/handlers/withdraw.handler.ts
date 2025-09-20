@@ -37,7 +37,7 @@ export class WithdrawHandler {
       }
 
       logger.info(`Withdraw command started [${requestId}]`, {
-        userId,
+        telegramId: parseInt(userId),
         username,
         commandName: this.commandName,
         requestId
@@ -48,7 +48,7 @@ export class WithdrawHandler {
 
       const duration = Date.now() - startTime;
       logger.info(`Withdraw command completed [${requestId}] - ${duration}ms`, {
-        userId,
+        telegramId: parseInt(userId),
         username,
         duration,
         requestId
@@ -58,7 +58,7 @@ export class WithdrawHandler {
       const duration = Date.now() - startTime;
       logger.error(`Withdraw command failed [${requestId}] - ${duration}ms`, {
         error: (error as Error).message,
-        userId,
+        telegramId: userId ? parseInt(userId) : 0,
         username,
         requestId
       });
@@ -170,7 +170,7 @@ Now please enter the withdrawal amount (USDT):`, { parse_mode: 'HTML' });
 
     } catch (error) {
       logger.error('Error handling user input for withdraw', {
-        userId,
+        telegramId: parseInt(userId),
         error: (error as Error).message
       });
       await ctx.reply('❌ Error processing your input, please try again', { parse_mode: 'HTML' });
@@ -235,7 +235,7 @@ Please verify the information and click confirm`;
 
     } catch (error) {
       logger.error('Error handling withdraw callback', {
-        userId,
+        telegramId: parseInt(userId),
         callbackData,
         error: (error as Error).message
       });
@@ -301,7 +301,7 @@ Please verify the information and click confirm`;
 
     } catch (error) {
       logger.error('Withdrawal processing failed', {
-        userId,
+        telegramId: parseInt(userId),
         amount,
         address,
         error: (error as Error).message
@@ -392,7 +392,7 @@ Transaction details will be sent once confirmed.`;
       const availableBalance = balance.withdrawableAmount ?? balance.totalUsdValue ?? 0;
       
       logger.debug('User balance retrieved for withdraw', {
-        userId,
+        telegramId: parseInt(userId),
         withdrawableAmount: balance.withdrawableAmount,
         totalUsdValue: balance.totalUsdValue,
         availableBalance
@@ -401,7 +401,7 @@ Transaction details will be sent once confirmed.`;
       return availableBalance.toFixed(2);
     } catch (error) {
       logger.error('Failed to get user balance', {
-        userId,
+        telegramId: parseInt(userId),
         error: (error as Error).message
       });
       return "0.00";
@@ -421,7 +421,7 @@ Transaction details will be sent once confirmed.`;
       });
 
       logger.info('Processing withdrawal request', {
-        userId,
+        telegramId: parseInt(userId),
         internalUserId: userData.userId,
         amount,
         destination: destination.substring(0, 10) + '...'
@@ -435,18 +435,18 @@ Transaction details will be sent once confirmed.`;
           amount: amount,
           destination: destination
         }
-      );
+      ) as any;
 
       if (response.code === 200) {
         logger.info('Withdrawal request successful', {
-          userId,
+          telegramId: parseInt(userId),
           amount,
           transactionHash: response.data?.transactionHash
         });
         return { success: true };
       } else {
         logger.warn('Withdrawal request failed', {
-          userId,
+          telegramId: parseInt(userId),
           amount,
           error: response.message
         });
@@ -455,7 +455,7 @@ Transaction details will be sent once confirmed.`;
 
     } catch (error) {
       logger.error('Withdrawal API call failed', {
-        userId,
+        telegramId: parseInt(userId),
         amount,
         error: (error as Error).message
       });
