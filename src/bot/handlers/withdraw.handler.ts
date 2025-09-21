@@ -331,10 +331,10 @@ Please verify the information and click confirm`;
     });
     
     try {
-      // 获取用户余额
+      // 获取用户余额 - 使用与wallet命令相同的逻辑
       const balance = await this.getUserBalance(userId);
       
-      logger.info('Max balance retrieved', {
+      logger.info('Max balance retrieved successfully', {
         telegramId: parseInt(userId),
         balance: balance
       });
@@ -346,7 +346,9 @@ Please verify the information and click confirm`;
         telegramId: parseInt(userId),
         error: (error as Error).message
       });
-      await ctx.answerCbQuery('❌ Unable to get balance info');
+      
+      // 提供用户友好的错误提示
+      await ctx.answerCbQuery('❌ Balance unavailable. Try /wallet first to check account status.');
     }
   }
 
@@ -487,23 +489,17 @@ Transaction details will be sent once confirmed.`;
    */
   private async getUserBalance(userId: string): Promise<string> {
     try {
-      // 获取用户钱包余额信息
+      // 使用与/wallet命令相同的余额获取逻辑
       const balance = await accountService.getAccountBalance(userId);
       
-      // 尝试多个字段来获取可提现余额
-      const availableBalance = balance.withdrawableAmount ?? balance.totalUsdValue ?? balance.nativeBalance ?? 0;
+      // 直接使用可提现金额字段，与wallet命令保持一致
+      const availableBalance = balance.withdrawableAmount || 0;
       
       logger.info('User balance retrieved for withdraw', {
         telegramId: parseInt(userId),
         withdrawableAmount: balance.withdrawableAmount,
         totalUsdValue: balance.totalUsdValue,
-        nativeBalance: balance.nativeBalance,
-        availableBalance,
-        balanceStructure: {
-          address: balance.address,
-          network: balance.network,
-          tokenBalances: balance.tokenBalances?.map(t => ({ symbol: t.symbol, balance: t.balance }))
-        }
+        availableBalance
       });
       
       return availableBalance.toFixed(2);
@@ -513,7 +509,9 @@ Transaction details will be sent once confirmed.`;
         error: (error as Error).message,
         stack: (error as Error).stack
       });
-      return "0.00";
+      
+      // 提供更具体的错误信息给用户
+      throw new Error('Unable to retrieve account balance. Please try /wallet command first to check your account status.');
     }
   }
 
