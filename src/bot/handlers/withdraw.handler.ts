@@ -202,23 +202,32 @@ export class WithdrawHandler {
    */
   private async showConfirmInterface(ctx: ExtendedContext, userId: string, address: string, amount: string): Promise<void> {
     const shortAddress = `${address.slice(0, 6)}...${address.slice(-4)}`;
+    const amountNum = parseFloat(amount);
+    const fee = 1.00;
+    const netAmount = (amountNum - fee).toFixed(2);
     
     const message = `⚠️ <b>Confirm Withdrawal Details</b>
 
-<b>Amount:</b> ${amount} USDT
-<b>Address:</b> <code>${shortAddress}</code>
-<b>Network:</b> Arbitrum
-<b>Fee:</b> 1.00 USDT
+💰 <b>Withdrawal Amount:</b> ${amount} USDT
+📍 <b>Destination Address:</b> <code>${shortAddress}</code>
+🌐 <b>Network:</b> Arbitrum
+💸 <b>Transaction Fee:</b> ${fee.toFixed(2)} USDT
+✅ <b>You Will Receive:</b> ${netAmount} USDT
 
-Please verify the information and click confirm`;
+⚠️ <b>Important:</b> 
+• Double-check the address - transactions cannot be reversed
+• Processing takes up to 24 hours
+• Minimum withdrawal: $10 USDT
+
+Please verify all information and confirm`;
 
     const keyboard = {
       inline_keyboard: [
         [
-          { text: 'Confirm Withdrawal', callback_data: `withdraw_confirm_${amount}_${encodeURIComponent(address)}` }
+          { text: '✅ Confirm Withdrawal', callback_data: `withdraw_confirm_${amount}_${encodeURIComponent(address)}` }
         ],
         [
-          { text: 'Cancel', callback_data: 'withdraw_cancel' }
+          { text: '❌ Cancel', callback_data: 'withdraw_cancel' }
         ]
       ]
     };
@@ -322,7 +331,7 @@ Please verify the information and click confirm`;
   }
 
   /**
-   * 处理Max按钮
+   * 处理Max按钮 - 自动填充最大金额并显示确认界面
    */
   private async handleMaxAmount(ctx: ExtendedContext, userId: string): Promise<void> {
     logger.debug('Max button clicked', {
@@ -331,24 +340,51 @@ Please verify the information and click confirm`;
     });
     
     try {
+      // 确认回调并显示加载状态
+      await ctx.answerCbQuery('🔄 Getting max balance...');
+      
+      // 获取用户状态，确保用户在正确的提现流程中
+      const userState = this.userStates.get(userId);
+      if (!userState || !userState.address) {
+        logger.warn('Max button clicked but no valid user state', {
+          telegramId: parseInt(userId),
+          hasState: !!userState,
+          hasAddress: !!userState?.address
+        });
+        await ctx.answerCbQuery('❌ Please restart withdrawal process');
+        return;
+      }
+      
       // 获取用户余额 - 使用与wallet命令相同的逻辑
       const balance = await this.getUserBalance(userId);
       
-      logger.info('Max balance retrieved successfully', {
+      logger.info('Max balance retrieved successfully, auto-filling amount', {
         telegramId: parseInt(userId),
-        balance: balance
+        balance: balance,
+        address: userState.address
       });
       
-      await ctx.answerCbQuery(`💰 Max available: $${balance} USDT`);
+      // 自动填充最大金额并更新用户状态到确认步骤
+      userState.amount = balance;
+      userState.step = 'confirm';
+      this.userStates.set(userId, userState);
+      
+      // 直接显示确认界面，预填充最大金额
+      await this.showConfirmInterface(ctx, userId, userState.address, balance);
       
     } catch (error) {
-      logger.error('Failed to get max balance', {
+      logger.error('Failed to handle max amount', {
         telegramId: parseInt(userId),
         error: (error as Error).message
       });
       
       // 提供用户友好的错误提示
-      await ctx.answerCbQuery('❌ Balance unavailable. Try /wallet first to check account status.');
+      try {
+        await ctx.answerCbQuery('❌ Balance unavailable. Try /wallet first to check account status.');
+      } catch (cbError) {
+        // 如果回调失败，发送普通消息
+        await ctx.reply('❌ Unable to get max balance. Please check your account with /wallet first.');
+      }
     }
   }
 
