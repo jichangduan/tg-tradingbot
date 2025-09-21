@@ -224,7 +224,7 @@ Please verify all information and confirm`;
     const keyboard = {
       inline_keyboard: [
         [
-          { text: '✅ Confirm Withdrawal', callback_data: `withdraw_confirm_${amount}_${encodeURIComponent(address)}` }
+          { text: '✅ Confirm Withdrawal', callback_data: 'withdraw_confirm' }
         ],
         [
           { text: '❌ Cancel', callback_data: 'withdraw_cancel' }
@@ -279,8 +279,8 @@ Please verify all information and confirm`;
         await this.handleCancel(ctx, userId);
       } else if (callbackData === 'withdraw_max') {
         await this.handleMaxAmount(ctx, userId);
-      } else if (callbackData.startsWith('withdraw_confirm_')) {
-        await this.handleConfirm(ctx, userId, callbackData);
+      } else if (callbackData === 'withdraw_confirm') {
+        await this.handleConfirm(ctx, userId);
       } else {
         logger.warn('Unknown withdraw callback', {
           telegramId: parseInt(userId),
@@ -391,13 +391,31 @@ Please verify all information and confirm`;
   /**
    * 处理确认提现
    */
-  private async handleConfirm(ctx: ExtendedContext, userId: string, callbackData: string): Promise<void> {
-    const parts = callbackData.replace('withdraw_confirm_', '').split('_');
-    const amount = parts[0];
-    const encodedAddress = parts.slice(1).join('_');
-    const address = decodeURIComponent(encodedAddress);
-
+  private async handleConfirm(ctx: ExtendedContext, userId: string): Promise<void> {
     const userState = this.userStates.get(userId);
+    
+    if (!userState || !userState.address || !userState.amount) {
+      logger.warn('Confirm clicked but invalid user state', {
+        telegramId: parseInt(userId),
+        hasState: !!userState,
+        hasAddress: !!userState?.address,
+        hasAmount: !!userState?.amount
+      });
+      await ctx.editMessageText('❌ Session expired. Please restart withdrawal process with /withdraw', {
+        parse_mode: 'HTML'
+      });
+      return;
+    }
+    
+    const amount = userState.amount;
+    const address = userState.address;
+    
+    logger.info('Processing withdrawal confirmation', {
+      telegramId: parseInt(userId),
+      amount,
+      address: address.substring(0, 10) + '...',
+      step: userState.step
+    });
 
     // 显示处理中消息
     await ctx.editMessageText('🔄 Processing withdrawal request...', {
