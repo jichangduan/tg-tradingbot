@@ -177,55 +177,50 @@ export class StartHandler {
   }
 
   /**
-   * Get welcome message (now supports multiple languages)
+   * Get welcome message (fixed content, supports multiple languages)
    */
   private async getWelcomeMessage(ctx: ExtendedContext): Promise<string> {
-    const botUsername = config.telegram.botUsername || 'aiw3_tradebot';
+    // Get fixed welcome content
+    const title = await ctx.__!('welcome.fixed.title');
+    const quickStart = await ctx.__!('welcome.fixed.quickStart');
+    const priceCommand = await ctx.__!('welcome.fixed.priceCommand');
+    const marketsCommand = await ctx.__!('welcome.fixed.marketsCommand');
+    const helpCommand = await ctx.__!('welcome.fixed.helpCommand');
     
-    const title = await ctx.__!('welcome.title');
-    const initializing = await ctx.__!('welcome.initializing');
-    const features = await ctx.__!('welcome.features');
-    const commands = await ctx.__!('welcome.commands');
-    const botId = await ctx.__!('welcome.botId', { botUsername });
-    const creating = await ctx.__!('welcome.creating');
+    const availableCommands = await ctx.__!('welcome.fixed.availableCommands');
+    const walletCommand = await ctx.__!('welcome.fixed.walletCommand');
+    const marketsListCommand = await ctx.__!('welcome.fixed.marketsListCommand');
+    const chartCommand = await ctx.__!('welcome.fixed.chartCommand');
+    const priceCheckCommand = await ctx.__!('welcome.fixed.priceCheckCommand');
+    const longShortCommand = await ctx.__!('welcome.fixed.longShortCommand');
+    const closeCommand = await ctx.__!('welcome.fixed.closeCommand');
+    const positionsCommand = await ctx.__!('welcome.fixed.positionsCommand');
+    const pnlCommand = await ctx.__!('welcome.fixed.pnlCommand');
+    const pushCommand = await ctx.__!('welcome.fixed.pushCommand');
     
-    // Get feature descriptions
-    const priceQueries = await ctx.__!('welcome.feature.priceQueries');
-    const priceChange = await ctx.__!('welcome.feature.priceChange');
-    const tradingVolume = await ctx.__!('welcome.feature.tradingVolume');
-    const tradeExecution = await ctx.__!('welcome.feature.tradeExecution');
-    const walletManagement = await ctx.__!('welcome.feature.walletManagement');
-    const referralSystem = await ctx.__!('welcome.feature.referralSystem');
+    const securityNote = await ctx.__!('welcome.fixed.securityNote');
+    const moreFeatures = await ctx.__!('welcome.fixed.moreFeatures');
     
-    // Get command examples
-    const priceExample = await ctx.__!('welcome.command.priceExample');
-    const longExample = await ctx.__!('welcome.command.longExample');
-    const marketsExample = await ctx.__!('welcome.command.marketsExample');
-    const walletExample = await ctx.__!('welcome.command.walletExample');
-    
-    return `
-${title}
+    return `🎉 <b>${title}</b>
 
-${initializing}
+<b>${quickStart}</b>
+${priceCommand}
+${marketsCommand}
+${helpCommand}
 
-<b>${features}</b>
-• ${priceQueries}
-• ${priceChange}
-• ${tradingVolume}
-• ${tradeExecution}
-• ${walletManagement}
-• ${referralSystem}
+<b>${availableCommands}</b>
+${walletCommand}
+${marketsListCommand}
+${chartCommand}
+${priceCheckCommand}
+${longShortCommand}
+${closeCommand}
+${positionsCommand}
+${pnlCommand}
+${pushCommand}
 
-<b>${commands}</b>
-${priceExample}
-${longExample}
-${marketsExample}
-${walletExample}
-
-<b>${botId}</b>
-
-<i>${creating}</i>
-    `.trim();
+${securityNote}
+${moreFeatures}`.trim();
   }
 
   /**

@@ -399,55 +399,30 @@ ${fastResponse}
   public formatUserInitSuccessMessage(userData: UserInitData): string {
     const { userId, walletAddress, nickname, referralCode, energy, isNewUser } = userData;
     
-    let message: string;
+    // Format according to the requested structure
+    let message = `🏦 <b>Your Account Info:</b>\n`;
+    message += `👤 User ID: ${userId}\n`;
+    message += `💎 Wallet Address: ${walletAddress}\n`;
+    message += `🔗 Referral Code: ${referralCode}\n\n`;
     
-    if (isNewUser) {
-      // New user welcome message
-      message = `✅ <b>Account Created Successfully!</b>\n\n`;
-      message += `🎉 Welcome to AIW3 Community, ${this.escapeHtml(nickname)}!\n\n`;
-      
-      message += `<b>🏦 Your Account Info:</b>\n`;
-      message += `👤 <b>User ID:</b> <code>${userId}</code>\n`;
-      message += `💎 <b>Wallet Address:</b> <code>${this.truncateAddress(walletAddress)}</code>\n`;
-      message += `🔗 <b>Referral Code:</b> <code>${referralCode}</code>\n\n`;
-      
-      message += `<b>🚀 Now you can:</b>\n`;
-      message += `• 💰 Check live prices: <code>/price BTC</code>\n`;
-      message += `• 📊 View market overview: <code>/markets</code>\n`;
-      message += `• 📱 Share your referral code to earn rewards\n`;
-      message += `• 💡 Get help info: <code>/help</code>\n\n`;
-      
-      message += `<b>🎁 Refer Friends Rewards:</b>\n`;
-      message += `Share referral code <code>${referralCode}</code> with friends, both get extra rewards!\n\n`;
-      
-    } else {
-      // Returning user welcome message  
-      message = `👋 <b>Welcome back, ${this.escapeHtml(nickname)}!</b>\n\n`;
-      
-      message += `<b>🏦 Your Account Info:</b>\n`;
-      message += `👤 <b>User ID:</b> <code>${userId}</code>\n`;
-      message += `💎 <b>Wallet Address:</b> <code>${this.truncateAddress(walletAddress)}</code>\n`;
-      message += `🔗 <b>Referral Code:</b> <code>${referralCode}</code>\n\n`;
-      
-      message += `<b>💡 Quick Start:</b>\n`;
-      message += `• <code>/price BTC</code> - Check Bitcoin price\n`;
-      message += `• <code>/markets</code> - View market overview\n`;
-      message += `• <code>/help</code> - View all features\n\n`;
-      
-      message += `<b>🚀 Available Commands:</b>\n`;
-      message += `• <code>/wallet</code> - View wallet balance\n`;
-      message += `• <code>/markets</code> - View all tradable perpetual tokens\n`;
-      message += `• <code>/chart</code> - View token price charts\n`;
-      message += `• <code>/price</code> - Check token prices\n`;
-      message += `• <code>/long</code> or <code>/short</code> - Open long or short positions\n`;
-      message += `• <code>/close</code> - Close positions\n`;
-      message += `• <code>/positions</code> - View current positions\n`;
-      message += `• <code>/pnl</code> - View profit and loss charts\n`;
-      message += `• <code>/push</code> - Set push notifications\n\n`;
-    }
+    message += `💡 <b>Quick Start:</b>\n`;
+    message += `• /price BTC - Check Bitcoin price\n`;
+    message += `• /markets - View market overview\n`;
+    message += `• /help - View all features\n\n`;
     
-    message += `<i>🔐 Your wallet address and private key are securely managed by the system</i>\n`;
-    message += `<i>💎 More features coming soon, stay tuned!</i>`;
+    message += `🚀 <b>Available Commands:</b>\n`;
+    message += `• /wallet - View wallet balance\n`;
+    message += `• /markets - View all tradable perpetual tokens\n`;
+    message += `• /chart - View token price charts\n`;
+    message += `• /price - Check token prices\n`;
+    message += `• /long or /short - Open long or short positions\n`;
+    message += `• /close - Close positions\n`;
+    message += `• /positions - View current positions\n`;
+    message += `• /pnl - View profit and loss charts\n`;
+    message += `• /push - Set push notifications\n\n`;
+    
+    message += `🔐 Your wallet address and private key are securely managed by the system\n`;
+    message += `💎 More features coming soon, stay tuned!`;
     
     return message;
   }
