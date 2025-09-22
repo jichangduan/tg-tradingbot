@@ -386,6 +386,11 @@
   "invite.welcome.creating": "💡 正在创建您的专属钱包并处理邀请奖励...",
 
   "group.welcome.title": "👋 AIW3交易机器人已加入群组！",
+  
+  "group.joined.title": "👋 <b>AIW3 交易机器人已加入群组！</b>",
+  "group.joined.pushInfo": "🔔 群组推送将根据群主的个人推送设置进行推送",
+  "group.joined.adminNote": "⚙️ 群主可以通过私聊机器人使用 /push 命令调整推送设置",
+  "group.joined.helpCommand": "💡 发送 /help 查看所有可用命令",
   "group.welcome.introduction": "🤖 我是@{botUsername}，您的专业加密货币交易助手",
   "group.welcome.coreFeatures": "🚀 核心功能：",
   "group.welcome.importantNotes": "⚠️ 重要提醒：",

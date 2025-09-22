@@ -7,6 +7,7 @@ import { apiService } from '../services/api.service';
 import { registerCommands } from './handlers';
 import { groupAutoBindingService } from '../services/group-auto-binding.service';
 import { createLanguageMiddleware } from '../middleware/language.middleware';
+import { createGroupLanguageContext, createGroupMessage } from '../utils/group-language.utils';
 
 /**
  * 扩展的Telegram Context，添加自定义属性
@@ -431,15 +432,29 @@ export class TelegramBot {
           // 添加群组到推送跟踪
           pushScheduler.addBotGroup(chatId);
           
-          // 可选：发送欢迎消息
+          // 发送国际化的欢迎消息
           try {
-            await ctx.reply(
-              '👋 <b>AIW3 Trading Bot 已加入群组！</b>\n\n' +
-              '🔔 群组推送将根据群主的个人推送设置进行推送\n' +
-              '⚙️ 群主可以通过私聊机器人使用 /push 命令调整推送设置\n\n' +
-              '💡 发送 /help 查看所有可用命令',
-              { parse_mode: 'HTML' }
-            );
+            // 创建带有群主语言偏好的上下文
+            const languageCtx = await createGroupLanguageContext(ctx);
+            
+            // 创建国际化消息
+            const welcomeMessage = await createGroupMessage(languageCtx, {
+              title: 'group.joined.title',
+              lines: [
+                'group.joined.pushInfo',
+                'group.joined.adminNote',
+                'group.joined.helpCommand'
+              ]
+            });
+            
+            await ctx.reply(welcomeMessage, { parse_mode: 'HTML' });
+            
+            logger.info(`[${requestId}] Group welcome message sent`, {
+              chatId,
+              language: languageCtx.userLanguage || 'default',
+              requestId
+            });
+            
           } catch (welcomeError) {
             logger.warn(`[${requestId}] Failed to send welcome message to group`, {
               chatId,

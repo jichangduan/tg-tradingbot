@@ -386,6 +386,11 @@
   "invite.welcome.creating": "💡 Creating your exclusive wallet and processing invitation rewards...",
 
   "group.welcome.title": "👋 AIW3 Trading Bot added to group!",
+  
+  "group.joined.title": "👋 <b>AIW3 Trading Bot added to group!</b>",
+  "group.joined.pushInfo": "🔔 Group push notifications will follow the group admin's personal push settings",
+  "group.joined.adminNote": "⚙️ Group admin can adjust push settings by using /push command in private chat",
+  "group.joined.helpCommand": "💡 Send /help to view all available commands",
   "group.welcome.introduction": "🤖 I'm @{botUsername}, your professional crypto trading assistant",
   "group.welcome.coreFeatures": "🚀 Core Features:",
   "group.welcome.importantNotes": "⚠️ Important Notes:",
