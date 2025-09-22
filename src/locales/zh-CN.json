@@ -491,5 +491,10 @@
   "positions.errors.generic.description": "获取持仓信息时发生错误，请稍后重试。",
   "positions.errors.generic.details": "错误详情：",
   "positions.errors.generic.requestId": "请求ID：",
-  "positions.errors.generic.note": "如果问题持续存在，请联系管理员。"
+  "positions.errors.generic.note": "如果问题持续存在，请联系管理员。",
+
+  "withdraw.groupRedirect.title": "🔒 <b>需要私聊提现</b>",
+  "withdraw.groupRedirect.description": "此命令包含敏感财务信息，必须在私聊中使用。",
+  "withdraw.groupRedirect.instruction": "请点击提现按钮安全继续。",
+  "withdraw.groupRedirect.button": "💸 提现"
 }

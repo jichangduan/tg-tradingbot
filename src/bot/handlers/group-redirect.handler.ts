@@ -42,7 +42,8 @@ function formatCommandForButton(command: string, args: string[]): { buttonText: 
     'positions': { emoji: '📊', name: 'Positions' },
     'wallet': { emoji: '💰', name: 'Wallet' },
     'pnl': { emoji: '💹', name: 'PnL' },
-    'push': { emoji: '🔔', name: 'Push' }
+    'push': { emoji: '🔔', name: 'Push' },
+    'withdraw': { emoji: '💸', name: 'Withdraw' }
   };
   
   const config = commandConfig[cleanCommand] || { emoji: '⚡', name: cleanCommand };
@@ -86,7 +87,8 @@ function getCommandActionName(command: string): string {
     'positions': 'Position View',
     'wallet': 'Wallet Access',
     'pnl': 'PnL Analysis',
-    'push': 'Push Settings'
+    'push': 'Push Settings',
+    'withdraw': 'Withdrawal'
   };
   
   return names[command.replace('/', '')] || 'Action';

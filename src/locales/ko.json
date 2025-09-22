@@ -492,5 +492,10 @@
   "positions.errors.generic.description": "포지션 정보를 가져오는 중 오류가 발생했습니다. 나중에 다시 시도하세요.",
   "positions.errors.generic.details": "오류 세부사항:",
   "positions.errors.generic.requestId": "요청 ID:",
-  "positions.errors.generic.note": "문제가 지속되면 관리자에게 문의하세요."
+  "positions.errors.generic.note": "문제가 지속되면 관리자에게 문의하세요.",
+
+  "withdraw.groupRedirect.title": "🔒 <b>개인 출금 필요</b>",
+  "withdraw.groupRedirect.description": "이 명령어는 민감한 금융 정보를 포함하고 있으므로 개인 채팅에서 사용해야 합니다.",
+  "withdraw.groupRedirect.instruction": "안전하게 계속하려면 출금 버튼을 누르세요.",
+  "withdraw.groupRedirect.button": "💸 출금"
 }

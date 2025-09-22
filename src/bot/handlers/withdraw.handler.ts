@@ -4,6 +4,8 @@ import { apiService } from '../../services/api.service';
 import { getUserDataAndToken } from '../../utils/auth';
 import { logger } from '../../utils/logger';
 import { accountService } from '../../services/account.service';
+import { isGroupChat } from '../../utils/group-admin.utils';
+import { handleGroupCommandRedirect } from './group-redirect.handler';
 
 /**
  * WithdrawHandler - 处理 /withdraw 命令
@@ -33,6 +35,20 @@ export class WithdrawHandler {
       // 验证用户ID
       if (!userId) {
         await ctx.reply('❌ Unable to identify user', { parse_mode: 'HTML' });
+        return;
+      }
+
+      // Check if this is a group chat - redirect to private chat
+      if (isGroupChat(ctx)) {
+        logger.info(`Withdraw command used in group, redirecting to private chat [${requestId}]`, {
+          telegramId: parseInt(userId),
+          username,
+          chatId: ctx.chat?.id,
+          chatType: ctx.chat?.type,
+          requestId
+        });
+        
+        await handleGroupCommandRedirect(ctx, '/withdraw', args);
         return;
       }
 

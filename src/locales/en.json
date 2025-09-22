@@ -491,5 +491,10 @@
   "positions.errors.generic.description": "An error occurred while fetching position information, please try again later.",
   "positions.errors.generic.details": "Error Details:",
   "positions.errors.generic.requestId": "Request ID:",
-  "positions.errors.generic.note": "If the problem persists, please contact administrator."
+  "positions.errors.generic.note": "If the problem persists, please contact administrator.",
+
+  "withdraw.groupRedirect.title": "🔒 <b>Private Withdrawal Required</b>",
+  "withdraw.groupRedirect.description": "This command contains sensitive financial information and must be used in private chat.",
+  "withdraw.groupRedirect.instruction": "Please press Withdraw to continue safely.",
+  "withdraw.groupRedirect.button": "💸 Withdraw"
 }
