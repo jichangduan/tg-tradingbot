@@ -3,6 +3,7 @@ import { InlineKeyboardMarkup } from 'telegraf/typings/core/types/typegram';
 import { ExtendedContext } from '../index';
 import { i18nService } from '../../services/i18n.service';
 import { logger } from '../../utils/logger';
+import { checkGroupAdminPermission, isGroupChat, getGroupInfo } from '../../utils/group-admin.utils';
 
 /**
  * Language command handler
@@ -19,9 +20,44 @@ export class LanguageHandler {
     const userId = ctx.from?.id;
     const username = ctx.from?.username || 'unknown';
     const requestId = ctx.requestId || 'unknown';
+    const chatType = ctx.chat?.type;
+    const groupInfo = getGroupInfo(ctx);
 
     try {
       logger.logCommand('language', userId!, username, args);
+
+      // Check if in group and verify admin permission
+      if (isGroupChat(ctx)) {
+        logger.info(`Language command in group [${requestId}]`, {
+          userId,
+          groupId: groupInfo.chatId,
+          groupName: groupInfo.chatTitle,
+          requestId
+        });
+
+        // Verify group creator permission
+        const hasPermission = await checkGroupAdminPermission(ctx, 'language_settings');
+        
+        if (!hasPermission) {
+          const permissionError = await ctx.__!('language.error.groupPermission');
+          await ctx.reply(permissionError, { parse_mode: 'HTML' });
+          
+          logger.warn(`Language command denied - insufficient permissions [${requestId}]`, {
+            userId,
+            groupId: groupInfo.chatId,
+            groupName: groupInfo.chatTitle,
+            requestId
+          });
+          return;
+        }
+
+        logger.info(`Language command authorized in group [${requestId}]`, {
+          userId,
+          groupId: groupInfo.chatId,
+          groupName: groupInfo.chatTitle,
+          requestId
+        });
+      }
 
       const currentLanguage = ctx.userLanguage || 'en';
       
@@ -44,6 +80,8 @@ export class LanguageHandler {
         userId,
         username,
         currentLanguage,
+        chatType,
+        groupId: groupInfo.chatId,
         duration,
         requestId
       });
@@ -56,6 +94,8 @@ export class LanguageHandler {
         duration,
         userId,
         username,
+        chatType,
+        groupId: groupInfo.chatId,
         requestId
       });
 

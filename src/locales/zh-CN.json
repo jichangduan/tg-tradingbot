@@ -247,6 +247,7 @@
   "language.error.contactAdmin": "• 如果问题持续存在，请联系管理员",
   "language.error.changeFailed": "❌ 语言切换失败",
   "language.error.getFailed": "❌ 获取语言信息失败",
+  "language.error.groupPermission": "❌ <b>权限不足</b>\n\n只有群主可以在此群组中更改语言设置。\n\n💡 <i>您仍可以在与机器人的私聊中使用 /language 命令。</i>",
   
   "price.error.suggestions": "💡 <b>您可以尝试：</b>",
   "price.error.retryLater": "• 稍后重试",

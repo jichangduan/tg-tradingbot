@@ -247,6 +247,7 @@
   "language.error.contactAdmin": "• Contact administrator if the problem persists",
   "language.error.changeFailed": "❌ Failed to change language",
   "language.error.getFailed": "❌ Failed to get language information",
+  "language.error.groupPermission": "❌ <b>Permission Denied</b>\n\nOnly the group creator can change the language settings in this group.\n\n💡 <i>You can still use /language in private chat with the bot.</i>",
   
   "price.error.suggestions": "💡 <b>You can try:</b>",
   "price.error.retryLater": "• Retry later",

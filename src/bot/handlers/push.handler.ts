@@ -12,6 +12,7 @@ import { telegramBot } from '../index';
 import { config } from '../../config';
 import { longHandler } from './long.handler';
 import { shortHandler } from './short.handler';
+import { checkGroupAdminPermission, isGroupChat, getGroupInfo } from '../../utils/group-admin.utils';
 
 /**
  * Push command handler
@@ -441,7 +442,7 @@ ${emoji} <b>${typeName} Push Enabled!</b>
       logger.logCommand('push', userId!, username, args);
 
       // 检查是否在群组中执行
-      if (chatType === 'group' || chatType === 'supergroup') {
+      if (isGroupChat(ctx)) {
         // 群组环境 - 验证群主权限后显示推送设置
         await this.handleGroupPushCommand(ctx, args);
       } else {
@@ -479,11 +480,10 @@ ${emoji} <b>${typeName} Push Enabled!</b>
    */
   private async handleGroupPushCommand(ctx: ExtendedContext, args: string[]): Promise<void> {
     const userId = ctx.from?.id;
-    const chatId = ctx.chat?.id;
-    const chatTitle = (ctx.chat && 'title' in ctx.chat) ? ctx.chat.title || 'Unnamed Group' : 'Unnamed Group';
     const requestId = ctx.requestId || 'unknown';
+    const groupInfo = getGroupInfo(ctx);
 
-    if (!userId || !chatId) {
+    if (!userId || !groupInfo.chatId) {
       const userInfoError = await ctx.__!('trading.userInfoError');
       await ctx.reply(userInfoError);
       return;
@@ -493,15 +493,15 @@ ${emoji} <b>${typeName} Push Enabled!</b>
       // 记录群组推送命令接收
       logger.info(`群组推送设置请求 [${requestId}]`, {
         userId,
-        groupId: chatId,
-        groupName: chatTitle,
+        groupId: groupInfo.chatId,
+        groupName: groupInfo.chatTitle,
         requestId
       });
 
-      // 验证用户是否为群主
-      const isCreator = await this.verifyGroupCreator(ctx, userId, chatId);
+      // 验证用户是否为群主（使用新的通用工具）
+      const hasPermission = await checkGroupAdminPermission(ctx, 'push_settings');
       
-      if (!isCreator) {
+      if (!hasPermission) {
         const insufficientPermMsg = await ctx.__!('push.insufficientPermissions');
         await ctx.reply(insufficientPermMsg, { parse_mode: 'HTML' });
         return;
@@ -513,16 +513,16 @@ ${emoji} <b>${typeName} Push Enabled!</b>
 
       logger.info(`群组推送设置显示成功 [${requestId}]`, {
         userId,
-        groupId: chatId,
-        groupName: chatTitle,
+        groupId: groupInfo.chatId,
+        groupName: groupInfo.chatTitle,
         requestId
       });
 
     } catch (error) {
       logger.error(`群组推送设置失败 [${requestId}]`, {
         userId,
-        groupId: chatId,
-        groupName: chatTitle,
+        groupId: groupInfo.chatId,
+        groupName: groupInfo.chatTitle,
         error: (error as Error).message,
         requestId
       });
@@ -532,45 +532,6 @@ ${emoji} <b>${typeName} Push Enabled!</b>
     }
   }
 
-  /**
-   * Verify if user is group creator
-   */
-  private async verifyGroupCreator(ctx: ExtendedContext, userId: number, chatId: number): Promise<boolean> {
-    const requestId = ctx.requestId || 'unknown';
-
-    try {
-      logger.debug(`Verifying group creator [${requestId}]`, { userId, chatId, requestId });
-
-      // 获取群组管理员列表
-      const administrators = await ctx.telegram.getChatAdministrators(chatId);
-      
-      // 检查用户是否为群组创建者
-      const isCreator = administrators.some(admin =>
-        admin.status === 'creator' && admin.user.id === userId
-      );
-
-      logger.debug(`Group creator verification result [${requestId}]`, {
-        userId,
-        chatId,
-        isCreator,
-        totalAdmins: administrators.length,
-        requestId
-      });
-
-      return isCreator;
-
-    } catch (error) {
-      logger.error(`Failed to verify group creator [${requestId}]`, {
-        userId,
-        chatId,
-        error: (error as Error).message,
-        requestId
-      });
-
-      // 权限验证失败时，为安全起见返回 false
-      return false;
-    }
-  }
 
 
   /**

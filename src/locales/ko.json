@@ -248,6 +248,7 @@
   "language.error.contactAdmin": "• 문제가 지속되면 관리자에게 문의",
   "language.error.changeFailed": "❌ 언어 변경에 실패했습니다",
   "language.error.getFailed": "❌ 언어 정보 가져오기에 실패했습니다",
+  "language.error.groupPermission": "❌ <b>권한 거부됨</b>\n\n이 그룹에서는 그룹 생성자만 언어 설정을 변경할 수 있습니다.\n\n💡 <i>봇과의 개인 채팅에서는 여전히 /language 명령어를 사용할 수 있습니다.</i>",
   
   "price.error.suggestions": "💡 <b>다음을 시도해 보세요:</b>",
   "price.error.retryLater": "• 나중에 재시도",
