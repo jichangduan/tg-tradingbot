@@ -609,6 +609,7 @@ Transaction details will be sent once confirmed.`;
         '/api/tgbot/withdraw',
         accessToken,
         {
+          userId: userData.userId,
           amount: amount,
           destination: destination
         }
