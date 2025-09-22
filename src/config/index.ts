@@ -48,6 +48,21 @@ function getDefaultHyperliquidUrl(): string {
 }
 
 /**
+ * 根据环境获取默认机器人用户名
+ */
+function getDefaultBotUsername(): string {
+  const nodeEnv = process.env.NODE_ENV || 'development';
+  switch (nodeEnv) {
+    case 'production':
+      return 'aiw3_tradebot';
+    case 'test':
+    case 'development':
+    default:
+      return 'yuze_trading_bot';
+  }
+}
+
+/**
  * 应用配置管理
  * 统一管理所有环境变量和配置项
  */
@@ -63,7 +78,7 @@ export const config = {
   // Telegram Bot配置
   telegram: {
     botToken: process.env.TELEGRAM_BOT_TOKEN!,
-    botUsername: process.env.TELEGRAM_BOT_USERNAME,
+    botUsername: process.env.TELEGRAM_BOT_USERNAME || getDefaultBotUsername(),
     webhookUrl: process.env.WEBHOOK_URL,
     adminChatId: process.env.ADMIN_CHAT_ID
   },
@@ -167,6 +182,24 @@ export function validateConfig(): void {
   const validLogLevels = ['error', 'warn', 'info', 'http', 'verbose', 'debug', 'silly'];
   if (!validLogLevels.includes(config.logging.level)) {
     throw new Error(`Invalid LOG_LEVEL: must be one of ${validLogLevels.join(', ')}`);
+  }
+}
+
+/**
+ * 记录配置信息（用于调试）
+ */
+export function logConfigInfo(): void {
+  console.log('🔧 Configuration Info:');
+  console.log(`   Environment: ${config.env.nodeEnv}`);
+  console.log(`   Bot Username: ${config.telegram.botUsername}`);
+  console.log(`   API Base URL: ${config.api.baseUrl}`);
+  console.log(`   Hyperliquid URL: ${config.hyperliquid.apiUrl}`);
+  console.log(`   Log Level: ${config.logging.level}`);
+  
+  // 检查是否使用了 fallback 值
+  const envBotUsername = process.env.TELEGRAM_BOT_USERNAME;
+  if (!envBotUsername) {
+    console.log(`   ⚠️  Bot username using fallback (TELEGRAM_BOT_USERNAME not set)`);
   }
 }
 

@@ -1,7 +1,7 @@
 import { telegramBot } from './bot';
 import { setBotCommands } from './bot/handlers';
 import { logger } from './utils/logger';
-import { config } from './config';
+import { config, logConfigInfo } from './config';
 import { pushScheduler } from './services/push-scheduler.service';
 
 /**
@@ -16,7 +16,9 @@ async function startApplication(): Promise<void> {
   logger.info('🚀 Starting AIW3 TGBot Application...');
   
   try {
-    // 记录启动配置
+    // 记录启动配置（包含机器人用户名验证）
+    logConfigInfo();
+    
     logger.info('Application configuration:', {
       nodeEnv: config.env.nodeEnv,
       apiBaseUrl: config.api.baseUrl,

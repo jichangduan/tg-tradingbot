@@ -232,7 +232,8 @@ ${walletExample}
    * Create inline keyboard for adding to group (now supports multiple languages)
    */
   private async createAddToGroupKeyboard(ctx: ExtendedContext): Promise<InlineKeyboardMarkup> {
-    const botUsername = config.telegram.botUsername || 'aiw3_tradebot';
+    // botUsername 现在在 config 中已经包含了环境感知的 fallback
+    const botUsername = config.telegram.botUsername;
     
     // Get localized button text
     const addToGroupText = await ctx.__!('button.addToGroup');
