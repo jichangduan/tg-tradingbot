@@ -3,7 +3,7 @@ import { priceHandler } from './price.handler';
 import { marketsHandler } from './markets.handler';
 import { startHandler } from './start.handler';
 import { walletHandler } from './wallet.handler';
-// import { inviteHandler } from './invite.handler';
+import { inviteHandler } from './invite.handler';
 // import { pointsHandler } from './points.handler';
 import { chartHandler } from './chart.handler';
 import { longHandler } from './long.handler';
@@ -421,11 +421,11 @@ Need help? Contact administrator 👨‍💻
     createCommandWrapper('wallet', walletHandler.handle.bind(walletHandler))
   );
 
-  // /invite 命令 - 邀请统计 (temporarily disabled)
-  // bot.command(
-  //   'invite', 
-  //   createCommandWrapper('invite', inviteHandler.handle.bind(inviteHandler))
-  // );
+  // /invite 命令 - 邀请统计
+  bot.command(
+    'invite', 
+    createCommandWrapper('invite', inviteHandler.handle.bind(inviteHandler))
+  );
 
   // /points 命令 - 积分查询 (temporarily disabled)
   // bot.command(
@@ -628,7 +628,7 @@ I don't recognize this command. Try these available commands:
 <b>💰 Account Management:</b>
 <code>/wallet</code> - View wallet balance
 <code>/withdraw</code> - Withdraw funds to external wallet
-<!-- <code>/invite</code> - View invitation stats -->
+<code>/invite</code> - View invitation stats
 <!-- <code>/points</code> - View points details -->
 
 <b>📢 Push Settings:</b>
@@ -803,7 +803,7 @@ export function getRegisteredCommands(): Array<{ command: string; description: s
     { command: '/markets', description: 'View market data' },
     { command: '/wallet', description: 'View wallet balance' },
     { command: '/withdraw', description: 'Withdraw funds to external wallet' },
-    // { command: '/invite', description: 'View invitation stats and points' }, // temporarily disabled
+    { command: '/invite', description: 'View invitation stats and points' },
     // { command: '/points', description: 'View your earned points' }, // temporarily disabled
     { command: '/push', description: 'Manage push notification settings' },
     { command: '/status', description: 'View system status' }
@@ -828,6 +828,7 @@ export async function setBotCommands(bot: Telegraf<ExtendedContext>): Promise<vo
     { command: 'markets', description: 'View market data' },
     { command: 'wallet', description: 'View wallet balance' },
     { command: 'withdraw', description: 'Withdraw funds to external wallet' },
+    { command: 'invite', description: 'View invitation stats' },
     { command: 'push', description: 'Manage push settings' },
     { command: 'status', description: 'View system status' }
   ];
