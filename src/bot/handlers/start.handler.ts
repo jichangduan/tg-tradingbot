@@ -9,6 +9,7 @@ import { ExtendedContext } from '../index';
 import { UserInitRequest, UserInitData } from '../../types/api.types';
 import { cacheService } from '../../services/cache.service';
 import { config } from '../../config';
+import { checkGroupAdminPermission } from '../../utils/group-admin.utils';
 
 /**
  * Start command handler
@@ -497,6 +498,13 @@ ${tradingCall}
         args,
         requestId
       });
+
+      // Check if user is group owner/creator
+      const isGroupOwner = await checkGroupAdminPermission(ctx, 'group_join');
+      if (!isGroupOwner) {
+        await ctx.reply('❌ 只有群主才能添加此机器人到群组');
+        return;
+      }
 
       // Send group welcome message
       await ctx.reply(
