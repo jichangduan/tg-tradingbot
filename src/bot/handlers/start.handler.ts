@@ -46,6 +46,12 @@ export class StartHandler {
         return;
       }
 
+      // Check if it's a failed group add attempt (user was not group owner)
+      if (args.length > 0 && args[0] === 'group_add_attempt' && chatType === 'private') {
+        await ctx.reply('❌ 只有群主才能添加此机器人到群组');
+        return;
+      }
+
       // 1. Initialize user first to get account information
       const userData = await this.initializeUser(ctx, args, requestId);
       
@@ -285,7 +291,7 @@ export class StartHandler {
         [
           {
             text: addToGroupText,
-            url: `tg://resolve?domain=${botUsername}&startgroup=welcome`
+            url: `tg://resolve?domain=${botUsername}&startgroup=welcome&start=group_add_attempt`
           }
         ],
         [
