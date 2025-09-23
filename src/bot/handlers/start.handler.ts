@@ -1,6 +1,7 @@
 import { Context, Markup } from 'telegraf';
 import { InlineKeyboardMarkup } from 'telegraf/typings/core/types/typegram';
 import { userService } from '../../services/user.service';
+import { accountService } from '../../services/account.service';
 import { messageFormatter } from '../utils/message.formatter';
 import { logger } from '../../utils/logger';
 import { DetailedError } from '../../types/api.types';
@@ -175,7 +176,7 @@ export class StartHandler {
   }
 
   /**
-   * Get welcome message (fixed content, supports multiple languages, includes account info)
+   * Get welcome message (fixed content, supports multiple languages, includes wallet balance and deposit info)
    */
   private async getWelcomeMessage(ctx: ExtendedContext, userData?: UserInitData | null): Promise<string> {
     // Get fixed welcome content
@@ -183,17 +184,57 @@ export class StartHandler {
     
     let message = `🎉 <b>${title}</b>\n\n`;
     
-    // Add account info if available
+    // Add wallet balance and deposit info if available
     if (userData) {
-      const accountInfo = await ctx.__!('welcome.fixed.accountInfo');
-      const userId = await ctx.__!('welcome.fixed.userId', { userId: userData.userId });
-      const walletAddress = await ctx.__!('welcome.fixed.walletAddress', { walletAddress: userData.walletAddress });
-      const referralCode = await ctx.__!('welcome.fixed.referralCode', { referralCode: userData.referralCode });
-      
-      message += `<b>${accountInfo}</b>\n`;
-      message += `${userId}\n`;
-      message += `${walletAddress}\n`;
-      message += `${referralCode}\n\n`;
+      try {
+        // Get wallet balance
+        const telegramId = ctx.from?.id?.toString();
+        if (telegramId) {
+          const balance = await accountService.getAccountBalance(telegramId);
+          
+          // Display contract account balance
+          const contractBalance = await ctx.__!('welcome.fixed.contractBalance', { 
+            balance: `$${balance.nativeBalance.toFixed(2)}`
+          });
+          
+          // Display deposit information
+          const depositInfo = await ctx.__!('welcome.fixed.depositInfo');
+          const depositNote = await ctx.__!('welcome.fixed.depositNote');
+          const arbitrumAddress = await ctx.__!('welcome.fixed.arbitrumAddress');
+          const walletAddress = await ctx.__!('welcome.fixed.walletAddress', { 
+            walletAddress: userData.walletAddress 
+          });
+          
+          message += `${contractBalance}\n`;
+          message += `${depositInfo}\n`;
+          message += `${depositNote}\n`;
+          message += `${arbitrumAddress}\n`;
+          message += `${walletAddress} <code>${userData.walletAddress}</code> (Click to copy)\n\n`;
+        }
+      } catch (error) {
+        // If wallet query fails, show fallback with deposit info
+        const contractBalance = await ctx.__!('welcome.fixed.contractBalance', { 
+          balance: '$0.00'
+        });
+        const depositInfo = await ctx.__!('welcome.fixed.depositInfo');
+        const depositNote = await ctx.__!('welcome.fixed.depositNote');
+        const arbitrumAddress = await ctx.__!('welcome.fixed.arbitrumAddress');
+        const walletAddress = await ctx.__!('welcome.fixed.walletAddress', { 
+          walletAddress: userData.walletAddress 
+        });
+        
+        message += `${contractBalance}\n`;
+        message += `${depositInfo}\n`;
+        message += `${depositNote}\n`;
+        message += `${arbitrumAddress}\n`;
+        message += `${walletAddress} <code>${userData.walletAddress}</code> (Click to copy)\n\n`;
+        
+        logger.warn('Failed to get wallet balance in start message, showing fallback', {
+          error: (error as Error).message,
+          telegramId: ctx.from?.id,
+          walletAddress: userData.walletAddress
+        });
+      }
     }
     
     const quickStart = await ctx.__!('welcome.fixed.quickStart');
