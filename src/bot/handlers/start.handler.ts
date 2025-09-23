@@ -31,19 +31,81 @@ export class StartHandler {
     try {
       logger.logCommand('start', userId!, username, args);
 
+      // 🔍 DEBUG: Log detailed start command analysis
+      logger.info(`🔍 [DEBUG] Start command analysis [${requestId}]`, {
+        userId,
+        username,
+        chatType,
+        chatId: ctx.chat?.id,
+        args,
+        argsLength: args.length,
+        firstArg: args[0] || 'none',
+        requestId
+      });
+
       // Check if it's a group redirect command
       if (args.length > 0 && args[0].startsWith('cmd_')) {
+        logger.info(`🔍 [DEBUG] Detected group redirect command [${requestId}]`, {
+          args,
+          firstArg: args[0],
+          requestId
+        });
         await this.handleGroupRedirectCommand(ctx, args[0]);
         return;
       }
 
-      // Check if it's a group start scenario (identified by startgroup parameter)
-      const isGroupStart = args.length > 0 && (args[0] === 'add_attempt' || args[0] === 'welcome') && chatType !== 'private';
+      // 🔍 DEBUG: Detailed group start condition checking
+      const hasArgs = args.length > 0;
+      const firstArg = args[0];
+      const isAddAttempt = firstArg === 'add_attempt';
+      const isWelcome = firstArg === 'welcome';
+      const isNotPrivate = chatType !== 'private';
+      const isGroupStart = hasArgs && (isAddAttempt || isWelcome) && isNotPrivate;
+      
+      logger.info(`🔍 [DEBUG] Group start condition analysis [${requestId}]`, {
+        hasArgs,
+        firstArg,
+        isAddAttempt,
+        isWelcome,
+        chatType,
+        isNotPrivate,
+        isGroupStart,
+        requestId
+      });
       
       if (isGroupStart) {
         // Handle group start scenario with permission check
+        logger.info(`🔍 [DEBUG] Triggering handleGroupStart [${requestId}]`, {
+          args,
+          chatType,
+          requestId
+        });
         await this.handleGroupStart(ctx, args);
         return;
+      }
+
+      // 🔍 DEBUG: Check if it's add_attempt in private chat
+      if (hasArgs && isAddAttempt && chatType === 'private') {
+        logger.info(`🔍 [DEBUG] add_attempt detected in private chat [${requestId}]`, {
+          args,
+          chatType,
+          explanation: 'This means user clicked Add to Group but ended up in private chat',
+          requestId
+        });
+        
+        // Send explanation to user
+        await ctx.reply(
+          '🤖 检测到群组添加尝试\n\n' +
+          '看起来您点击了"添加到群组"按钮，但最终进入了私聊。\n\n' +
+          '这通常意味着：\n' +
+          '• 您不是目标群组的群主\n' +
+          '• 或者Telegram无法自动添加机器人到该群组\n\n' +
+          '解决方案：\n' +
+          '1. 请联系群主手动添加机器人\n' +
+          '2. 或者继续在此私聊中使用机器人\n\n' +
+          '现在为您显示正常的欢迎信息：',
+          { parse_mode: 'HTML' }
+        );
       }
 
       // 1. Initialize user first to get account information
@@ -280,12 +342,20 @@ export class StartHandler {
     const addToGroupText = await ctx.__!('button.addToGroup');
     const usageGuideText = await ctx.__!('button.usageGuide');
     
+    // 🔍 DEBUG: Log URL generation
+    const addToGroupUrl = `https://t.me/${botUsername}?startgroup=add_attempt`;
+    logger.info(`🔍 [DEBUG] Add to Group URL generated`, {
+      botUsername,
+      url: addToGroupUrl,
+      explanation: 'Using https://t.me format instead of tg://resolve'
+    });
+    
     return {
       inline_keyboard: [
         [
           {
             text: addToGroupText,
-            url: `tg://resolve?domain=${botUsername}&startgroup=add_attempt`
+            url: addToGroupUrl
           }
         ],
         [
@@ -491,12 +561,15 @@ ${tradingCall}
     const requestId = ctx.requestId || 'unknown';
 
     try {
-      logger.info(`Group start command [${requestId}]`, {
+      logger.info(`🔍 [DEBUG] Group start command triggered [${requestId}]`, {
         userId,
         username,
         chatType,
+        chatId: ctx.chat?.id,
+        chatTitle: ctx.chat && 'title' in ctx.chat ? ctx.chat.title : 'No title',
         args,
-        requestId
+        requestId,
+        explanation: 'This means we successfully detected a group scenario'
       });
 
       // Check if user is group owner/creator
