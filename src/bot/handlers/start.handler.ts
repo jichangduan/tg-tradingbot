@@ -38,17 +38,11 @@ export class StartHandler {
       }
 
       // Check if it's a group start scenario (identified by startgroup parameter)
-      const isGroupStart = args.length > 0 && args[0] === 'welcome' && chatType !== 'private';
+      const isGroupStart = args.length > 0 && (args[0] === 'add_attempt' || args[0] === 'welcome') && chatType !== 'private';
       
       if (isGroupStart) {
-        // Handle group start scenario
+        // Handle group start scenario with permission check
         await this.handleGroupStart(ctx, args);
-        return;
-      }
-
-      // Check if it's a failed group add attempt (user was not group owner)
-      if (args.length > 0 && args[0] === 'group_add_attempt' && chatType === 'private') {
-        await ctx.reply('❌ 只有群主才能添加此机器人到群组');
         return;
       }
 
@@ -291,7 +285,7 @@ export class StartHandler {
         [
           {
             text: addToGroupText,
-            url: `tg://resolve?domain=${botUsername}&startgroup=welcome&start=group_add_attempt`
+            url: `tg://resolve?domain=${botUsername}&startgroup=add_attempt`
           }
         ],
         [
@@ -506,11 +500,59 @@ ${tradingCall}
       });
 
       // Check if user is group owner/creator
-      const isGroupOwner = await checkGroupAdminPermission(ctx, 'group_join');
+      const isAddAttempt = args[0] === 'add_attempt';
+      const operationType = isAddAttempt ? 'add_bot' : 'group_join';
+      
+      logger.info(`Checking group permission [${requestId}]`, {
+        userId,
+        chatId: ctx.chat?.id,
+        operation: operationType,
+        isAddAttempt,
+        requestId
+      });
+
+      const isGroupOwner = await checkGroupAdminPermission(ctx, operationType);
       if (!isGroupOwner) {
-        await ctx.reply('❌ 只有群主才能添加此机器人到群组');
+        logger.warn(`Group permission denied [${requestId}]`, {
+          userId,
+          username,
+          chatId: ctx.chat?.id,
+          operation: operationType,
+          requestId
+        });
+
+        // Send permission denied message
+        const permissionDeniedMessage = await ctx.__!('group.permission.denied.full');
+        await ctx.reply(permissionDeniedMessage);
+        
+        // Leave the group immediately to prevent unauthorized access
+        if (ctx.chat?.id) {
+          try {
+            await ctx.telegram.leaveChat(ctx.chat.id);
+            logger.info(`Bot left group due to permission restriction [${requestId}]`, {
+              chatId: ctx.chat.id,
+              userId,
+              requestId
+            });
+          } catch (leaveError) {
+            logger.error(`Failed to leave group [${requestId}]`, {
+              chatId: ctx.chat.id,
+              error: (leaveError as Error).message,
+              requestId
+            });
+          }
+        }
+        
         return;
       }
+
+      logger.info(`Group permission granted [${requestId}]`, {
+        userId,
+        username,
+        chatId: ctx.chat?.id,
+        operation: operationType,
+        requestId
+      });
 
       // Send group welcome message
       await ctx.reply(
@@ -546,11 +588,8 @@ ${tradingCall}
       });
 
       // Send error message
-      await ctx.reply(
-        '❌ Group initialization failed\n\n' +
-        'Please try again later or contact administrator.',
-        { parse_mode: 'HTML' }
-      );
+      const errorMessage = await ctx.__!('group.initialization.failed');
+      await ctx.reply(errorMessage, { parse_mode: 'HTML' });
     }
   }
 

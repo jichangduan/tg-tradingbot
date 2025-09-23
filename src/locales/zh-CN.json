@@ -529,5 +529,7 @@
   "group.redirect.error.message": "请直接与机器人开始私聊",
 
   "group.permission.denied.title": "权限不足",
-  "group.permission.denied.message": "只有群主可以将此机器人添加到群组。机器人现在将退出此群组。"
+  "group.permission.denied.message": "只有群主可以将此机器人添加到群组。机器人现在将退出此群组。",
+  "group.permission.denied.full": "❌ 只有群主才能添加此机器人到群组\n\n请联系群主进行添加，或在私聊中使用机器人。",
+  "group.initialization.failed": "❌ 群组初始化失败\n\n请稍后重试或联系管理员。"
 }

@@ -529,5 +529,7 @@
   "group.redirect.error.message": "Please start a private chat with the bot directly",
 
   "group.permission.denied.title": "Permission Denied",
-  "group.permission.denied.message": "Only group administrators can add this bot to groups. The bot will now leave this group."
+  "group.permission.denied.message": "Only group administrators can add this bot to groups. The bot will now leave this group.",
+  "group.permission.denied.full": "❌ Only group owners can add this bot to groups\n\nPlease ask the group owner to add the bot, or use the bot in private chat.",
+  "group.initialization.failed": "❌ Group initialization failed\n\nPlease try again later or contact administrator."
 }

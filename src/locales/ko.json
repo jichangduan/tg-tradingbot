@@ -530,5 +530,7 @@
   "group.redirect.error.message": "봇과 직접 개인 채팅을 시작하세요",
 
   "group.permission.denied.title": "권한 거부됨",
-  "group.permission.denied.message": "그룹 관리자만 이 봇을 그룹에 추가할 수 있습니다. 봇이 이 그룹을 떠납니다."
+  "group.permission.denied.message": "그룹 관리자만 이 봇을 그룹에 추가할 수 있습니다. 봇이 이 그룹을 떠납니다.",
+  "group.permission.denied.full": "❌ 그룹 소유자만 이 봇을 그룹에 추가할 수 있습니다\n\n그룹 소유자에게 봇 추가를 요청하거나, 개인 채팅에서 봇을 사용하세요.",
+  "group.initialization.failed": "❌ 그룹 초기화 실패\n\n나중에 다시 시도하거나 관리자에게 문의하세요."
 }
