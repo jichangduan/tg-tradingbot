@@ -33,42 +33,17 @@ export function createLanguageMiddleware() {
           requestId: (ctx as any).requestId
         });
         
-        if (isNewUser && telegramLangCode) {
-          // 只对真正的新用户进行自动语言检测
-          const detectedLang = i18nService.detectLanguageFromTelegram(telegramLangCode);
+        if (isNewUser) {
+          // 新用户默认使用英文，不进行自动语言检测
+          await i18nService.setUserLanguage(telegramId, 'en');
+          userLanguage = 'en';
           
-          logger.info('🌍 Auto-detecting language for new user', {
+          logger.info('✅ Set English for new user (default)', {
             telegramId,
             username,
             telegramLangCode,
-            detectedLanguage: detectedLang,
-            willSetLanguage: detectedLang !== 'en'
+            defaultLanguage: 'en'
           });
-          
-          if (detectedLang !== 'en') {
-            const saved = await i18nService.setUserLanguage(telegramId, detectedLang);
-            if (saved) {
-              userLanguage = detectedLang;
-              
-              logger.info('✅ Auto-detected and set user language for new user', {
-                telegramId,
-                username,
-                telegramLangCode,
-                detectedLanguage: detectedLang,
-                previousLanguage: 'en'
-              });
-            }
-          } else {
-            // 新用户但检测为英文，显式设置为英文以标记非新用户
-            await i18nService.setUserLanguage(telegramId, 'en');
-            userLanguage = 'en';
-            
-            logger.info('✅ Set English for new English-speaking user', {
-              telegramId,
-              username,
-              telegramLangCode
-            });
-          }
         } else {
           // 现有用户，尊重已存储的语言选择，绝不覆盖
           userLanguage = storedLanguage;
