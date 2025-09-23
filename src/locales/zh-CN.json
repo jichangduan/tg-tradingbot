@@ -519,5 +519,15 @@
   "withdraw.groupRedirect.title": "🔒 <b>需要私聊提现</b>",
   "withdraw.groupRedirect.description": "此命令包含敏感财务信息，必须在私聊中使用。",
   "withdraw.groupRedirect.instruction": "请点击提现按钮安全继续。",
-  "withdraw.groupRedirect.button": "💸 提现"
+  "withdraw.groupRedirect.button": "💸 提现",
+
+  "group.redirect.title": "需要私聊{actionName}",
+  "group.redirect.info": "此命令包含敏感信息，必须在私聊中使用。",
+  "group.redirect.continue": "请点击{buttonText}安全继续。",
+  "group.redirect.paramsWarning": "参数过长无法直接传输，您需要在私聊中手动输入。",
+  "group.redirect.error.title": "无法创建私聊链接",
+  "group.redirect.error.message": "请直接与机器人开始私聊",
+
+  "group.permission.denied.title": "权限不足",
+  "group.permission.denied.message": "只有群主可以将此机器人添加到群组。机器人现在将退出此群组。"
 }

@@ -519,5 +519,15 @@
   "withdraw.groupRedirect.title": "🔒 <b>Private Withdrawal Required</b>",
   "withdraw.groupRedirect.description": "This command contains sensitive financial information and must be used in private chat.",
   "withdraw.groupRedirect.instruction": "Please press Withdraw to continue safely.",
-  "withdraw.groupRedirect.button": "💸 Withdraw"
+  "withdraw.groupRedirect.button": "💸 Withdraw",
+
+  "group.redirect.title": "Private {actionName} Required",
+  "group.redirect.info": "This command contains sensitive information and must be used in private chat.",
+  "group.redirect.continue": "Please press {buttonText} to continue safely.",
+  "group.redirect.paramsWarning": "Parameters too long for direct transfer. You'll need to enter them manually in private chat.",
+  "group.redirect.error.title": "Unable to create private chat link",
+  "group.redirect.error.message": "Please start a private chat with the bot directly",
+
+  "group.permission.denied.title": "Permission Denied",
+  "group.permission.denied.message": "Only group administrators can add this bot to groups. The bot will now leave this group."
 }

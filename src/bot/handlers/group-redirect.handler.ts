@@ -147,14 +147,19 @@ export async function handleGroupCommandRedirect(
       const { buttonText, emoji } = formatCommandForButton(command, []);
       const actionName = getCommandActionName(command);
       
+      const title = await ctx.__!('group.redirect.title', { actionName });
+      const info = await ctx.__!('group.redirect.info');
+      const continue_msg = await ctx.__!('group.redirect.continue', { buttonText });
+      const params_warning = await ctx.__!('group.redirect.paramsWarning');
+      
       const message = `
-🔒 <b>Private ${actionName} Required</b>
+🔒 <b>${title}</b>
 
-This command contains sensitive information and must be used in private chat.
+${info}
 
-Please press ${buttonText} to continue safely.
+${continue_msg}
 
-⚠️ <i>Parameters too long for direct transfer. You'll need to enter them manually in private chat.</i>
+⚠️ <i>${params_warning}</i>
       `.trim();
       
       const keyboard = {
@@ -176,12 +181,16 @@ Please press ${buttonText} to continue safely.
     const jumpUrl = `https://t.me/${botUsername}?start=cmd_${encodedParams}`;
     
     // 构建提示消息
+    const title = await ctx.__!('group.redirect.title', { actionName });
+    const info = await ctx.__!('group.redirect.info');
+    const continue_msg = await ctx.__!('group.redirect.continue', { buttonText });
+    
     const message = `
-🔒 <b>Private ${actionName} Required</b>
+🔒 <b>${title}</b>
 
-This command contains sensitive information and must be used in private chat.
+${info}
 
-Please press ${buttonText} to continue safely.
+${continue_msg}
     `.trim();
     
     // 创建跳转按钮
@@ -216,9 +225,11 @@ Please press ${buttonText} to continue safely.
     
     // 发送错误提示
     try {
+      const error_title = await ctx.__!('group.redirect.error.title');
+      const error_message = await ctx.__!('group.redirect.error.message');
+      
       await ctx.reply(
-        '❌ Unable to create private chat link\n\n' +
-        'Please start a private chat with the bot directly',
+        `❌ ${error_title}\n\n${error_message}`,
         { parse_mode: 'HTML' }
       );
     } catch (replyError) {

@@ -428,6 +428,68 @@ export class TelegramBot {
             chatTitle: chat.title,
             requestId
           });
+
+          // 检查添加者是否为群主
+          const addedByUserId = chatMember.from?.id;
+          if (addedByUserId) {
+            const { checkGroupAdminPermission } = await import('../utils/group-admin.utils');
+            
+            // 创建临时上下文用于权限检查
+            const tempCtx = {
+              ...ctx,
+              from: chatMember.from,
+              chat: chat
+            } as any;
+            
+            const hasPermission = await checkGroupAdminPermission(tempCtx, 'add_bot');
+            
+            if (!hasPermission) {
+              logger.warn(`[${requestId}] Non-admin user tried to add bot to group`, {
+                userId: addedByUserId,
+                chatId,
+                chatTitle: chat.title,
+                requestId
+              });
+              
+              // 发送权限不足提示并退出群组
+              try {
+                const languageCtx = await createGroupLanguageContext(ctx);
+                const errorTitle = await languageCtx.__!('group.permission.denied.title');
+                const errorMessage = await languageCtx.__!('group.permission.denied.message');
+                
+                await ctx.reply(
+                  `❌ ${errorTitle}\n\n${errorMessage}`,
+                  { parse_mode: 'HTML' }
+                );
+                
+                // 等待1秒后退出群组
+                setTimeout(async () => {
+                  try {
+                    await ctx.telegram.leaveChat(chat.id);
+                    logger.info(`[${requestId}] Bot left group due to permission restriction`, {
+                      chatId,
+                      requestId
+                    });
+                  } catch (leaveError) {
+                    logger.error(`[${requestId}] Failed to leave group`, {
+                      chatId,
+                      error: (leaveError as Error).message,
+                      requestId
+                    });
+                  }
+                }, 1000);
+                
+              } catch (replyError) {
+                logger.error(`[${requestId}] Failed to send permission error message`, {
+                  chatId,
+                  error: (replyError as Error).message,
+                  requestId
+                });
+              }
+              
+              return; // 不执行后续的欢迎消息逻辑
+            }
+          }
           
           // 添加群组到推送跟踪
           pushScheduler.addBotGroup(chatId);

@@ -520,5 +520,15 @@
   "withdraw.groupRedirect.title": "🔒 <b>개인 출금 필요</b>",
   "withdraw.groupRedirect.description": "이 명령어는 민감한 금융 정보를 포함하고 있으므로 개인 채팅에서 사용해야 합니다.",
   "withdraw.groupRedirect.instruction": "안전하게 계속하려면 출금 버튼을 누르세요.",
-  "withdraw.groupRedirect.button": "💸 출금"
+  "withdraw.groupRedirect.button": "💸 출금",
+
+  "group.redirect.title": "개인 {actionName} 필요",
+  "group.redirect.info": "이 명령어는 민감한 정보를 포함하고 있으므로 개인 채팅에서 사용해야 합니다.",
+  "group.redirect.continue": "안전하게 계속하려면 {buttonText}를 누르세요.",
+  "group.redirect.paramsWarning": "매개변수가 너무 길어 직접 전송할 수 없습니다. 개인 채팅에서 수동으로 입력해야 합니다.",
+  "group.redirect.error.title": "개인 채팅 링크를 생성할 수 없습니다",
+  "group.redirect.error.message": "봇과 직접 개인 채팅을 시작하세요",
+
+  "group.permission.denied.title": "권한 거부됨",
+  "group.permission.denied.message": "그룹 관리자만 이 봇을 그룹에 추가할 수 있습니다. 봇이 이 그룹을 떠납니다."
 }
