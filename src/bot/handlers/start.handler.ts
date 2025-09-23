@@ -44,20 +44,20 @@ export class StartHandler {
         return;
       }
 
-      // 1. Send welcome message (immediate user response)
+      // 1. Initialize user first to get account information
+      const userData = await this.initializeUser(ctx, args, requestId);
+      
+      // 2. Send welcome message with account information
       // Check if it's private chat, only show "Add to Group" button in private chat
       const isPrivateChat = ctx.chat?.type === 'private';
       
       const welcomeMessage = await ctx.reply(
-        await this.getWelcomeMessage(ctx),
+        await this.getWelcomeMessage(ctx, userData),
         {
           parse_mode: 'HTML',
           reply_markup: isPrivateChat ? await this.createAddToGroupKeyboard(ctx) : undefined
         }
       );
-
-      // 2. Perform user initialization in background
-      await this.initializeUserInBackground(ctx, args, requestId);
 
       const duration = Date.now() - startTime;
       logger.info(`Start command completed [${requestId}] - ${duration}ms`, {
@@ -85,18 +85,18 @@ export class StartHandler {
   }
 
   /**
-   * Initialize user in background (non-blocking user experience)
+   * Initialize user and return user data (synchronous)
    */
-  private async initializeUserInBackground(
+  private async initializeUser(
     ctx: ExtendedContext, 
     args: string[], 
     requestId: string
-  ): Promise<void> {
+  ): Promise<UserInitData | null> {
     try {
       const user = ctx.from;
       if (!user) {
         logger.warn('No user information available in context', { requestId });
-        return;
+        return null;
       }
 
       // Parse invitation code
@@ -115,8 +115,8 @@ export class StartHandler {
         telegramId: initRequest.telegram_id,
         username: initRequest.username,
         hasInvitationCode: !!invitationCode,
-        invitationCode: invitationCode || 'none',  // Show specific invitation code
-        fullInitRequest: JSON.stringify(initRequest, null, 2),  // Complete request body
+        invitationCode: invitationCode || 'none',
+        fullInitRequest: JSON.stringify(initRequest, null, 2),
         requestId
       });
 
@@ -126,9 +126,6 @@ export class StartHandler {
       // Cache user's accessToken
       await this.cacheUserAccessToken(user.id, userData.accessToken, requestId);
 
-      // Send initialization completion message
-      await this.sendInitializationSuccessMessage(ctx, userData);
-
       logger.info(`User initialization completed [${requestId}]`, {
         userId: userData.userId,
         walletAddress: userData.walletAddress,
@@ -137,16 +134,17 @@ export class StartHandler {
         requestId
       });
 
+      return userData;
+
     } catch (error) {
-      logger.error(`Background user initialization failed [${requestId}]`, {
+      logger.error(`User initialization failed [${requestId}]`, {
         error: (error as Error).message,
         requestId
       });
-
-      // Send initialization failure message (friendly hint)
-      await this.sendInitializationErrorMessage(ctx, error as DetailedError);
+      return null;
     }
   }
+
 
   /**
    * Parse invitation code from command parameters
@@ -177,11 +175,27 @@ export class StartHandler {
   }
 
   /**
-   * Get welcome message (fixed content, supports multiple languages)
+   * Get welcome message (fixed content, supports multiple languages, includes account info)
    */
-  private async getWelcomeMessage(ctx: ExtendedContext): Promise<string> {
+  private async getWelcomeMessage(ctx: ExtendedContext, userData?: UserInitData | null): Promise<string> {
     // Get fixed welcome content
     const title = await ctx.__!('welcome.fixed.title');
+    
+    let message = `🎉 <b>${title}</b>\n\n`;
+    
+    // Add account info if available
+    if (userData) {
+      const accountInfo = await ctx.__!('welcome.fixed.accountInfo');
+      const userId = await ctx.__!('welcome.fixed.userId', { userId: userData.userId });
+      const walletAddress = await ctx.__!('welcome.fixed.walletAddress', { walletAddress: userData.walletAddress });
+      const referralCode = await ctx.__!('welcome.fixed.referralCode', { referralCode: userData.referralCode });
+      
+      message += `<b>${accountInfo}</b>\n`;
+      message += `${userId}\n`;
+      message += `${walletAddress}\n`;
+      message += `${referralCode}\n\n`;
+    }
+    
     const quickStart = await ctx.__!('welcome.fixed.quickStart');
     const priceCommand = await ctx.__!('welcome.fixed.priceCommand');
     const marketsCommand = await ctx.__!('welcome.fixed.marketsCommand');
@@ -201,26 +215,26 @@ export class StartHandler {
     const securityNote = await ctx.__!('welcome.fixed.securityNote');
     const moreFeatures = await ctx.__!('welcome.fixed.moreFeatures');
     
-    return `🎉 <b>${title}</b>
-
-<b>${quickStart}</b>
-${priceCommand}
-${marketsCommand}
-${helpCommand}
-
-<b>${availableCommands}</b>
-${walletCommand}
-${marketsListCommand}
-${chartCommand}
-${priceCheckCommand}
-${longShortCommand}
-${closeCommand}
-${positionsCommand}
-${pnlCommand}
-${pushCommand}
-
-${securityNote}
-${moreFeatures}`.trim();
+    message += `<b>${quickStart}</b>\n`;
+    message += `${priceCommand}\n`;
+    message += `${marketsCommand}\n`;
+    message += `${helpCommand}\n\n`;
+    
+    message += `<b>${availableCommands}</b>\n`;
+    message += `${walletCommand}\n`;
+    message += `${marketsListCommand}\n`;
+    message += `${chartCommand}\n`;
+    message += `${priceCheckCommand}\n`;
+    message += `${longShortCommand}\n`;
+    message += `${closeCommand}\n`;
+    message += `${positionsCommand}\n`;
+    message += `${pnlCommand}\n`;
+    message += `${pushCommand}\n\n`;
+    
+    message += `${securityNote}\n`;
+    message += `${moreFeatures}`;
+    
+    return message.trim();
   }
 
   /**
@@ -252,43 +266,6 @@ ${moreFeatures}`.trim();
     };
   }
 
-  /**
-   * Send user initialization success message
-   */
-  private async sendInitializationSuccessMessage(
-    ctx: Context, 
-    userData: UserInitData
-  ): Promise<void> {
-    const message = messageFormatter.formatUserInitSuccessMessage(userData);
-    
-    try {
-      await ctx.reply(message, { parse_mode: 'HTML' });
-    } catch (error) {
-      logger.error('Failed to send initialization success message', {
-        error: (error as Error).message,
-        userId: userData.userId
-      });
-    }
-  }
-
-  /**
-   * Send user initialization error message
-   */
-  private async sendInitializationErrorMessage(
-    ctx: Context, 
-    error: DetailedError
-  ): Promise<void> {
-    const message = messageFormatter.formatUserInitErrorMessage(error);
-    
-    try {
-      await ctx.reply(message, { parse_mode: 'HTML' });
-    } catch (sendError) {
-      logger.error('Failed to send initialization error message', {
-        error: (sendError as Error).message,
-        originalError: error.message
-      });
-    }
-  }
 
   /**
    * Send general error message
@@ -342,12 +319,21 @@ ${moreFeatures}`.trim();
         requestId
       });
 
-      // Send special invitation welcome message
-      const inviteMessage = await this.getInvitationWelcomeMessage(ctx, invitationCode);
-      await ctx.reply(inviteMessage, { parse_mode: 'HTML' });
-
-      // Use invitation code for user initialization
-      await this.initializeUserInBackground(ctx, [invitationCode], requestId);
+      // Initialize user with invitation code first
+      const userData = await this.initializeUser(ctx, [invitationCode], requestId);
+      
+      // Send special invitation welcome message (or regular welcome if invitation message not needed)
+      if (userData) {
+        // Send welcome message with account info
+        await ctx.reply(
+          await this.getWelcomeMessage(ctx, userData),
+          { parse_mode: 'HTML' }
+        );
+      } else {
+        // Fallback to invitation message if initialization failed
+        const inviteMessage = await this.getInvitationWelcomeMessage(ctx, invitationCode);
+        await ctx.reply(inviteMessage, { parse_mode: 'HTML' });
+      }
 
       const duration = Date.now() - startTime;
       logger.info(`Start with invitation completed [${requestId}] - ${duration}ms`, {
@@ -489,7 +475,7 @@ ${tradingCall}
 
       // Initialize user in background (if needed)
       if (userId) {
-        await this.initializeUserInBackground(ctx, [], requestId);
+        await this.initializeUser(ctx, [], requestId);
       }
 
       const duration = Date.now() - startTime;
@@ -642,9 +628,9 @@ Please contact administrator or restart with /start
       switch (command) {
         case '/start':
           // Avoid recursive calls, execute initialization logic directly
-          const welcomeMessage = await this.getWelcomeMessage(ctx);
+          const userData = await this.initializeUser(ctx, [], requestId);
+          const welcomeMessage = await this.getWelcomeMessage(ctx, userData);
           await ctx.reply(welcomeMessage, { parse_mode: 'HTML' });
-          await this.initializeUserInBackground(ctx, [], requestId);
           break;
         case '/long':
           try {
