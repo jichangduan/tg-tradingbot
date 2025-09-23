@@ -200,16 +200,11 @@ export class StartHandler {
           // Display deposit information
           const depositInfo = await ctx.__!('welcome.fixed.depositInfo');
           const depositNote = await ctx.__!('welcome.fixed.depositNote');
-          const arbitrumAddress = await ctx.__!('welcome.fixed.arbitrumAddress');
-          const walletAddress = await ctx.__!('welcome.fixed.walletAddress', { 
-            walletAddress: userData.walletAddress 
-          });
           
           message += `${contractBalance}\n`;
           message += `${depositInfo}\n`;
           message += `${depositNote}\n`;
-          message += `${arbitrumAddress}\n`;
-          message += `${walletAddress} <code>${userData.walletAddress}</code> (Click to copy)\n\n`;
+          message += `💎 Wallet Address: <code>${userData.walletAddress}</code> (Click to copy)\n\n`;
         }
       } catch (error) {
         // If wallet query fails, show fallback with deposit info
@@ -218,16 +213,11 @@ export class StartHandler {
         });
         const depositInfo = await ctx.__!('welcome.fixed.depositInfo');
         const depositNote = await ctx.__!('welcome.fixed.depositNote');
-        const arbitrumAddress = await ctx.__!('welcome.fixed.arbitrumAddress');
-        const walletAddress = await ctx.__!('welcome.fixed.walletAddress', { 
-          walletAddress: userData.walletAddress 
-        });
         
         message += `${contractBalance}\n`;
         message += `${depositInfo}\n`;
         message += `${depositNote}\n`;
-        message += `${arbitrumAddress}\n`;
-        message += `${walletAddress} <code>${userData.walletAddress}</code> (Click to copy)\n\n`;
+        message += `💎 Wallet Address: <code>${userData.walletAddress}</code> (Click to copy)\n\n`;
         
         logger.warn('Failed to get wallet balance in start message, showing fallback', {
           error: (error as Error).message,
