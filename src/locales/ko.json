@@ -194,6 +194,8 @@
   "invite.title": "🎁 초대 시스템",
   "invite.loading": "🔍 초대 정보를 불러오고 있습니다...",
   "invite.error": "❌ 초대 정보 로드 실패",
+  "invite.commission.title": "💰 수수료 인출",
+  "invite.commission.available": "인출 가능",
   
   "points.title": "⭐ 포인트 시스템",
   "points.loading": "🔍 포인트 정보를 불러오고 있습니다...",

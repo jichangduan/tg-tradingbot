@@ -475,6 +475,7 @@ export interface InviteStatsData {
   totalPages: number;              // 总页数
   totalRecords: number;            // 总邀请用户数量
   totalTradingVolume: number;      // 总交易量
+  available_rebate: number;        // 可提现佣金金额
   invitationLink: string;          // 邀请链接
   referralCode: string;            // 推荐码
 }
@@ -489,6 +490,7 @@ export interface RawInviteStatsData {
   totalPages?: number | string;           // 总页数 (可选)
   totalRecords: number | string;          // 总邀请用户数量 (必需)
   totalTradingVolume: number | string;    // 总交易量 (必需)
+  available_rebate?: number | string;     // 可提现佣金金额 (可选，API可能返回字符串)
   invitationLink?: string;                // 邀请链接 (可选)
   referralCode?: string;                  // 推荐码 (可选)
 }
@@ -518,6 +520,7 @@ export interface FormattedInviteStats {
   inviteeCount: number;            // 邀请人数
   totalTradingVolume: number;      // 总交易量
   currentPoints: number;           // 当前积分 (交易量/100)
+  availableRebate: number;         // 可提现佣金金额
   inviteRecords: InviteRecord[];   // 邀请记录
   invitationLink?: string;         // 邀请链接
   referralCode?: string;           // 推荐码

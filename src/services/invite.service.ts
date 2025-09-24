@@ -160,6 +160,7 @@ export class InviteService {
       inviteeCount: data.totalRecords || 0,
       totalTradingVolume: data.totalTradingVolume || 0,
       currentPoints,
+      availableRebate: data.available_rebate || 0,
       inviteRecords: data.inviteRecord || [],
       invitationLink: data.invitationLink,
       referralCode: data.referralCode,
@@ -250,6 +251,17 @@ export class InviteService {
         }
       }
 
+      // 检查available_rebate字段 (可选字段，允许字符串转数字)
+      if ('available_rebate' in data) {
+        const rebateValue = data.available_rebate;
+        if (typeof rebateValue === 'string' && !isNaN(Number(rebateValue))) {
+          normalized.data.available_rebate = Number(rebateValue);
+        } else if (typeof rebateValue !== 'number' && rebateValue !== null && rebateValue !== undefined) {
+          // 这不是致命错误，只是警告
+          logger.warn(`Non-critical: "data.available_rebate" should be number or numeric string, got: ${typeof rebateValue} (${rebateValue}) [${requestId}]`);
+        }
+      }
+
       // 检查可选的分页字段
       if ('page' in data) {
         const pageValue = data.page;
@@ -323,6 +335,7 @@ export class InviteService {
         totalPages: raw.data.totalPages ? (typeof raw.data.totalPages === 'string' ? Number(raw.data.totalPages) : raw.data.totalPages) : 1,
         totalRecords: typeof raw.data.totalRecords === 'string' ? Number(raw.data.totalRecords) : raw.data.totalRecords,
         totalTradingVolume: typeof raw.data.totalTradingVolume === 'string' ? Number(raw.data.totalTradingVolume) : raw.data.totalTradingVolume,
+        available_rebate: raw.data.available_rebate ? (typeof raw.data.available_rebate === 'string' ? Number(raw.data.available_rebate) : raw.data.available_rebate) : 0,
         invitationLink: raw.data.invitationLink || '',
         referralCode: raw.data.referralCode || ''
       }

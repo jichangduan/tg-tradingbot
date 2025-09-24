@@ -193,6 +193,8 @@
   "invite.title": "🎁 邀请系统",
   "invite.loading": "🔍 正在加载邀请信息...",
   "invite.error": "❌ 邀请信息加载失败",
+  "invite.commission.title": "💰 提现佣金",
+  "invite.commission.available": "可提现",
   
   "points.title": "⭐ 积分系统",
   "points.loading": "🔍 正在加载积分信息...",

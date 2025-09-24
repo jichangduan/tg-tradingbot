@@ -193,6 +193,8 @@
   "invite.title": "🎁 Invitation System",
   "invite.loading": "🔍 Loading invitation information...",
   "invite.error": "❌ Failed to load invitation information",
+  "invite.commission.title": "💰 Withdraw Commissions",
+  "invite.commission.available": "Available",
   
   "points.title": "⭐ Points System",
   "points.loading": "🔍 Loading points information...",

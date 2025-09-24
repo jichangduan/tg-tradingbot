@@ -870,11 +870,9 @@ ${fastResponse}
       message += `💡 Start inviting friends to earn points rewards!`;
     }
     
-    // Points explanation
-    message += `\n\n🏆 <b>Points Rules:</b>\n`;
-    message += `• Every $100 trading volume = 1 point\n`;
-    message += `• Real-time statistics, instant crediting\n`;
-    message += `• Points can be redeemed for rewards\n`;
+    // Withdraw Commissions
+    message += `\n\n💰 <b>Withdraw Commissions:</b>\n`;
+    message += `• Available: $${this.formatCurrency(stats.availableRebate)}\n`;
     
     // Invitation link
     message += `\n\n🔗 <b>Your Exclusive Invitation Link:</b>\n`;
