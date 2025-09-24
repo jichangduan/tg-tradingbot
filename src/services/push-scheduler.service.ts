@@ -147,8 +147,8 @@ export class PushSchedulerService {
       lastPushTime: this.lastPushTime > 0 ? new Date(this.lastPushTime).toISOString() : 'first_execution',
       actualIntervalMs: actualInterval,
       actualIntervalMinutes: actualIntervalMinutes.toFixed(2),
-      expectedInterval: '2_minutes',
-      intervalAccurate: Math.abs(actualIntervalMinutes - 2) < 0.1 ? 'YES' : 'NO'
+      expectedInterval: '20_minutes',
+      intervalAccurate: Math.abs(actualIntervalMinutes - 20) < 0.5 ? 'YES' : 'NO'
     });
     
     this.lastPushTime = startTime;
@@ -164,15 +164,45 @@ export class PushSchedulerService {
 
       let successCount = 0;
       let failureCount = 0;
+      let groupSuccessCount = 0;
+      let groupFailureCount = 0;
 
+      // 🔄 统一推送流程：为每个用户同时处理个人推送和群组推送，避免双重推送
       for (const user of enabledUsers) {
         try {
-            // 删除发送前的详细日志
-          
+          // 1. 发送个人推送
           await this.sendPushToUser(user.userId, user.settings, user.pushData);
           successCount++;
           
-          // 删除发送完成的详细日志
+          // 2. 同时处理该用户的群组推送（避免重复API调用和重复推送）
+          try {
+            const userBoundGroups = await this.getUserBoundGroups(user.userId);
+            if (userBoundGroups.length > 0) {
+              logger.info(`📤 [UNIFIED_PUSH] Processing ${userBoundGroups.length} groups for user ${user.userId}`, {
+                executionId,
+                userId: parseInt(user.userId),
+                groupCount: userBoundGroups.length
+              });
+              
+              for (const groupId of userBoundGroups) {
+                try {
+                  await this.sendPushToGroup(groupId, user.settings, user.pushData, executionId);
+                  groupSuccessCount++;
+                } catch (groupError) {
+                  groupFailureCount++;
+                  logger.error(`❌ [UNIFIED_PUSH] Failed to send to group ${groupId}`, {
+                    error: (groupError as Error).message,
+                    executionId
+                  });
+                }
+              }
+            }
+          } catch (groupError) {
+            logger.error(`❌ [UNIFIED_PUSH] Failed to process groups for user ${user.userId}`, {
+              error: (groupError as Error).message
+            });
+          }
+          
         } catch (error) {
           failureCount++;
           logger.error(`❌ [SCHEDULER] Failed to send push to user ${user.userId}`, {
@@ -182,8 +212,13 @@ export class PushSchedulerService {
         }
       }
 
-      // 执行群组推送
-      await this.executeGroupPush(executionId);
+      logger.info(`✅ [UNIFIED_PUSH] Push execution completed [${executionId}]`, {
+        executionId,
+        userPushes: { success: successCount, failed: failureCount },
+        groupPushes: { success: groupSuccessCount, failed: groupFailureCount },
+        totalSuccess: successCount + groupSuccessCount,
+        totalFailed: failureCount + groupFailureCount
+      });
       
       await this.updateLastPushTime();
 

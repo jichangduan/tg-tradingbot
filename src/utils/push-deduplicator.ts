@@ -7,7 +7,7 @@ import { logger } from './logger';
  */
 export class PushDeduplicator {
   private readonly cachePrefix = 'push_dedup';
-  private readonly defaultTtl = 60 * 60; // 1小时TTL，防止同一小时内重复推送
+  private readonly defaultTtl = 25 * 60; // 25分钟TTL，略大于20分钟推送间隔，防止重复推送
 
   /**
    * 生成内容的唯一标识
@@ -28,8 +28,8 @@ export class PushDeduplicator {
         // 对于资金流：消息内容前缀
         message: content.message?.substring(0, 50),
         symbol: content.symbol,
-        // 时间戳取到分钟级别
-        timePrefix: content.timestamp?.substring(0, 16)
+        // 时间戳取到秒级别，提高去重精度
+        timePrefix: content.timestamp?.substring(0, 19)
       };
 
       const contentStr = JSON.stringify(normalized);
