@@ -90,8 +90,8 @@ export class PushSchedulerService {
       // 添加测试用户以便测试推送功能
       this.addTestUserToPushTracking();
 
-      // 5秒后执行首次推送任务
-      setTimeout(() => this.executeScheduledPush().catch(() => {}), 5000);
+      // 5秒后执行首次推送任务 - 已禁用，避免重启时额外推送导致频繁推送问题
+      // setTimeout(() => this.executeScheduledPush().catch(() => {}), 5000);
 
     } catch (error) {
       this.isRunning = false;
@@ -136,6 +136,18 @@ export class PushSchedulerService {
   private async executeScheduledPush(): Promise<void> {
     const startTime = Date.now();
     const executionId = `push_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+
+    // 🛡️ 推送间隔保护：如果距离上次推送不足18分钟，跳过本次推送
+    if (this.lastPushTime && (startTime - this.lastPushTime) < 18 * 60 * 1000) {
+      const lastPushMinutesAgo = ((startTime - this.lastPushTime) / (1000 * 60)).toFixed(1);
+      logger.info('⏭️ [INTERVAL_PROTECTION] Skipping push - too close to last push', {
+        executionId,
+        lastPushMinutesAgo,
+        minIntervalMinutes: 18,
+        reason: 'interval_protection'
+      });
+      return;
+    }
 
     // 🕐 记录实际推送间隔
     const actualInterval = this.lastPushTime > 0 ? startTime - this.lastPushTime : 0;

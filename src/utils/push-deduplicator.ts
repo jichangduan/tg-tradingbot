@@ -7,7 +7,7 @@ import { logger } from './logger';
  */
 export class PushDeduplicator {
   private readonly cachePrefix = 'push_dedup';
-  private readonly defaultTtl = 25 * 60; // 25分钟TTL，略大于20分钟推送间隔，防止重复推送
+  private readonly defaultTtl = 40 * 60; // 40分钟TTL，确保跨推送周期有效去重，防止重复推送
 
   /**
    * 生成内容的唯一标识
@@ -28,8 +28,19 @@ export class PushDeduplicator {
         // 对于资金流：消息内容前缀
         message: content.message?.substring(0, 50),
         symbol: content.symbol,
-        // 时间戳取到秒级别，提高去重精度，兼容数字和字符串类型
-        timePrefix: content.timestamp ? String(content.timestamp).substring(0, 19) : undefined
+        
+        // Fund Flow专用去重字段，避免依赖不稳定的时间戳
+        flow1h: content.flow1h,        // 1小时流量数据
+        flow4h: content.flow4h,        // 4小时流量数据
+        price: content.price,          // 当前价格
+        
+        // 创建内容签名，用于Fund Flow去重
+        contentSignature: content.flow1h && content.flow4h ? 
+          `${content.symbol || 'unknown'}_${content.flow1h}_${content.flow4h}_${content.price || ''}` : 
+          undefined,
+          
+        // 时间戳仅作为辅助字段，不作为主要去重依据
+        timePrefix: content.timestamp ? String(content.timestamp).substring(0, 16) : undefined
       };
 
       const contentStr = JSON.stringify(normalized);
