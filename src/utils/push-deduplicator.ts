@@ -28,8 +28,8 @@ export class PushDeduplicator {
         // 对于资金流：消息内容前缀
         message: content.message?.substring(0, 50),
         symbol: content.symbol,
-        // 时间戳取到秒级别，提高去重精度
-        timePrefix: content.timestamp?.substring(0, 19)
+        // 时间戳取到秒级别，提高去重精度，兼容数字和字符串类型
+        timePrefix: content.timestamp ? String(content.timestamp).substring(0, 19) : undefined
       };
 
       const contentStr = JSON.stringify(normalized);
