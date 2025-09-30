@@ -292,8 +292,17 @@ export class StartHandler {
    * Create inline keyboard for adding to group (now supports multiple languages)
    */
   private async createAddToGroupKeyboard(ctx: ExtendedContext): Promise<InlineKeyboardMarkup> {
-    // botUsername 现在在 config 中已经包含了环境感知的 fallback
+    // 添加环境检查日志
+    const nodeEnv = process.env.NODE_ENV || 'development';
     const botUsername = config.telegram.botUsername;
+    
+    logger.info('Creating add to group keyboard', {
+      nodeEnv,
+      botUsername,
+      configEnv: config.env.nodeEnv,
+      userId: ctx.from?.id,
+      envBotUsername: process.env.TELEGRAM_BOT_USERNAME
+    });
     
     // Get localized button text
     const addToGroupText = await ctx.__!('button.addToGroup');
