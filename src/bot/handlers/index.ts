@@ -83,9 +83,11 @@ async function handleTradingInput(ctx: ExtendedContext, state: TradingState, inp
       const amount = parseFloat(input.trim());
       
       if (isNaN(amount) || amount <= 0) {
+        const invalidAmountMsg = await ctx.__!('trading.invalidAmount');
+        const amountExampleMsg = await ctx.__!('trading.amountExample');
         await ctx.reply(
-          `❌ <b>无效的金额</b>\n\n` +
-          `请输入有效的数字金额，例如：30`,
+          `❌ <b>${invalidAmountMsg}</b>\n\n` +
+          `${amountExampleMsg}`,
           { parse_mode: 'HTML' }
         );
         return;
@@ -125,9 +127,11 @@ async function handleTradingInput(ctx: ExtendedContext, state: TradingState, inp
         });
         
       } catch (error) {
+        const orderPreviewFailedMsg = await ctx.__!('trading.orderPreviewFailed');
+        const retryLaterMsg = await ctx.__!('trading.retryLater');
         await ctx.reply(
-          `❌ <b>生成订单预览失败</b>\n\n` +
-          `请稍后重试或重新开始交易`,
+          `${orderPreviewFailedMsg}\n\n` +
+          `${retryLaterMsg}`,
           { parse_mode: 'HTML' }
         );
         await tradingStateService.clearState(userId);
@@ -142,9 +146,11 @@ async function handleTradingInput(ctx: ExtendedContext, state: TradingState, inp
       input: input.substring(0, 50)
     });
     
+    const inputProcessErrorMsg = await ctx.__!('trading.inputProcessError');
+    const restartProcessMsg = await ctx.__!('trading.restartProcess');
     await ctx.reply(
-      `❌ <b>处理输入时出错</b>\n\n` +
-      `请重新开始交易流程`,
+      `${inputProcessErrorMsg}\n\n` +
+      `${restartProcessMsg}`,
       { parse_mode: 'HTML' }
     );
     await tradingStateService.clearState(userId);
