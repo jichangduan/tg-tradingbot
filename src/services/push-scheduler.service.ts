@@ -46,19 +46,13 @@ export class PushSchedulerService {
     try {
       const environment = process.env.NODE_ENV || 'development';
       
-      // 根据环境变量选择推送间隔
+      // 简化环境配置：测试环境统一每分钟执行
       let cronPattern: string;
-      switch (environment) {
-        case 'production':
-          cronPattern = PUSH_CONSTANTS.CRON.PRODUCTION; // 每20分钟
-          break;
-        case 'testing':
-          cronPattern = PUSH_CONSTANTS.CRON.TESTING; // 每2分钟
-          break;
-        case 'development':
-        default:
-          cronPattern = PUSH_CONSTANTS.CRON.TEST; // 每1分钟
-          break;
+      if (environment === 'production') {
+        cronPattern = PUSH_CONSTANTS.CRON.PRODUCTION; // 每20分钟
+      } else {
+        // 测试环境（test/testing/development）统一每分钟执行
+        cronPattern = PUSH_CONSTANTS.CRON.TEST; // 每1分钟
       }
       
       logger.info('📅 [PUSH_SCHEDULER] Push scheduler configuration', {
@@ -137,30 +131,13 @@ export class PushSchedulerService {
     const startTime = Date.now();
     const executionId = `push_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 
-    // 🛡️ 推送间隔保护：如果距离上次推送不足18分钟，跳过本次推送
-    if (this.lastPushTime && (startTime - this.lastPushTime) < 18 * 60 * 1000) {
-      const lastPushMinutesAgo = ((startTime - this.lastPushTime) / (1000 * 60)).toFixed(1);
-      logger.info('⏭️ [INTERVAL_PROTECTION] Skipping push - too close to last push', {
-        executionId,
-        lastPushMinutesAgo,
-        minIntervalMinutes: 18,
-        reason: 'interval_protection'
-      });
-      return;
-    }
+    // ✅ 间隔保护已移除 - 测试环境每分钟执行推送
 
-    // 🕐 记录实际推送间隔
-    const actualInterval = this.lastPushTime > 0 ? startTime - this.lastPushTime : 0;
-    const actualIntervalMinutes = actualInterval / (1000 * 60);
-    
-    logger.error('⏰ [PUSH_INTERVAL_DEBUG] Push execution timing analysis', {
+    // 🕐 简化推送执行日志
+    logger.info('🚀 [PUSH_EXECUTION] Starting scheduled push', {
       executionId,
       currentTime: new Date(startTime).toISOString(),
-      lastPushTime: this.lastPushTime > 0 ? new Date(this.lastPushTime).toISOString() : 'first_execution',
-      actualIntervalMs: actualInterval,
-      actualIntervalMinutes: actualIntervalMinutes.toFixed(2),
-      expectedInterval: '20_minutes',
-      intervalAccurate: Math.abs(actualIntervalMinutes - 20) < 0.5 ? 'YES' : 'NO'
+      environment: process.env.NODE_ENV || 'development'
     });
     
     this.lastPushTime = startTime;
@@ -282,41 +259,23 @@ export class PushSchedulerService {
                                 userSettingsResult.fund_enabled;
             
             if (hasAnyEnabled) {
-              // 删除详细的调用前日志
-              
               try {
-                // 📊 对比调试: 定时推送 vs 立即推送的API调用模式
-                logger.info(`📊 [SCHEDULED_PUSH_DEBUG] Starting push data request for comparison`, {
-                  userId: parseInt(userId),
-                  apiCallContext: 'scheduled_push_request',
-                  userSettingsExists: !!userSettingsResult
-                });
-                
                 // 获取推送内容数据
                 const pushDataResult = await pushDataService.getPushDataForUser(userId);
                 
-                // 📊 对比结果记录
-                logger.info(`📊 [SCHEDULED_PUSH_DEBUG] Push data result for comparison`, {
-                  userId: parseInt(userId),
-                  pushDataExists: !!pushDataResult,
-                  apiCallContext: 'scheduled_push_request',
-                  hasFlashNews: !!pushDataResult?.flash_news?.length,
-                  hasWhaleActions: !!pushDataResult?.whale_actions?.length,
-                  hasFundFlows: !!pushDataResult?.fund_flows?.length,
-                  flashNewsCount: pushDataResult?.flash_news?.length || 0,
-                  whaleActionsCount: pushDataResult?.whale_actions?.length || 0,
-                  fundFlowsCount: pushDataResult?.fund_flows?.length || 0
-                });
-                
-                // 删除详细的调用完成日志
+                // 简化日志记录
+                if (pushDataResult) {
+                  const dataCount = (pushDataResult.flash_news?.length || 0) + 
+                                   (pushDataResult.whale_actions?.length || 0) + 
+                                   (pushDataResult.fund_flows?.length || 0);
+                  logger.info(`📊 [PUSH_DATA] User ${userId} - ${dataCount} total items available`);
+                }
                 
                 enabledUsers.push({
                   userId: userId,
                   settings: userSettingsResult,
                   pushData: pushDataResult
                 });
-                
-                // 删除用户添加的debug日志
               } catch (pushDataError) {
                 logger.error(`❌ [SCHEDULER] Error calling pushDataService.getPushDataForUser for user ${userId}`, {
                   error: (pushDataError as Error).message,
@@ -361,9 +320,8 @@ export class PushSchedulerService {
    */
   private async getUsersWithPushSettings(): Promise<string[]> {
     try {
-      // 首先尝试从Redis缓存获取
+      // 从Redis缓存获取用户设置
       const pushSettingsPattern = 'push_settings:*';
-      // 删除Redis搜索日志
       
       const cacheKeys = await cacheService.getKeys(pushSettingsPattern);
       
@@ -424,12 +382,9 @@ export class PushSchedulerService {
       return null;
       
     } catch (error) {
-      // 删除获取缓存设置失败的debug日志
-      
-      // 出错时使用内存存储
+      // 出错时使用内存存储fallback
       const memoryData = this.enabledUsersMemoryStore.get(userId);
       if (memoryData) {
-        // 删除错误后使用内存存储的debug日志
         return memoryData.settings;
       }
       
@@ -445,8 +400,6 @@ export class PushSchedulerService {
       settings,
       lastUpdated: Date.now()
     });
-    
-    // 删除用户添加到跟踪的debug日志
   }
 
   /**
@@ -481,7 +434,6 @@ export class PushSchedulerService {
    */
   public removeUserFromPushTracking(userId: string): void {
     this.enabledUsersMemoryStore.delete(userId);
-    // 删除用户移除跟踪的debug日志
   }
 
 
@@ -517,8 +469,6 @@ export class PushSchedulerService {
         return;
       }
 
-      // 删除内容验证通过日志
-
       // 根据用户设置筛选推送内容
       const { flashNews, whaleActions, fundFlows } = pushDataService.filterPushContent(pushData, settings);
       
@@ -531,11 +481,11 @@ export class PushSchedulerService {
         pushDeduplicator.filterDuplicates(userId, fundFlows, 'fund_flows')
       ]);
       
-      logger.info(`🚫 [DEDUP] Deduplication results for user ${userId}`, {
-        flashNews: { original: flashNews.length, filtered: dedupFlashNews.length },
-        whaleActions: { original: whaleActions.length, filtered: dedupWhaleActions.length },
-        fundFlows: { original: fundFlows.length, filtered: dedupFundFlows.length }
-      });
+      // 简化去重日志
+      const totalAfterDedup = dedupFlashNews.length + dedupWhaleActions.length + dedupFundFlows.length;
+      if (totalAfterDedup > 0) {
+        logger.info(`📤 [PUSH_READY] User ${userId} - ${totalAfterDedup} items ready for push`);
+      }
 
       // 使用消息格式化服务处理消息（使用去重后的数据）
       const messages = pushMessageFormatterService.formatBatchMessages(dedupFlashNews, dedupWhaleActions, dedupFundFlows);
@@ -547,12 +497,9 @@ export class PushSchedulerService {
         return;
       }
 
-      // 删除消息发送开始的详细日志
-
       // 发送所有消息
       for (let i = 0; i < messages.length; i++) {
         const message = messages[i];
-        // 删除每条消息发送的详细日志
         
         const sendOptions: any = {
           parse_mode: 'HTML',
@@ -564,8 +511,7 @@ export class PushSchedulerService {
         }
 
         try {
-          const telegramResult = await bot.telegram.sendMessage(parseInt(userId), message.content, sendOptions);
-          // 删除每条消息发送成功的详细日志
+          await bot.telegram.sendMessage(parseInt(userId), message.content, sendOptions);
         } catch (sendError) {
           logger.error(`❌ [MESSAGE_SEND] Failed to send message ${i + 1} to user ${userId}`, {
             error: (sendError as Error).message,
@@ -584,8 +530,6 @@ export class PushSchedulerService {
         pushDeduplicator.markBatchAsPushed(userId, dedupWhaleActions, 'whale_actions'),
         pushDeduplicator.markBatchAsPushed(userId, dedupFundFlows, 'fund_flows')
       ]);
-      
-      // 删除去重标记的详细日志
 
       const duration = Date.now() - startTime;
       const totalContentLength = messages.reduce((total, msg) => total + (msg.content?.length || 0), 0);
@@ -632,19 +576,13 @@ export class PushSchedulerService {
   } {
     const environment = process.env.NODE_ENV || 'development';
     
-    // 根据环境变量选择推送间隔
+    // 简化环境配置：测试环境统一每分钟执行
     let cronPattern: string;
-    switch (environment) {
-      case 'production':
-        cronPattern = PUSH_CONSTANTS.CRON.PRODUCTION; // 每20分钟
-        break;
-      case 'testing':
-        cronPattern = PUSH_CONSTANTS.CRON.TESTING; // 每2分钟
-        break;
-      case 'development':
-      default:
-        cronPattern = PUSH_CONSTANTS.CRON.TEST; // 每1分钟
-        break;
+    if (environment === 'production') {
+      cronPattern = PUSH_CONSTANTS.CRON.PRODUCTION; // 每20分钟
+    } else {
+      // 测试环境（test/testing/development）统一每分钟执行
+      cronPattern = PUSH_CONSTANTS.CRON.TEST; // 每1分钟
     }
     
     return {
@@ -662,10 +600,8 @@ export class PushSchedulerService {
     switch (cronPattern) {
       case PUSH_CONSTANTS.CRON.PRODUCTION:
         return 'Every 20 minutes';
-      case PUSH_CONSTANTS.CRON.TESTING:
-        return 'Every 2 minutes';
       case PUSH_CONSTANTS.CRON.TEST:
-        return 'Every 1 minute';
+        return 'Every 1 minute (Test Environment)';
       default:
         return `Custom: ${cronPattern}`;
     }
