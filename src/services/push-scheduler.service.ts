@@ -84,8 +84,15 @@ export class PushSchedulerService {
       // 添加测试用户以便测试推送功能
       this.addTestUserToPushTracking();
 
-      // 5秒后执行首次推送任务 - 已禁用，避免重启时额外推送导致频繁推送问题
-      // setTimeout(() => this.executeScheduledPush().catch(() => {}), 5000);
+      // 启动后立即执行首次推送 - 解决用户开启推送后等待时间过长的问题
+      setTimeout(() => {
+        logger.info('🚀 [IMMEDIATE_PUSH] Executing immediate push after startup');
+        this.executeScheduledPush().catch((error) => {
+          logger.error('❌ [IMMEDIATE_PUSH] Initial push failed', {
+            error: (error as Error).message
+          });
+        });
+      }, 1000); // 1秒后立即推送
 
     } catch (error) {
       this.isRunning = false;
@@ -119,6 +126,29 @@ export class PushSchedulerService {
    */
   public async executeManualPush(): Promise<void> {
     await this.executeScheduledPush();
+  }
+
+  /**
+   * 用户设置推送后立即触发推送检查
+   * 用于改善用户体验，设置推送后立即看到效果
+   */
+  public async triggerImmediatePush(userId?: string): Promise<void> {
+    try {
+      logger.info('🎯 [USER_TRIGGER] User triggered immediate push', {
+        userId: userId ? parseInt(userId) : 'all_users',
+        timestamp: new Date().toISOString()
+      });
+      
+      await this.executeScheduledPush();
+      
+      logger.info('✅ [USER_TRIGGER] Immediate push completed successfully');
+    } catch (error) {
+      logger.error('❌ [USER_TRIGGER] Immediate push failed', {
+        userId: userId ? parseInt(userId) : 'all_users',
+        error: (error as Error).message
+      });
+      throw error;
+    }
   }
 
   // 记录上次推送时间，用于计算实际间隔

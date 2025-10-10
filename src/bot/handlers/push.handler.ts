@@ -1251,9 +1251,21 @@ ${emoji} <b>${typeName} Push Enabled!</b>
         // Update user settings
         await this.updateUserPushSetting(userIdString, type, enabled);
 
-        // 禁用立即推送测试 - 等待20分钟定时器推送
+        // 用户启用推送后立即触发一次推送 - 改善用户体验
         if (enabled) {
-          logger.info(`✅ [PUSH_ENABLED] ${type} push enabled, will receive updates via 20-minute timer [${requestId}]`);
+          logger.info(`✅ [PUSH_ENABLED] ${type} push enabled, triggering immediate push [${requestId}]`);
+          
+          // 异步触发立即推送，不阻塞用户界面响应
+          setImmediate(async () => {
+            try {
+              await pushScheduler.triggerImmediatePush(userIdString);
+              logger.info(`🚀 [IMMEDIATE_PUSH] Successfully triggered immediate push for user ${userIdString}`);
+            } catch (error) {
+              logger.error(`❌ [IMMEDIATE_PUSH] Failed to trigger immediate push for user ${userIdString}`, {
+                error: (error as Error).message
+              });
+            }
+          });
         }
 
         // Get updated settings
