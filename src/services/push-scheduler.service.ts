@@ -135,7 +135,8 @@ export class PushSchedulerService {
   public async triggerImmediatePush(userId?: string): Promise<void> {
     try {
       logger.info('🎯 [USER_TRIGGER] User triggered immediate push', {
-        userId: userId ? parseInt(userId) : 'all_users',
+        userId: userId ? parseInt(userId) || undefined : undefined,
+        userIdString: userId || 'all_users',
         timestamp: new Date().toISOString()
       });
       
@@ -144,7 +145,8 @@ export class PushSchedulerService {
       logger.info('✅ [USER_TRIGGER] Immediate push completed successfully');
     } catch (error) {
       logger.error('❌ [USER_TRIGGER] Immediate push failed', {
-        userId: userId ? parseInt(userId) : 'all_users',
+        userId: userId ? parseInt(userId) || undefined : undefined,
+        userIdString: userId || 'all_users',
         error: (error as Error).message
       });
       throw error;
