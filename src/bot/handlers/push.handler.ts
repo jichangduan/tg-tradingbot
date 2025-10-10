@@ -1251,33 +1251,72 @@ ${emoji} <b>${typeName} Push Enabled!</b>
         // Update user settings
         await this.updateUserPushSetting(userIdString, type, enabled);
 
+        // Get updated settings first
+        const { settings: updatedSettings, pushData } = await this.getUserPushSettings(userIdString);
+
         // 用户启用推送后立即触发一次推送 - 改善用户体验
         if (enabled) {
           logger.info(`✅ [PUSH_ENABLED] ${type} push enabled, triggering immediate push [${requestId}]`);
           
+          // 🆕 立即发送测试消息，验证Telegram发送功能
+          try {
+            logger.info(`📨 [TEST_MESSAGE] Sending immediate test message to user ${userIdString} for ${type} push`);
+            const bot = telegramBot.getBot();
+            if (bot) {
+              const typeName = this.getTypeName(type);
+              await bot.telegram.sendMessage(parseInt(userIdString), 
+                `✅ ${typeName}推送已开启！正在获取最新数据...`, {
+                  parse_mode: 'HTML'
+                });
+              logger.info(`✅ [TEST_MESSAGE] Test message sent successfully to user ${userIdString}`);
+            } else {
+              logger.error(`❌ [TEST_MESSAGE] Bot instance not available for user ${userIdString}`);
+            }
+          } catch (testError) {
+            logger.error(`❌ [TEST_MESSAGE] Failed to send test message to user ${userIdString}`, {
+              error: (testError as Error).message,
+              pushType: type
+            });
+          }
+          
           // 异步触发立即推送，不阻塞用户界面响应
           setImmediate(async () => {
             try {
-              // 🆕 先强制刷新API数据，确保推送最新内容
-              logger.info(`🔄 [FRESH_API] Pre-fetching fresh API data for user ${userIdString} - ${type} push`);
+              logger.info(`🔄 [STEP1] Starting immediate push process for user ${userIdString} - ${type} push`);
+              
+              // 🆕 强制添加用户到推送跟踪，确保用户被发现
+              logger.info(`🔄 [STEP2] Adding user ${userIdString} to push tracking`);
+              const currentSettings = {
+                flash_enabled: type === 'flash' ? true : (updatedSettings?.flash_enabled || false),
+                whale_enabled: type === 'whale' ? true : (updatedSettings?.whale_enabled || false),
+                fund_enabled: type === 'fund' ? true : (updatedSettings?.fund_enabled || false)
+              };
+              pushScheduler.addUserToPushTracking(userIdString, currentSettings);
+              
+              // 等待1秒确保设置生效
+              logger.info(`🔄 [STEP3] Waiting for settings to sync`);
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              
+              // 先强制刷新API数据，确保推送最新内容
+              logger.info(`🔄 [STEP4] Pre-fetching fresh API data for user ${userIdString} - ${type} push`);
               await pushDataService.getPushDataForUser(userIdString);
-              logger.info(`✅ [FRESH_API] Successfully refreshed API data for user ${userIdString}`);
+              logger.info(`✅ [STEP4] Successfully refreshed API data for user ${userIdString}`);
               
               // 然后触发立即推送（使用刚获取的最新数据）
+              logger.info(`🔄 [STEP5] Triggering immediate push for user ${userIdString}`);
               await pushScheduler.triggerImmediatePush(userIdString);
-              logger.info(`🚀 [IMMEDIATE_PUSH] Successfully triggered immediate push for user ${userIdString} with fresh data`);
+              logger.info(`🚀 [IMMEDIATE_PUSH] Successfully completed immediate push for user ${userIdString} with fresh data`);
+              
             } catch (error) {
               logger.error(`❌ [IMMEDIATE_PUSH] Failed to trigger immediate push for user ${userIdString}`, {
                 error: (error as Error).message,
                 pushType: type,
-                step: (error as Error).message.includes('getPushDataForUser') ? 'api_refresh' : 'immediate_push'
+                step: (error as Error).message.includes('getPushDataForUser') ? 'api_refresh' : 'immediate_push',
+                stack: (error as Error).stack
               });
             }
           });
         }
-
-        // Get updated settings
-        const { settings: updatedSettings, pushData } = await this.getUserPushSettings(userIdString);
 
         // Update message
         const message = await this.formatPushSettingsMessage(ctx, updatedSettings, pushData);
