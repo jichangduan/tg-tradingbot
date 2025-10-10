@@ -105,6 +105,21 @@ export class PushDataService {
   public hasNewPushContent(pushData: PushData | undefined): boolean {
     PushLogger.logContentCheckStart(pushData);
     
+    const environment = process.env.NODE_ENV || 'development';
+    
+    // 测试环境：始终返回true，只要有pushData就认为有新内容
+    if (environment !== 'production') {
+      if (!pushData) {
+        PushLogger.logContentCheckFailed();
+        return false;
+      }
+      
+      logger.info(`✅ [TEST_PUSH] Test environment: always returning true for hasNewPushContent`);
+      PushLogger.logContentCheckResult(true, pushData);
+      return true;
+    }
+    
+    // 生产环境：使用原有逻辑
     if (!pushData) {
       PushLogger.logContentCheckFailed();
       return false;

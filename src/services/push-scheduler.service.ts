@@ -461,12 +461,24 @@ export class PushSchedulerService {
       // 检查是否有新的推送内容
       PushLogger.logPushContentCheck(userId, !!pushData, pushData ? Object.keys(pushData) : []);
       
-      if (!pushData || !pushDataService.hasNewPushContent(pushData)) {
-        logger.warn(`⚠️ [MESSAGE_SEND] No new push content for user ${userId} - stopping send process`, {
-          hasPushData: !!pushData,
-          contentCheckPassed: pushData ? pushDataService.hasNewPushContent(pushData) : false
-        });
-        return;
+      const environment = process.env.NODE_ENV || 'development';
+      
+      // 测试环境：跳过内容新鲜度检查，只要有API数据就推送
+      if (environment === 'production') {
+        if (!pushData || !pushDataService.hasNewPushContent(pushData)) {
+          logger.warn(`⚠️ [MESSAGE_SEND] No new push content for user ${userId} - stopping send process`, {
+            hasPushData: !!pushData,
+            contentCheckPassed: pushData ? pushDataService.hasNewPushContent(pushData) : false
+          });
+          return;
+        }
+      } else {
+        // 测试环境：只要有pushData就继续，不检查新鲜度
+        if (!pushData) {
+          logger.warn(`⚠️ [TEST_PUSH] No pushData for user ${userId} - stopping send process`);
+          return;
+        }
+        logger.info(`✅ [TEST_PUSH] Skipping content freshness check for test environment - user ${userId}`);
       }
 
       // 根据用户设置筛选推送内容
@@ -792,9 +804,21 @@ export class PushSchedulerService {
       }
       
       // 检查是否有新的推送内容
-      if (!pushData || !pushDataService.hasNewPushContent(pushData)) {
-        logger.debug(`[${executionId}] No new push content for group ${groupId}`);
-        return;
+      const environment = process.env.NODE_ENV || 'development';
+      
+      // 测试环境：跳过内容新鲜度检查，只要有API数据就推送
+      if (environment === 'production') {
+        if (!pushData || !pushDataService.hasNewPushContent(pushData)) {
+          logger.debug(`[${executionId}] No new push content for group ${groupId}`);
+          return;
+        }
+      } else {
+        // 测试环境：只要有pushData就继续，不检查新鲜度
+        if (!pushData) {
+          logger.debug(`[${executionId}] No pushData for group ${groupId} - stopping send process`);
+          return;
+        }
+        logger.debug(`[${executionId}] Test environment: skipping content freshness check for group ${groupId}`);
       }
       
       // 根据群主设置筛选推送内容

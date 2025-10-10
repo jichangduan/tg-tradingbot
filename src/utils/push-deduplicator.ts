@@ -7,7 +7,16 @@ import { logger } from './logger';
  */
 export class PushDeduplicator {
   private readonly cachePrefix = 'push_dedup';
-  private readonly defaultTtl = 40 * 60; // 40分钟TTL，确保跨推送周期有效去重，防止重复推送
+  
+  // 根据环境设置不同的TTL时间
+  private get defaultTtl(): number {
+    const environment = process.env.NODE_ENV || 'development';
+    if (environment === 'production') {
+      return 40 * 60; // 生产环境：40分钟TTL，确保跨推送周期有效去重
+    } else {
+      return 30; // 测试环境：30秒TTL，允许快速重新推送
+    }
+  }
 
   /**
    * 生成内容的唯一标识
@@ -16,7 +25,15 @@ export class PushDeduplicator {
    */
   private generateContentHash(content: any): string {
     try {
-      // 创建内容的简化版本用于去重
+      const environment = process.env.NODE_ENV || 'development';
+      
+      // 测试环境：使用时间戳确保每次都生成不同的hash，允许重复推送
+      if (environment !== 'production') {
+        const testHash = `test_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+        return testHash;
+      }
+      
+      // 生产环境：使用原有的内容去重逻辑
       const normalized = {
         type: content.type || 'unknown',
         // 对于快讯：标题+时间戳前缀
