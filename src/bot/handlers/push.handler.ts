@@ -1258,11 +1258,19 @@ ${emoji} <b>${typeName} Push Enabled!</b>
           // 异步触发立即推送，不阻塞用户界面响应
           setImmediate(async () => {
             try {
+              // 🆕 先强制刷新API数据，确保推送最新内容
+              logger.info(`🔄 [FRESH_API] Pre-fetching fresh API data for user ${userIdString} - ${type} push`);
+              await pushDataService.getPushDataForUser(userIdString);
+              logger.info(`✅ [FRESH_API] Successfully refreshed API data for user ${userIdString}`);
+              
+              // 然后触发立即推送（使用刚获取的最新数据）
               await pushScheduler.triggerImmediatePush(userIdString);
-              logger.info(`🚀 [IMMEDIATE_PUSH] Successfully triggered immediate push for user ${userIdString}`);
+              logger.info(`🚀 [IMMEDIATE_PUSH] Successfully triggered immediate push for user ${userIdString} with fresh data`);
             } catch (error) {
               logger.error(`❌ [IMMEDIATE_PUSH] Failed to trigger immediate push for user ${userIdString}`, {
-                error: (error as Error).message
+                error: (error as Error).message,
+                pushType: type,
+                step: (error as Error).message.includes('getPushDataForUser') ? 'api_refresh' : 'immediate_push'
               });
             }
           });
