@@ -2,7 +2,6 @@ import * as cron from 'node-cron';
 import { PushSettings, PushData, pushService } from './push.service';
 import { pushMessageFormatterService } from './push-message-formatter.service';
 import { pushDataService } from './push-data.service';
-import { cacheService } from './cache.service';
 import { logger } from '../utils/logger';
 import { PushLogger } from '../utils/push-logger';
 import { pushDeduplicator } from '../utils/push-deduplicator';
@@ -17,8 +16,6 @@ import { PUSH_CONSTANTS } from '../types/push.types';
 export class PushSchedulerService {
   private isRunning = false;
   private scheduleTask?: cron.ScheduledTask;
-  private readonly cachePrefix = 'push_scheduler';
-  private readonly lastPushCacheKey = 'last_push_time';
   
   // 内存存储fallback - 跟踪启用推送的用户
   private enabledUsersMemoryStore = new Map<string, {
@@ -195,17 +192,20 @@ export class PushSchedulerService {
           await this.sendPushToUser(user.userId, user.settings, user.pushData);
           successCount++;
           
-          // 2. 同时处理该用户的群组推送（避免重复API调用和重复推送）
+          // 2. 同时处理该用户的群组推送（使用已获取的群组数据，避免重复API调用）
           try {
-            const userBoundGroups = await this.getUserBoundGroups(user.userId);
-            if (userBoundGroups.length > 0) {
-              logger.info(`📤 [UNIFIED_PUSH] Processing ${userBoundGroups.length} groups for user ${user.userId}`, {
+            const userBoundGroups = user.managedGroups || [];
+            const groupIds = userBoundGroups.map(group => group.group_id).filter(id => id);
+            
+            if (groupIds.length > 0) {
+              logger.info(`📤 [UNIFIED_PUSH] Processing ${groupIds.length} groups for user ${user.userId}`, {
                 executionId,
                 userId: parseInt(user.userId),
-                groupCount: userBoundGroups.length
+                groupCount: groupIds.length,
+                source: 'cached_api_response'
               });
               
-              for (const groupId of userBoundGroups) {
+              for (const groupId of groupIds) {
                 try {
                   await this.sendPushToGroup(groupId, user.settings, user.pushData, executionId);
                   groupSuccessCount++;
@@ -260,87 +260,87 @@ export class PushSchedulerService {
 
   /**
    * 获取启用推送的用户列表
-   * 使用本地缓存跟踪启用推送的用户
+   * 简化版本：直接使用内存存储 + API调用，删除Redis缓存依赖
    */
   private async getEnabledPushUsers(): Promise<Array<{
     userId: string;
     settings: PushSettings;
     pushData?: PushData;
+    managedGroups?: Array<{group_id: string; group_name: string; bound_at: string}>;
   }>> {
     try {
-      // 删除获取用户的开始日志
-      
       const enabledUsers: Array<{
         userId: string;
         settings: PushSettings;
         pushData?: PushData;
+        managedGroups?: Array<{group_id: string; group_name: string; bound_at: string}>;
       }> = [];
       
-      // 从缓存中获取所有有推送设置的用户列表
-      const userCacheKeys = await this.getUsersWithPushSettings();
+      // 🎯 简化逻辑：直接从内存存储获取用户列表
+      const enabledUserIds = Array.from(this.enabledUsersMemoryStore.keys());
       
-      for (const userId of userCacheKeys) {
+      logger.info(`📋 [PUSH_SCHEDULER] Processing ${enabledUserIds.length} users from memory store`, {
+        userIds: enabledUserIds
+      });
+      
+      for (const userId of enabledUserIds) {
         try {
-          // 获取用户的推送设置
-          const userSettingsResult = await this.getCachedUserPushSettings(userId);
+          // 🔄 直接调用API获取最新的用户设置和推送数据
+          const accessToken = await getUserAccessToken(userId, {
+            username: undefined,
+            first_name: undefined,
+            last_name: undefined
+          });
           
-          if (userSettingsResult) {
-            // 检查是否至少有一项推送功能启用
-            const hasAnyEnabled = userSettingsResult.flash_enabled || 
-                                userSettingsResult.whale_enabled || 
-                                userSettingsResult.fund_enabled;
-            
-            if (hasAnyEnabled) {
-              try {
-                // 获取推送内容数据
-                const pushDataResult = await pushDataService.getPushDataForUser(userId);
-                
-                // 简化日志记录
-                if (pushDataResult) {
-                  const dataCount = (pushDataResult.flash_news?.length || 0) + 
-                                   (pushDataResult.whale_actions?.length || 0) + 
-                                   (pushDataResult.fund_flows?.length || 0);
-                  logger.info(`📊 [PUSH_DATA] User ${userId} - ${dataCount} total items available`);
-                }
-                
-                enabledUsers.push({
-                  userId: userId,
-                  settings: userSettingsResult,
-                  pushData: pushDataResult
-                });
-              } catch (pushDataError) {
-                logger.error(`❌ [SCHEDULER] Error calling pushDataService.getPushDataForUser for user ${userId}`, {
-                  error: (pushDataError as Error).message,
-                  stack: (pushDataError as Error).stack
-                });
-                
-                // 仍然添加用户，但没有推送数据
-                enabledUsers.push({
-                  userId: userId,
-                  settings: userSettingsResult,
-                  pushData: undefined
-                });
-              }
+          const apiResponse = await pushService.getUserPushSettings(userId, accessToken);
+          const userSettings = apiResponse.data.user_settings;
+          const pushData = apiResponse.data.push_data;
+          
+          // 检查是否至少有一项推送功能启用
+          const hasAnyEnabled = userSettings.flash_enabled || 
+                              userSettings.whale_enabled || 
+                              userSettings.fund_enabled;
+          
+          if (hasAnyEnabled) {
+            // 统计推送内容数量
+            if (pushData) {
+              const dataCount = (pushData.flash_news?.length || 0) + 
+                               (pushData.whale_actions?.length || 0) + 
+                               (pushData.fund_flows?.length || 0);
+              logger.info(`📊 [PUSH_DATA] User ${userId} - ${dataCount} total items available (from API)`);
             }
+            
+            enabledUsers.push({
+              userId: userId,
+              settings: userSettings,
+              pushData: pushData,
+              managedGroups: userSettings.managed_groups || []
+            });
+          } else {
+            // 用户关闭了所有推送，从内存中移除
+            logger.info(`⚠️ [PUSH_SCHEDULER] User ${userId} disabled all push types, removing from memory`);
+            this.enabledUsersMemoryStore.delete(userId);
           }
+          
         } catch (userError) {
-          logger.warn('Failed to process user for push', {
-            telegramId: userId,
+          logger.warn(`⚠️ [PUSH_SCHEDULER] Failed to get settings for user ${userId}`, {
             error: (userError as Error).message
           });
+          // 继续处理其他用户，不移除该用户（可能是临时网络问题）
           continue;
         }
       }
 
-      logger.info('Enabled push users fetched successfully', {
-        userCount: enabledUsers.length,
+      logger.info(`✅ [PUSH_SCHEDULER] Enabled push users processed successfully`, {
+        totalUsers: enabledUserIds.length,
+        enabledUsers: enabledUsers.length,
         userIds: enabledUsers.map(u => u.userId)
       });
 
       return enabledUsers;
 
     } catch (error) {
-      logger.error('Failed to get enabled push users', {
+      logger.error('❌ [PUSH_SCHEDULER] Failed to get enabled push users', {
         error: (error as Error).message
       });
       return [];
@@ -348,81 +348,14 @@ export class PushSchedulerService {
   }
 
   /**
-   * 获取有推送设置的用户ID列表
+   * @deprecated 已删除复杂的Redis缓存逻辑
+   * 现在直接使用内存存储和API调用，见 getEnabledPushUsers()
    */
-  private async getUsersWithPushSettings(): Promise<string[]> {
-    try {
-      // 从Redis缓存获取用户设置
-      const pushSettingsPattern = 'push_settings:*';
-      
-      const cacheKeys = await cacheService.getKeys(pushSettingsPattern);
-      
-      if (cacheKeys.length > 0) {
-        const userIds = cacheKeys
-          .map(key => key.replace('push_settings:', ''))
-          .filter(id => id && /^\d+$/.test(id));
-        
-        return userIds;
-      }
-      
-      // 如果Redis没有数据，使用内存存储的fallback
-      const memoryUserIds = Array.from(this.enabledUsersMemoryStore.keys());
-      
-      if (memoryUserIds.length > 0) {
-        return memoryUserIds;
-      }
-      
-      return [];
-      
-    } catch (error) {
-      logger.warn('Failed to get users with push settings from cache', {
-        error: (error as Error).message
-      });
-      
-      return Array.from(this.enabledUsersMemoryStore.keys());
-    }
-  }
 
   /**
-   * 从缓存获取用户的推送设置
+   * @deprecated 已删除复杂的Redis缓存逻辑
+   * 现在直接调用API获取最新设置，见 getEnabledPushUsers()
    */
-  private async getCachedUserPushSettings(userId: string): Promise<PushSettings | null> {
-    try {
-      // 首先尝试从Redis缓存获取
-      const cacheKey = `push_settings:${userId}`;
-      const cachedResult = await cacheService.get<{
-        data: { user_settings: PushSettings };
-      }>(cacheKey);
-      
-      if (cachedResult.success && cachedResult.data?.data?.user_settings) {
-        // 同时更新内存存储
-        this.enabledUsersMemoryStore.set(userId, {
-          settings: cachedResult.data.data.user_settings,
-          lastUpdated: Date.now()
-        });
-        
-        return cachedResult.data.data.user_settings;
-      }
-      
-      // 如果Redis没有，尝试从内存存储获取
-      const memoryData = this.enabledUsersMemoryStore.get(userId);
-      if (memoryData) {
-        // 删除内存存储fallback日志
-        return memoryData.settings;
-      }
-      
-      return null;
-      
-    } catch (error) {
-      // 出错时使用内存存储fallback
-      const memoryData = this.enabledUsersMemoryStore.get(userId);
-      if (memoryData) {
-        return memoryData.settings;
-      }
-      
-      return null;
-    }
-  }
 
   /**
    * 添加用户到推送跟踪（供外部调用）
@@ -442,7 +375,15 @@ export class PushSchedulerService {
     // 这样系统启动后就能立即开始推送，无需等待用户手动设置
     const knownUsers = [
       {
-        userId: '1238737093', // 从日志中看到的活跃用户
+        userId: '111919', // 从用户提供的JWT Token中提取的用户ID
+        settings: {
+          flash_enabled: true,
+          whale_enabled: true,
+          fund_enabled: false // 根据API响应，用户关闭了fund推送
+        }
+      },
+      {
+        userId: '1238737093', // 备用测试用户
         settings: {
           flash_enabled: true,
           whale_enabled: true,
@@ -589,20 +530,14 @@ export class PushSchedulerService {
 
   /**
    * 更新最后推送时间
+   * 简化版本：仅在内存中记录，不再依赖Redis缓存
    */
   private async updateLastPushTime(): Promise<void> {
     try {
-      const cacheKey = `${this.cachePrefix}:${this.lastPushCacheKey}`;
-      const result = await cacheService.set(cacheKey, new Date().toISOString(), 24 * 60 * 60);
-      
-      if (!result.success) {
-        const errorMessage = result.error || 'Unknown cache error';
-        // Redis配置问题不影响推送核心功能
-        if (errorMessage.includes('Redis config issue')) {
-        } else {
-          logger.warn('Failed to cache push time - push tracking may be affected', { error: errorMessage });
-        }
-      }
+      this.lastPushTime = Date.now();
+      logger.debug('📝 [PUSH_SCHEDULER] Updated last push time in memory', {
+        lastPushTime: new Date(this.lastPushTime).toISOString()
+      });
     } catch (error) {
       logger.warn('Failed to update last push time', { error: (error as Error).message });
     }
@@ -654,36 +589,13 @@ export class PushSchedulerService {
   // ==================== 群组推送功能 ====================
 
   /**
-   * 获取用户绑定的群组 (与测试推送使用相同逻辑)
+   * @deprecated 已优化：不再需要重复API调用
+   * 群组信息现在在 getEnabledPushUsers() 中一次性获取，避免重复调用
+   * 使用 user.managedGroups 替代此方法
    */
   private async getUserBoundGroups(userId: string): Promise<string[]> {
-    try {
-      
-      const accessToken = await getUserAccessToken(userId, {
-        username: undefined,
-        first_name: undefined,
-        last_name: undefined
-      });
-
-      const response = await pushService.getUserPushSettings(userId, accessToken);
-      const managedGroups = response.data.user_settings.managed_groups || [];
-      const groupIds = managedGroups.map(group => group.group_id).filter(id => id);
-      
-      logger.debug(`✅ [GROUP_UNIFY] Found ${groupIds.length} bound groups for user ${userId}`, {
-        userId: parseInt(userId),
-        groupCount: groupIds.length,
-        groupIds: groupIds,
-        dataSource: 'api_managed_groups'
-      });
-      
-      return groupIds;
-    } catch (error) {
-      logger.warn(`❌ [GROUP_UNIFY] Failed to get bound groups for user ${userId}`, {
-        userId: parseInt(userId),
-        error: error instanceof Error ? error.message : String(error)
-      });
-      return [];
-    }
+    logger.warn('🚨 [DEPRECATED] getUserBoundGroups() should not be called anymore. Groups are fetched in getEnabledPushUsers()');
+    return [];
   }
 
   /**
@@ -710,20 +622,21 @@ export class PushSchedulerService {
       
       for (const user of enabledUsers) {
         try {
-          // 获取用户绑定的群组 (使用与测试推送相同的逻辑)
-          const userBoundGroups = await this.getUserBoundGroups(user.userId);
+          // 使用已获取的群组数据，避免重复API调用
+          const userBoundGroups = user.managedGroups || [];
+          const groupIds = userBoundGroups.map(group => group.group_id).filter(id => id);
           
-          if (userBoundGroups.length === 0) {
+          if (groupIds.length === 0) {
             continue;
           }
           
-          logger.info(`🎯 [${executionId}] User ${user.userId} has ${userBoundGroups.length} bound groups`);
+          logger.info(`🎯 [${executionId}] User ${user.userId} has ${groupIds.length} bound groups (from cached data)`);
           
-          // 获取用户的推送数据
-          const pushData = await pushDataService.getPushDataForUser(user.userId);
+          // 使用已获取的推送数据，避免重复API调用
+          const pushData = user.pushData;
           
           // 遍历用户绑定的每个群组
-          for (const groupId of userBoundGroups) {
+          for (const groupId of groupIds) {
             // 避免重复推送 (如果多个用户绑定了同一个群组)
             if (processedGroups.has(groupId)) {
               continue;
