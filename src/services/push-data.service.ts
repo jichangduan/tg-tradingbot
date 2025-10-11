@@ -38,6 +38,10 @@ export class PushDataService {
       }
 
       // 获取用户推送设置，其中包含推送数据
+      // 🔧 立即推送时清除缓存，避免POST响应（无push_data）覆盖GET响应的问题
+      await pushService.clearUserCache(userId);
+      logger.info(`🧹 [CACHE_CLEAR] Cleared cache for user ${userId} to ensure fresh push data`);
+      
       PushLogger.logApiCallStart(userId);
       const response = await pushService.getUserPushSettings(userId, accessToken);
       

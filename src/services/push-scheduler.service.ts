@@ -225,11 +225,20 @@ export class PushSchedulerService {
           }
           
         } catch (error) {
-          failureCount++;
-          logger.error(`❌ [SCHEDULER] Failed to send push to user ${user.userId}`, {
-            error: (error as Error).message,
-            stack: (error as Error).stack
-          });
+          // 检查是否是无效用户错误
+          if ((error as any).isInvalidChat) {
+            logger.info(`🗑️ [AUTO_CLEANUP] Skipped invalid user ${user.userId}, already removed from tracking`, {
+              error: (error as Error).message,
+              action: 'user_cleaned_up'
+            });
+            // 不计入失败统计，因为这是用户问题不是系统问题
+          } else {
+            failureCount++;
+            logger.error(`❌ [SCHEDULER] Failed to send push to user ${user.userId}`, {
+              error: (error as Error).message,
+              stack: (error as Error).stack
+            });
+          }
         }
       }
 
@@ -498,8 +507,28 @@ export class PushSchedulerService {
         try {
           await bot.telegram.sendMessage(parseInt(userId), message.content, sendOptions);
         } catch (sendError) {
+          const errorMessage = (sendError as Error).message;
+          
+          // 检查是否是"chat not found"错误
+          if (errorMessage.includes('chat not found') || errorMessage.includes('user not found')) {
+            logger.warn(`🚫 [INVALID_USER] User ${userId} chat not found, removing from push tracking`, {
+              error: errorMessage,
+              userId: parseInt(userId),
+              action: 'auto_cleanup'
+            });
+            
+            // 自动从内存存储中移除这个用户
+            this.removeUserFromPushTracking(userId);
+            
+            // 抛出特殊错误类型，让上层调用者知道这是用户问题
+            const chatError = new Error(`INVALID_CHAT: ${errorMessage}`);
+            (chatError as any).isInvalidChat = true;
+            throw chatError;
+          }
+          
+          // 其他错误正常处理
           logger.error(`❌ [MESSAGE_SEND] Failed to send message ${i + 1} to user ${userId}`, {
-            error: (sendError as Error).message,
+            error: errorMessage,
             messageContent: message.content?.substring(0, 200)
           });
           throw sendError;
